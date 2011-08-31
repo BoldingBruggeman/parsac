@@ -51,7 +51,7 @@ class Job:
         self.interactive = interactive
 
     @staticmethod
-    def fromConfigurationFile(path,jobid,scenariodir):
+    def fromConfigurationFile(path,jobid,scenariodir,allowedtransports=None):
         import xml.etree.ElementTree
         tree = xml.etree.ElementTree.parse(path)
         
@@ -96,6 +96,7 @@ class Job:
         for itransport,element in enumerate(tree.findall('transports/transport')):
             att = attributes(element,'transport %i' % (itransport+1))
             type = att.get('type',unicode)
+            if allowedtransports is not None and type not in allowedtransports: continue
             if type=='mysql':
                 curtransport = transport.MySQL(server  =att.get('server',  unicode),
                                                user    =att.get('user',    unicode),
