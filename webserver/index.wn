@@ -1,0 +1,2 @@
+Attributes=serveall
+Default-CGI-Handler=/usr/local/bin/php.cgi
