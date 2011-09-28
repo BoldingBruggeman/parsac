@@ -103,8 +103,8 @@ class Job:
                                                password=att.get('password',unicode),
                                                database=att.get('database',unicode))
             elif type=='http':
-                curtransport = transport.MySQL(server  =att.get('server',  unicode),
-                                               path    =att.get('path',    unicode))
+                curtransport = transport.HTTP(server  =att.get('server',  unicode),
+                                              path    =att.get('path',    unicode))
             else:
                 raise Exception('Unknown transport type "%s".' % type)
             att.testEmpty()
