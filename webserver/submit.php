@@ -1,9 +1,6 @@
 <?php 
 	
-	$host     = '130.37.88.108';
-	$user     = 'run';
-	$password = 'g0tm';
-	$database = 'optimize';
+  include 'settings.php';
 	
 	// If PHP's magic_quotes_gpc option is on, all special characters (e.g. quotes) in
 	// GET/POST/COOKIE strings are automatically escaped. Here we undo this, because we want the

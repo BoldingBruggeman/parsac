@@ -1,10 +1,7 @@
 <?php 
 	
-	$host     = '130.37.88.108';
-	$user     = 'run';
-	$password = 'g0tm';
-	$database = 'optimize';
-
+  include 'settings.php';
+  
 	// If PHP's magic_quotes_gpc option is on, all special characters (e.g. quotes) in
 	// GET/POST/COOKIE strings are automatically escaped. Here we undo this, because we want the
 	// true input. I can do my own escaping if needed, thank you very much!
@@ -63,7 +60,7 @@
 	//exit();
 	
 	function err($msg) {
-		header("HTTP/1.1 500 Internal Server Error");
+		//header("HTTP/1.1 500 Internal Server Error");
 		echo $msg;
 		exit();
 	}
