@@ -146,13 +146,14 @@ class Job:
                                min_scale_factor  =att.get('minscalefactor',     float,required=False),
                                max_scale_factor  =att.get('maxscalefactor',     float,required=False),
                                fixed_scale_factor=att.get('constantscalefactor',float,required=False),
+                               minimum           =att.get('minimum',            float,default=0.1),
                                sd                =att.get('sd',                 float,required=False,minimum=0.),
                                cache=False)
             att.testEmpty()
 
         return job
             
-    def addObservation(self,observeddata,outputvariable,spinupyears=0,relativefit=False,min_scale_factor=None,max_scale_factor=None,sd=None,maxdepth=None,cache=True,fixed_scale_factor=None,logscale=False):
+    def addObservation(self,observeddata,outputvariable,spinupyears=0,relativefit=False,min_scale_factor=None,max_scale_factor=None,sd=None,maxdepth=None,cache=True,fixed_scale_factor=None,logscale=False,minimum=None):
         sourcepath = None
         if maxdepth==None: maxdepth = self.controller.depth
         assert maxdepth>0, 'Argument "maxdepth" must be positive but is %.6g  (distance from surface in meter).' % maxdepth
@@ -206,8 +207,8 @@ class Job:
         else:
             assert False, 'Currently observations must be supplied as path to an 3-column ASCII file.'
 
-        if relativefit:
-            assert not logscale,'Fitting observations on a log-scale and estimating the scale factor is currently not supported.'
+        if logscale and minimum is None:
+            raise Exception('For log scale fitting, the (relevant) minimum value must be specified.')
 
         self.observations.append({'outputvariable':outputvariable,
                                   'observeddata':  observeddata,
@@ -217,7 +218,8 @@ class Job:
                                   'fixed_scale_factor':fixed_scale_factor,
                                   'sd':            sd,
                                   'sourcepath':    sourcepath,
-                                  'logscale':      logscale})
+                                  'logscale':      logscale,
+                                  'minimum':       minimum})
 
     def excludeObservationPeriod(self,start,stop):
         print 'Excluding observations between %s and %s.' % (str(start),str(stop))
@@ -352,30 +354,38 @@ class Job:
             allvals = eval(obsvar,vardata)
             modelvals = gotmcontroller.interp2_frominfo(allvals,obsinfo['interp2_info'])
 
+            if not numpy.isfinite(modelvals).all():
+                print 'WARNING: one or more model values for %s are not finite.' % obsvar
+                print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                self.reportResult(values,None,error='Some model values for %s are not finite' % obsvar)
+                return -numpy.Inf
+
             obsvals = obsdata[:,2]
             if obsinfo['logscale']:
-                valid = numpy.logical_and(modelvals>0.1,obsvals>0.1)
-                modelvals = numpy.log10(modelvals[valid])
-                obsvals   = numpy.log10(obsvals  [valid])
+                modelvals = numpy.log10(numpy.maximum(modelvals,obsinfo['minimum']))
+                obsvals   = numpy.log10(numpy.maximum(obsvals,  obsinfo['minimum']))
 
             # If the model fit is relative, calculate the optimal model to observation scaling factor.
+            scale = None
             if obsinfo['relativefit']:
-                if (modelvals==0.).all():
-                    print 'WARNING: cannot calculate optimal scaling factor for %s because all model values equal zero.' % obsvar
-                    print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
-                    self.reportResult(values,None,error='All model values for %s equal 0' % obsvar)
-                    return -numpy.Inf
-                if not numpy.isfinite(modelvals).all():
-                    print 'WARNING: cannot calculate optimal scaling factor for %s because one or more model were not finite.' % obsvar
-                    print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
-                    self.reportResult(values,None,error='Some model values for %s are not finite' % obsvar)
-                    return -numpy.Inf
-                scale = (obsvals*modelvals).sum()/(modelvals*modelvals).sum()
-                if not numpy.isfinite(scale):
-                    print 'WARNING: optimal scaling factor for %s is not finite.' % obsvar
-                    print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
-                    self.reportResult(values,None,error='Optimal scaling factor for %s is not finite' % obsvar)
-                    return -numpy.Inf
+                if obsinfo['logscale']:
+                    # Optimal scale factor is calculated from optimal offset on a log scale.
+                    scale = 10.**(obsvals.mean()-modelvals.mean())
+                else:
+                    # Calculate optimal scale factor.
+                    if (modelvals==0.).all():
+                        print 'WARNING: cannot calculate optimal scaling factor for %s because all model values equal zero.' % obsvar
+                        print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                        self.reportResult(values,None,error='All model values for %s equal 0' % obsvar)
+                        return -numpy.Inf
+                    scale = (obsvals*modelvals).sum()/(modelvals*modelvals).sum()
+                    if not numpy.isfinite(scale):
+                        print 'WARNING: optimal scaling factor for %s is not finite.' % obsvar
+                        print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                        self.reportResult(values,None,error='Optimal scaling factor for %s is not finite' % obsvar)
+                        return -numpy.Inf
+
+                # Report and check optimal scale factor.
                 print 'Optimal model-to-observation scaling factor for %s = %.6g.' % (obsvar,scale)
                 if obsinfo['min_scale_factor'] is not None and scale<obsinfo['min_scale_factor']:
                     print 'Clipping optimal scale factor to minimum = %.6g.' % obsinfo['min_scale_factor']
@@ -383,9 +393,15 @@ class Job:
                 elif obsinfo['max_scale_factor'] is not None and scale>obsinfo['max_scale_factor']:
                     print 'Clipping optimal scale factor to maximum = %.6g.' % obsinfo['max_scale_factor']
                     scale = obsinfo['max_scale_factor']
-                modelvals *= scale
             elif obsinfo['fixed_scale_factor'] is not None:
-                modelvals *= obsinfo['fixed_scale_factor']
+                scale = obsinfo['fixed_scale_factor']
+
+            # Apply scale factor if set
+            if scale is not None:
+                if obsinfo['logscale']:
+                    modelvals += numpy.log10(scale)
+                else:
+                    modelvals *= scale
 
             # Calculate difference between model outcome and observations
             diff = modelvals-obsvals
