@@ -101,7 +101,7 @@ class HTTP(Transport):
         params = {'run': runid, 'count': len(results)}
         for ires,(values,lnlikelihood) in enumerate(results):
             params['parameters%i' % ires] = ';'.join('%.12e' % v for v in values)
-            if lnlikelihood==None:
+            if lnlikelihood is None:
                 params['lnlikelihood%i' % ires] = ''
             else:
                 params['lnlikelihood%i' % ires] = '%.12e' % lnlikelihood
