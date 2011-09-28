@@ -18,7 +18,7 @@ parser.add_option('-o','--orderby',type='choice',choices=('count','lnl'),help='W
 parser.add_option('--maxcount',type='int',help='Maximum number of series to plot')
 parser.add_option('--constraint',type='string',action='append',nargs=3,help='Constraint on parameter (parameter name, minimum, maximum)',dest='constraints')
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
-parser.set_defaults(range=None,bincount=25,job=None,orderby='count',maxcount=None,groupby='source',constraints=[],limit=-1)
+parser.set_defaults(range=None,bincount=25,job=None,orderby='count',maxcount=None,groupby='run',constraints=[],limit=-1)
 (options, args) = parser.parse_args()
 
 job = client.run.getJob(options.job)
