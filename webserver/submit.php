@@ -31,7 +31,7 @@
 	$result = mysql_connect($host,$user,$password);
 	if (!$result) err("Failed to connect to MySQL database!");
 
-	// Select NVTB database.
+	// Select database.
 	$result = mysql_select_db($database);
 	if (!$result) err( "Unable to select database");
 

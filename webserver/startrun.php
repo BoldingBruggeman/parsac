@@ -19,7 +19,7 @@
 	
 	$description = $_POST['description'];
 	if (empty($description)) {
-		//err('Description argument is missing.');
+		//err('"description" argument is missing.');
 		$description = '';
 	}
 
@@ -33,11 +33,8 @@
 
 	// Check for job identifier
 	$job = $_POST['job'];
-	if (empty($job)) {
-		$job = 'NULL';
-	} else {
-		$job = "'".mysql_real_escape_string($job)."'";
-	}
+	if (empty($job)) err('"job" argument is missing.');
+	$job = "'".mysql_real_escape_string($job)."'";
 
 	// Escape strings to be sent to database
 	$description = mysql_real_escape_string($description);
@@ -60,7 +57,7 @@
 	//exit();
 	
 	function err($msg) {
-		//header("HTTP/1.1 500 Internal Server Error");
+		header("HTTP/1.1 500 Internal Server Error");
 		echo $msg;
 		exit();
 	}
