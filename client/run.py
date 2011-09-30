@@ -4,7 +4,26 @@
 import os.path,sys,optparse,datetime
 
 # Import personal custom stuff
-import gotmcontroller,optimizer
+import optimizer
+
+import desolver
+class Solver(desolver.DESolver):
+    def __init__(self,job,*args,**kwargs):
+        desolver.DESolver.__init__(self,*args,**kwargs)
+        self.job = job
+        
+    # Functions for random number generation
+    def SetupClassRandomNumberMethods(self):
+        pass
+    def GetClassRandomIntegerBetweenZeroAndParameterCount(self):
+        return self.randomstate.random_integers(0, self.parameterCount-1)
+    def GetClassRandomFloatBetweenZeroAndOne(self):
+        return self.randomstate.uniform()
+    def GetClassRandomIntegerBetweenZeroAndPopulationSize(self):
+        return self.randomstate.random_integers(0, self.populationSize-1)
+        
+    def externalEnergyFunction(self,trial):
+        return -self.job.evaluateFitness(trial)
 
 def getJob(jobid,allowedtransports=None):
     scenpath = os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid)
@@ -90,26 +109,6 @@ def main():
                 for parinfo,val in zip(job.controller.parameters,vals):
                     print '  %s = %.6g' % (parinfo['name'],val)
         elif options.method=='DE':
-            import DESolver_nopp as DESolver
-            import numpy.random
-
-            class Solver(DESolver.DESolver):
-                def __init__(self,job,*args,**kwargs):
-                    DESolver.DESolver.__init__(self,*args,**kwargs)
-                    self.job = job
-                    
-                # Functions for random number generation
-                def SetupClassRandomNumberMethods(self):
-                    pass
-                def GetClassRandomIntegerBetweenZeroAndParameterCount(self):
-                    return self.randomstate.random_integers(0, self.parameterCount-1)
-                def GetClassRandomFloatBetweenZeroAndOne(self):
-                    return self.randomstate.uniform()
-                def GetClassRandomIntegerBetweenZeroAndPopulationSize(self):
-                    return self.randomstate.random_integers(0, self.populationSize-1)
-                    
-                def externalEnergyFunction(self,trial):
-                    return -self.job.evaluateFitness(trial)
 
             minpar,maxpar = job.controller.getParameterBounds()
             

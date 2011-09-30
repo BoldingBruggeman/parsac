@@ -396,7 +396,7 @@ class Controller:
         nextprogress = .1
         span = float((self.stop-self.start).days)
         cleanfinish = False
-        while True:
+        while 1:
             line = proc.stdout.readline()
             if line=='': break
             if showoutput:
