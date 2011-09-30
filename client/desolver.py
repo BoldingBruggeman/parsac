@@ -5,32 +5,41 @@
 # email: zunzun@zunzun.com
 
 import numpy, random
+try:
+    import pp # http://www.parallelpython.com - can be single CPU, multi-core SMP, or cluster parallelization
+except ImportError:
+    pp = None
+#pp = None
 
-# runs only in remote worker
-def MakeGlobalDESolverObjectInWorker(in_solver):
-    global solver    
-    solver = in_solver
-    if True == solver.useClassRandomNumberMethods:
-        solver.SetupClassRandomNumberMethods()
-
-# runs only in remote worker
-def UpdatePopulationInWorker(in_population, in_bestEnergy, in_generation):
+# NB thie function below runs only in remote worker
+def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
     global solver
-    solver.population = in_population
-    solver.bestEnergy = in_bestEnergy
-    solver.generation = in_generation
+    try:
+        ready = bool(solver)
+    except:
+        ready = False
+    if not ready:
+        # This worker is being run fro the first time.
+        # Create a copy of the central (virgin) job object.
+        # This job object is uninitialized, so the call to solver.EnergyFunction
+        # will force initializion for this thread only.
+        solver = ref_solver
+        solver.randomstate = numpy.random.RandomState(seed=None)
+    else:
+        # This worker has been used before. Simply update it with the latest population info.
+        solver.population = ref_solver.population
+        solver.bestEnergy = ref_solver.bestEnergy
+        solver.generation = ref_solver.generation
 
-# runs only in remote worker
-def GenerateTrialAndTestInWorker(in_candidate):
-    global solver
-
-    # Jorn added: loop until parameter vector differs from original
+    # Jorn added: multiply and mutate the selected candidate until obtaining an child that differs.
+    # This may not happen immediately if the cross-over probability is low.
     while(1):
-        # deStrategy is the name of the DE function to use
+        # deStrategy is the name of the DE function to use for mutant generation.
         eval('solver.' + solver.deStrategy + '(in_candidate)')
         if (in_candidate!=solver.trialSolution).any(): break
 
-    # Jorn added!
+    # Jorn added: reflect parameter values if they have digressed beyond the specified boundaries.
+    # This may need to be done multiple times, if the allowed range is small and the parameter deviation large.
     if solver.checkbounds:
         while numpy.logical_or(solver.trialSolution<solver.minInitialValue,solver.trialSolution>solver.maxInitialValue).any():
             print 'Mirroring out-of-bound parameter values.'
@@ -38,6 +47,7 @@ def GenerateTrialAndTestInWorker(in_candidate):
             solver.trialSolution = solver.maxInitialValue - numpy.abs(solver.maxInitialValue-solver.trialSolution)
         solver.trialSolution = tuple(solver.trialSolution)
             
+    # Evaluate the current energy level (*less is better*)
     energy, atSolution = solver.EnergyFunction(solver.trialSolution)
     
     if solver.polishTheBestTrials == True and energy < solver.bestEnergy and solver.generation > 0: # not the first generation
@@ -77,7 +87,7 @@ class DESolver:
         self.checkbounds = True
         self.initialpopulation = initialpopulation
 
-        if self.initialpopulation!=None:
+        if self.initialpopulation is not None:
             assert self.initialpopulation.ndim==2, 'Initial population must be a NumPy matrix.'
             assert self.initialpopulation.shape[0]>=self.populationSize, 'Initial population must be a matrix with at least %i rows (current row count = %i).' % (self.populationSize,self.initialpopulation.shape[0])
             assert self.initialpopulation.shape[1]==self.parameterCount, 'Initial population must be a matrix with %i columns (current column count = %i).' % (self.parameterCount,self.initialpopulation.shape[1])
@@ -93,16 +103,16 @@ class DESolver:
 
         # Changed by Jorn!
         #self.population = numpy.random.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
-        if self.initialpopulation != None:
+        if self.initialpopulation is not None:
             self.population = self.initialpopulation
         else:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
 
+        job_server = None
+        if pp is not None: job_server = pp.Server(ncpus=4) # auto-detects number of SMP CPU cores (will detect 1 core on single-CPU systems)
+        
         # try/finally block is to ensure remote worker processes are killed
         try:
-
-            # give each worker a copy of this object
-            MakeGlobalDESolverObjectInWorker(self)
 
             # now run DE
             for self.generation in range(self.maxGenerations):
@@ -112,11 +122,19 @@ class DESolver:
                     break # from generation loop
                 
                 # synchronize the populations for each worker
-                UpdatePopulationInWorker(self.population, self.bestEnergy, self.generation)
-                
+                if job_server is None:
+                    jobs = range(self.populationSize)
+                else:
+                    jobs = []
+                    for candidate in range(self.populationSize):
+                        jobs.append(job_server.submit(GenerateTrialAndTestInWorker, (candidate,self), (), ('desolver','numpy.random', 'run','optimizer')))
+                        
                 # run this generation remotely
-                for candidate in range(self.populationSize):
-                    candidate, trialSolution, trialEnergy, atSolution = GenerateTrialAndTestInWorker(candidate)
+                for job in jobs:
+                    if job_server is None:
+                        candidate, trialSolution, trialEnergy, atSolution = GenerateTrialAndTestInWorker(job,self)
+                    else:
+                        candidate, trialSolution, trialEnergy, atSolution = job()
                     
                     # if we've reached a sufficient solution we can stop
                     if atSolution == True:
@@ -133,7 +151,7 @@ class DESolver:
                             self.bestSolution = numpy.copy(self.population[candidate])
 
         finally:
-            pass
+            if job_server is not None: job_server.destroy()
 
         return atSolution
 
