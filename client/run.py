@@ -41,7 +41,8 @@ def main():
     parser.add_option('-m', '--method',      type='choice', choices=('DE','fmin','galileo'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex, galileo = galileo genetic algorithm')
     parser.add_option('-t', '--transport',   type='choice', choices=('http','mysql'), help='Transport to use for server communication: http or mysql')
     parser.add_option('-i', '--interactive', action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
-    parser.set_defaults(method='DE',transport=None,interactive=False)
+    parser.add_option('-n', '--ncpus',       type='int', help='Number of CPUs to use (only for Differential Evolution genetic algorithm).')
+    parser.set_defaults(method='DE',transport=None,interactive=False,ncpus=None)
     (options, args) = parser.parse_args()
     if len(args)<1:
         print 'One argument must be provided: the (integer) job identifier.'
@@ -123,7 +124,7 @@ def main():
                 startpop = numpy.load(startpoppath)
 
             # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-            solver = Solver(job, len(minpar), popsize, maxgen, minpar, maxpar, 'Rand1Exp_jorn', 0.5, 0.9, 0.01, True, False, initialpopulation=startpop)
+            solver = Solver(job, len(minpar), popsize, maxgen, minpar, maxpar, 'Rand1Exp_jorn', 0.5, 0.9, 0.01, True, False, initialpopulation=startpop, ncpus=options.ncpus)
             solver.Solve()
 
             #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)

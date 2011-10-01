@@ -61,7 +61,7 @@ def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
 
 class DESolver:
 
-    def __init__(self, parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials, initialpopulation = None):
+    def __init__(self, parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials, initialpopulation = None, ncpus=None):
 
         self.polishTheBestTrials = polishTheBestTrials # see the Solve method where this flag is used
         self.maxGenerations = maxGenerations
@@ -86,6 +86,7 @@ class DESolver:
         self.randomstate = numpy.random.RandomState(seed=None)
         self.checkbounds = True
         self.initialpopulation = initialpopulation
+        self.ncpus = ncpus
 
         if self.initialpopulation is not None:
             assert self.initialpopulation.ndim==2, 'Initial population must be a NumPy matrix.'
@@ -109,7 +110,7 @@ class DESolver:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
 
         job_server = None
-        if pp is not None: job_server = pp.Server(ncpus=4) # auto-detects number of SMP CPU cores (will detect 1 core on single-CPU systems)
+        if pp is not None: job_server = pp.Server(ncpus=self.ncpus) # auto-detects number of SMP CPU cores (will detect 1 core on single-CPU systems)
         
         # try/finally block is to ensure remote worker processes are killed
         try:
