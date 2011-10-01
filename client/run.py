@@ -41,7 +41,7 @@ def main():
     parser.add_option('-m', '--method',      type='choice', choices=('DE','fmin','galileo'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex, galileo = galileo genetic algorithm')
     parser.add_option('-t', '--transport',   type='choice', choices=('http','mysql'), help='Transport to use for server communication: http or mysql')
     parser.add_option('-i', '--interactive', action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
-    parser.set_defaults(method='DE',transport=None,interactive=not hasattr(sys,'frozen'))
+    parser.set_defaults(method='DE',transport=None,interactive=False)
     (options, args) = parser.parse_args()
     if len(args)<1:
         print 'One argument must be provided: the (integer) job identifier.'

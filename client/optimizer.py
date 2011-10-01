@@ -487,18 +487,18 @@ class Job:
             return
 
         # If we arrived here, reporting failed.
-        print 'Unable to report result(s).'
         self.reportfailcount += 1
+        print 'Unable to report result(s), %ith time. Last report was sent %.0f s ago.' % (self.reportfailcount,time.time()-self.lastreporttime)
 
         # If interaction with user is not allowed, leave the result in the queue and return.
         if not self.interactive: return
             
         # Check if the report failure tolerances (count and period) have been exceeded.
         exceeded = False
-        if self.allowedreportfailcount!=None and self.reportfailcount>self.allowedreportfailcount:
+        if self.allowedreportfailcount is not None and self.reportfailcount>self.allowedreportfailcount:
             print 'Maximum number of reporting failures (%i) exceeded.' % self.allowedreportfailcount
             exceeded = True
-        elif self.allowedreportfailperiod!=None and time.time()>(self.lastreporttime+self.allowedreportfailperiod):
+        elif self.allowedreportfailperiod is not None and time.time()>(self.lastreporttime+self.allowedreportfailperiod):
             print 'Maximum period of reporting failure (%i s) exceeded.' % self.allowedreportfailperiod
             exceeded = True
 
