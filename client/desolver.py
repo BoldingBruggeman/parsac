@@ -14,17 +14,14 @@ except ImportError:
 # NB thie function below runs only in remote worker
 def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
     global solver
-    try:
-        ready = bool(solver)
-    except:
-        ready = False
-    if not ready:
+    if 'solver' not in globals():
         # This worker is being run fro the first time.
         # Create a copy of the central (virgin) job object.
         # This job object is uninitialized, so the call to solver.EnergyFunction
         # will force initializion for this thread only.
         solver = ref_solver
         solver.randomstate = numpy.random.RandomState(seed=None)
+        solver.switchToLocal()
     else:
         # This worker has been used before. Simply update it with the latest population info.
         solver.population = ref_solver.population
@@ -55,7 +52,7 @@ def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
         solver.trialSolution = scipy.optimize.fmin(solver.externalEnergyFunction, solver.trialSolution, disp = 0) # don't print warning messages to stdout
         energy, atSolution = solver.EnergyFunction(solver.trialSolution) # recalc with polished coefficients
 
-    return[in_candidate, solver.trialSolution, energy, atSolution]
+    return[in_candidate, solver.trialSolution, energy, atSolution,solver.getLocalResult()]
 
 
 
@@ -110,7 +107,7 @@ class DESolver:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
 
         job_server = None
-        if pp is not None: job_server = pp.Server(ncpus=self.ncpus) # auto-detects number of SMP CPU cores (will detect 1 core on single-CPU systems)
+        if pp is not None: job_server = pp.Server(ncpus=self.ncpus)
         
         # try/finally block is to ensure remote worker processes are killed
         try:
@@ -133,9 +130,11 @@ class DESolver:
                 # run this generation remotely
                 for job in jobs:
                     if job_server is None:
-                        candidate, trialSolution, trialEnergy, atSolution = GenerateTrialAndTestInWorker(job,self)
+                        candidate, trialSolution, trialEnergy, atSolution, localresult = GenerateTrialAndTestInWorker(job,self)
                     else:
-                        candidate, trialSolution, trialEnergy, atSolution = job()
+                        candidate, trialSolution, trialEnergy, atSolution, localresult = job()
+
+                    if localresult is not None: self.processLocalResult(localresult)
                     
                     # if we've reached a sufficient solution we can stop
                     if atSolution == True:
@@ -156,6 +155,14 @@ class DESolver:
 
         return atSolution
 
+    def switchToLocal(self):
+        pass
+
+    def processLocalResult(self,result):
+        pass
+
+    def getLocalResult(self):
+        return None
 
     def SetupClassRandomNumberMethods(self):
         assert False,'Base SetupClassRandomNumberMethods should never be called!'

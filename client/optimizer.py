@@ -46,6 +46,7 @@ class Job:
         self.lastreporttime = time.time()
         self.reportedcount = 0
         self.nexttransportreset = 30
+        self.bufferresults = False
 
         # Whether to allow for interaction with user (via e.g. raw_input)
         self.interactive = interactive
@@ -424,6 +425,8 @@ class Job:
         return lnlikelihood
 
     def reportRunStart(self):
+        if not self.initialized: self.initialize()
+
         runid = None
         for transport in self.transports:
             if not transport.available(): continue
@@ -444,26 +447,26 @@ class Job:
         self.runid = runid
 
     def reportResult(self,values,lnlikelihood,error=None):
-        # Report the start of the run, if that was not done before.
-        if self.runid==None: self.reportRunStart()
-
         # Append result to queue
         self.resultqueue.append((values,lnlikelihood))
 
         # Flush the queue if needed.
-        self.flushResultQueue()
+        if not self.bufferresults: self.flushResultQueue()
         
     def flushResultQueue(self):
+        # Report the start of the run, if that was not done before.
+        if self.runid is None: self.reportRunStart()
+
         # Reorder transports, prioritizing last working transport
         # Once in a while we retry the different transports starting from the top.
         curtransports = []
         if self.reportedcount<self.nexttransportreset:
-            if self.lasttransport!=None: curtransports.append(self.lasttransport)
+            if self.lasttransport is not None: curtransports.append(self.lasttransport)
         else:
             self.nexttransportreset += 30
             self.lasttransport = None
         for transport in self.transports:
-            if self.lasttransport==None or transport is not self.lasttransport: curtransports.append(transport)
+            if self.lasttransport is None or transport is not self.lasttransport: curtransports.append(transport)
 
         # Try to report the results
         for transport in curtransports:
@@ -488,7 +491,7 @@ class Job:
 
         # If we arrived here, reporting failed.
         self.reportfailcount += 1
-        print 'Unable to report result(s), %ith time. Last report was sent %.0f s ago.' % (self.reportfailcount,time.time()-self.lastreporttime)
+        print 'Unable to report result(s). Last report was sent %i runs/%.0f s ago.' % (self.reportfailcount,time.time()-self.lastreporttime)
 
         # If interaction with user is not allowed, leave the result in the queue and return.
         if not self.interactive: return

@@ -25,6 +25,18 @@ class Solver(desolver.DESolver):
     def externalEnergyFunction(self,trial):
         return -self.job.evaluateFitness(trial)
 
+    def switchToLocal(self):
+        self.job.bufferresults = True
+
+    def getLocalResult(self):
+        curqueue = self.job.resultqueue
+        self.job.resultqueue = []
+        return curqueue
+
+    def processLocalResult(self,resultqueue):
+        self.job.resultqueue += resultqueue
+        self.job.flushResultQueue()
+
 def getJob(jobid,allowedtransports=None):
     scenpath = os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid)
 
