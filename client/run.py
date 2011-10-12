@@ -68,7 +68,7 @@ def main():
 
     ppservers = ()
     if options.ppservers is not None:
-        ppservers = options.ppservers.split(',')
+        ppservers = tuple(options.ppservers.split(','))
 
     job = getJob(jobid,allowedtransports=allowedtransports)
         

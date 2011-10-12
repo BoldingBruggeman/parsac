@@ -83,6 +83,7 @@ class DESolver:
         self.randomstate = numpy.random.RandomState(seed=None)
         self.checkbounds = True
         self.initialpopulation = initialpopulation
+        if ncpus is None: ncpus = 'autodetect'
         self.ncpus = ncpus
         self.ppservers = ppservers
 
