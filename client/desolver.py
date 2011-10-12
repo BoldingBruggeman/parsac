@@ -58,7 +58,7 @@ def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
 
 class DESolver:
 
-    def __init__(self, parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials, initialpopulation = None, ncpus=None):
+    def __init__(self, parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials, initialpopulation = None, ncpus=None, ppservers=()):
 
         self.polishTheBestTrials = polishTheBestTrials # see the Solve method where this flag is used
         self.maxGenerations = maxGenerations
@@ -84,6 +84,7 @@ class DESolver:
         self.checkbounds = True
         self.initialpopulation = initialpopulation
         self.ncpus = ncpus
+        self.ppservers = ppservers
 
         if self.initialpopulation is not None:
             assert self.initialpopulation.ndim==2, 'Initial population must be a NumPy matrix.'
@@ -107,7 +108,7 @@ class DESolver:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
 
         job_server = None
-        if pp is not None: job_server = pp.Server(ncpus=self.ncpus)
+        if pp is not None: job_server = pp.Server(ncpus=self.ncpus,ppservers=self.ppservers)
         
         # try/finally block is to ensure remote worker processes are killed
         try:
