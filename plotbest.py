@@ -119,7 +119,7 @@ for i,oi in enumerate(obsinfo):
 
     # Plot model result
     matplotlib.pylab.subplot(len(obsinfo),2,i*2+1)
-    matplotlib.pylab.pcolor(tim_stag,z_stag,modeldata.transpose())
+    matplotlib.pylab.pcolormesh(tim_stag,z_stag,modeldata.transpose())
     matplotlib.pylab.clim(varrange)
     matplotlib.pylab.ylim(-viewdepth,0)
     matplotlib.pylab.colorbar()
@@ -143,7 +143,7 @@ for i,oi in enumerate(obsinfo):
             iz = zgrid.searchsorted(obsdata[iobs,1])-1
             griddedobs[iz,it] += obsdata[iobs,2]
             counts[iz,it] += 1
-        matplotlib.pylab.pcolor(tgrid,zgrid,numpy.ma.array(griddedobs/counts,mask=(counts==0)))
+        matplotlib.pylab.pcolormesh(tgrid,zgrid,numpy.ma.array(griddedobs/counts,mask=(counts==0)))
     else:
         matplotlib.pylab.scatter(obsdata[:,0],obsdata[:,1],s=10,c=obsdata[:,2],cmap=matplotlib.cm.jet,vmin=varrange[0],vmax=varrange[1],faceted=False)
     matplotlib.pylab.ylim(-viewdepth,0)
@@ -197,7 +197,7 @@ if len(extravars)>0:
         modeldata = res[varname]
         if logscale: modeldata = numpy.log10(modeldata)
         matplotlib.pylab.subplot(rowcount,colcount,i+1)
-        matplotlib.pylab.pcolor(tim_stag,z_stag,modeldata.transpose())
+        matplotlib.pylab.pcolormesh(tim_stag,z_stag,modeldata.transpose())
         matplotlib.pylab.ylim(-viewdepth,0)
         matplotlib.pylab.colorbar()
         xax = matplotlib.pylab.gca().xaxis
