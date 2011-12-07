@@ -6,12 +6,15 @@ import numpy
 import matplotlib.pylab
 import MySQLdb
 
+# Import custom modules
+import mysqlinfo
+
 parser = optparse.OptionParser()
 (options, args) = parser.parse_args()
 
 assert len(args)>1, 'First argument must be the run identifier, second argument the file to save to.'
 
-db = MySQLdb.connect(host='localhost',user='jorn',passwd='1r3z2g6$',db='optimize')
+db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
 
 # Retrieve all results
 c = db.cursor()

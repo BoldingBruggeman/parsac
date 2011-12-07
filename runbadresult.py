@@ -3,20 +3,26 @@ import sys,math,optparse
 # Import third-party modules
 import MySQLdb
 
-import client.run,client.gotmcontroller
+import client.run
+import client.gotmcontroller
+import mysqlinfo
 
 parser = optparse.OptionParser()
-parser.add_option('-j', '--job',   type='int', help='job identifier')
 parser.add_option('-i', '--index', type='int', help='index of bad result (>=0)')
-parser.set_defaults(job=0,index=0)
+parser.set_defaults(index=0)
 (options, args) = parser.parse_args()
 
-print 'Looking for bad result %i of job %i.' % (options.index,options.job)
+if len(args)<1:
+    print 'No job identifier provided.'
+    sys.exit(2)
+jobid = int(args[0])
+
+print 'Looking for bad result %i of job %i.' % (options.index,jobid)
 
 # Connect to database and retrieve best parameter set.
-db = MySQLdb.connect(host='localhost',user='jorn',passwd='1r3z2g6$',db='optimize')
+db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
 c = db.cursor()
-c.execute("SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE (`runs`.`id`=`results`.`run` AND `runs`.`job`=%i AND `lnlikelihood` IS NULL) LIMIT %i,1" % (options.job,options.index))
+c.execute("SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE (`runs`.`id`=`results`.`run` AND `runs`.`job`=%i AND `lnlikelihood` IS NULL) LIMIT %i,1" % (jobid,options.index))
 parameters = None
 for strpars,lnlikelihood in c:
     parameters = map(float,strpars.split(';'))
@@ -25,16 +31,18 @@ if parameters==None:
     print 'No bad results found. Exiting...'
     sys.exit(0)
 
+job = client.run.getJob(jobid)
+
 # Show best parameter set
 print 'Testing bad parameter set number %i.' % options.index
 print 'Problem parameter set:'
 for i,val in enumerate(parameters):
-    pi = client.run.job.controller.parameters[i]
+    pi = job.controller.parameters[i]
     if pi['logscale']: val = math.pow(10.,val)
     print '   %s = %.6g' % (pi['name'],val)
 
 # Initialize the GOTM controller.
-client.run.job.controller.initialize()
+job.controller.initialize()
 
 # Run and retrieve results.
-nc = client.run.job.controller.run(parameters,showoutput=True)
+nc = job.controller.run(parameters,showoutput=True)

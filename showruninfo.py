@@ -4,6 +4,9 @@ import sys,optparse
 # Import third-party modules
 import MySQLdb
 
+# Import custom Python modules
+import mysqlinfo
+
 parser = optparse.OptionParser()
 (options, args) = parser.parse_args()
 
@@ -15,7 +18,7 @@ runid = int(args[0])
 print 'Showing information for run with identifier %i' % runid
 
 # Retrieve run information
-db = MySQLdb.connect(host='localhost',user='jorn',passwd='1r3z2g6$',db='optimize')
+db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
 c = db.cursor()
 c.execute("SELECT `source`,`time`,`description` FROM `runs` WHERE `id`=%i" % runid)
 for (source,time,description) in c:
