@@ -1,5 +1,5 @@
 # Import from standard Python library (>= 2.4)
-import sys,os.path,re,datetime,math,time
+import sys,os.path,re,datetime,math,time,cPickle,hashlib
 
 # Import third-party modules
 import numpy
@@ -149,7 +149,7 @@ class Job:
                                fixed_scale_factor=att.get('constantscalefactor',float,required=False),
                                minimum           =att.get('minimum',            float,default=0.1),
                                sd                =att.get('sd',                 float,required=False,minimum=0.),
-                               cache=False)
+                               cache=True)
             att.testEmpty()
 
         return job
@@ -158,43 +158,61 @@ class Job:
         sourcepath = None
         if maxdepth==None: maxdepth = self.controller.depth
         assert maxdepth>0, 'Argument "maxdepth" must be positive but is %.6g  (distance from surface in meter).' % maxdepth
+
+        def getMD5(path):
+            #print 'Calculating MD5 hash of %s...' % path
+            f = open(path,'rb')
+            m = hashlib.md5()
+            while 1:
+                block = f.read(m.block_size)
+                if not block: break
+                m.update(block)
+            f.close()
+            return m.digest()
+
         if isinstance(observeddata,basestring):
             
             # Observations are specified as path to ASCII file.
             sourcepath = observeddata
+            md5 = getMD5(sourcepath)
 
+            observeddata = None
             if cache and os.path.isfile(sourcepath+'.cache'):
                 # Retrieve cached copy of the observations
-                print 'Getting cached copy of %s...' % sourcepath
-                observeddata = numpy.load(sourcepath+'.cache')
-            else:
+                f = open(sourcepath+'.cache','rb')
+                oldmd5 = cPickle.load(f)
+                if oldmd5!=md5:
+                    print 'Cached copy of %s is out of date - file will be reparsed.' % sourcepath
+                else:
+                    print 'Getting cached copy of %s...' % sourcepath
+                    observeddata = cPickle.load(f)
+                f.close()
+                
+            if observeddata is None:
                 # Parse ASCII file and store observations as matrix.
                 if self.verbose:
                     print 'Reading observations for variable "%s" from "%s".' % (outputvariable,sourcepath)
                 if not os.path.isfile(sourcepath):
                     raise Exception('"%s" is not a file.' % sourcepath)
-                mindate = self.controller.start+datetime.timedelta(days=spinupyears*365)
                 obs = []
-                f = open(sourcepath)
+                f = open(sourcepath,'rU')
                 iline = 1
-                while True:
+                while 1:
                     line = f.readline()
-                    if line=='': break
-                    if line[0]!='#':
-                        datematch = datetimere.match(line)
-                        if datematch==None:
-                            raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline,line))
-                        refvals = map(int,datematch.group(1,2,3,4,5,6)) # Convert matched strings into integers
-                        curtime = datetime.datetime(*refvals)
-                        if curtime>=mindate and curtime<=self.controller.stop:
-                            data = line[datematch.end():].split()
-                            if len(data)!=2:
-                                raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline,len(data)))
-                            depth,value = map(float,data)
-                            if depth>-maxdepth:
-                                obs.append((gotmcontroller.date2num(curtime),depth,value))
-                    if self.verbose and iline%10000==0:
-                        print 'Read "%s" upto line %i.' % (observeddata,iline)
+                    if not line: break
+                    if line[0]=='#': continue
+                    datematch = datetimere.match(line)
+                    if datematch is None:
+                        raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline,line))
+                    refvals = map(int,datematch.group(1,2,3,4,5,6)) # Convert matched strings into integers
+                    curtime = datetime.datetime(*refvals)
+                    data = line[datematch.end():].split()
+                    if len(data)!=2:
+                        raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline,len(data)))
+                    depth,value = map(float,data)
+                    obs.append((gotmcontroller.date2num(curtime),depth,value))
+                    if self.verbose and iline%20000==0:
+                        print 'Read "%s" upto line %i.' % (sourcepath,iline)
                     iline += 1
                 f.close()
                 observeddata = numpy.array(obs)
@@ -202,9 +220,18 @@ class Job:
                 # Try to store cached copy of observations
                 if cache:
                     try:
-                        observeddata.dump(sourcepath+'.cache')
+                        f = open(sourcepath+'.cache','wb')
+                        cPickle.dump(md5,         f,cPickle.HIGHEST_PROTOCOL)
+                        cPickle.dump(observeddata,f,cPickle.HIGHEST_PROTOCOL)
+                        f.close()
                     except Exception,e:
                         print 'Unable to store cached copy of observation file. Reason: %s' % e
+
+            mindate = self.controller.start+datetime.timedelta(days=spinupyears*365)
+            mint,maxt = gotmcontroller.date2num(mindate),gotmcontroller.date2num(self.controller.stop)
+            valid = numpy.logical_and(numpy.logical_and(observeddata[:,0]>=mint,observeddata[:,0]<=maxt),observeddata[:,1]>-maxdepth)
+            print '%i of %i observations lie within active time and depth range.' % (valid.sum(),observeddata.shape[0])
+            observeddata = observeddata[valid,:]
         else:
             assert False, 'Currently observations must be supplied as path to an 3-column ASCII file.'
 
