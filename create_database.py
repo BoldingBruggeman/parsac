@@ -22,10 +22,10 @@ c.execute('DROP DATABASE `%s`;' % mysqlinfo.database)
 c.execute('CREATE DATABASE `%s`;' % mysqlinfo.database)
 
 # Create users and grant minimum permissions
-c.execute('CREATE USER \'%s\'@\'%\' IDENTIFIED BY \'%s\';' % (mysqlinfo.runuser,mysqlinfo.runpassword))
+c.execute('CREATE USER \'%s\'@\'%%\' IDENTIFIED BY \'%s\';' % (mysqlinfo.runuser,mysqlinfo.runpassword))
 c.execute('CREATE USER \'%s\'@\'localhost\' IDENTIFIED BY \'%s\';' % (mysqlinfo.viewuser,mysqlinfo.viewpassword))
 c.execute('GRANT SELECT ON `%s`.* TO \'%s\'@\'localhost\';' % (mysqlinfo.database,mysqlinfo.viewuser))
-c.execute('GRANT INSERT ON `%s`.* TO \'%s\'@\'%\';' % (mysqlinfo.database,mysqlinfo.runuser))
+c.execute('GRANT INSERT ON `%s`.* TO \'%s\'@\'%%\';' % (mysqlinfo.database,mysqlinfo.runuser))
 
 # Create tables
 c.execute('USE `%s`;' % mysqlinfo.database)
