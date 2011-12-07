@@ -1,0 +1,6 @@
+host         = 'localhost'
+database     = 'optimize'
+runuser      = 'run'
+runpassword  = 'g0tm'
+viewuser     = 'jorn'
+viewpassword = '1r3z2g6$'

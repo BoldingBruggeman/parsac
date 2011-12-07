@@ -7,10 +7,10 @@ import matplotlib.pylab
 import MySQLdb
 
 # Import custom modules
+import mysqlinfo
 import client.run
 
 parser = optparse.OptionParser()
-parser.add_option('-j', '--job', type='int', help='Job identifier')
 parser.add_option('-r', '--range', type='float', help='Lower boundary for relative ln likelihood (always < 0)')
 parser.add_option('--bincount', type='int', help='Number of bins for ln likelihood marginals')
 parser.add_option('-g','--groupby',type='choice',choices=('source','run'),help='What identifier to group the results by, i.e., "source" or "run".')
@@ -18,21 +18,25 @@ parser.add_option('-o','--orderby',type='choice',choices=('count','lnl'),help='W
 parser.add_option('--maxcount',type='int',help='Maximum number of series to plot')
 parser.add_option('--constraint',type='string',action='append',nargs=3,help='Constraint on parameter (parameter name, minimum, maximum)',dest='constraints')
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
-parser.set_defaults(range=None,bincount=25,job=None,orderby='count',maxcount=None,groupby='run',constraints=[],limit=-1)
+parser.set_defaults(range=None,bincount=25,orderby='count',maxcount=None,groupby='run',constraints=[],limit=-1)
 (options, args) = parser.parse_args()
 
-job = client.run.getJob(options.job)
+if len(args)<1:
+    print 'No job identifier provided.'
+    sys.exit(2)
+jobid = int(args[0])
+
+job = client.run.getJob(jobid)
 
 if options.range!=None and options.range>0:
     print 'Range argument must be less than zero.'
     sys.exit(1)
 
-db = MySQLdb.connect(host='localhost',user='jorn',passwd='1r3z2g6$',db='optimize')
+db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
 
 # Build map from run identifier to source machine
 c = db.cursor()
-query = "SELECT `id`,`source`,`description` FROM `runs`"
-if options.job!=None: query += " WHERE `job`='%i'" % options.job
+query = "SELECT `id`,`source`,`description` FROM `runs` WHERE `job`='%i'" % jobid
 c.execute(query)
 run2source = {}
 for run,source,description in c:
@@ -58,8 +62,7 @@ for (name,minval,maxval) in options.constraints:
 
 # Retrieve all results
 c = db.cursor()
-query = "SELECT DISTINCT `parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run`" % options.groupby
-if options.job!=None: query += " AND `runs`.`job`='%i'" % options.job
+query = "SELECT DISTINCT `parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run` AND `runs`.`job`='%i'" % (options.groupby,jobid)
 if options.limit!=-1: query += ' LIMIT %i' % options.limit
 c.execute(query)
 history = []

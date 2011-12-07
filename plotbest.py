@@ -6,16 +6,21 @@ import matplotlib.pylab,matplotlib.cm
 import MySQLdb
 
 import client.run,client.gotmcontroller
+import mysqlinfo
 from Scientific.IO.NetCDF import NetCDFFile
 
 parser = optparse.OptionParser()
-parser.add_option('-j', '--job',   type='int',   help='Job identifier')
 parser.add_option('-r', '--rank',  type='int',   help='Rank of the result to plot (default = 1, i.e., the very best result)')
 parser.add_option('-d', '--depth', type='float', help='Depth range to show (> 0)')
 parser.add_option('-g', '--grid',  action='store_true', help='Whether to grid the observations.')
 parser.add_option('--savenc',      type='string', help='Path to copy NetCDF output file to.')
 parser.set_defaults(rank=1,depth=None,grid=False,savenc=None)
 (options, args) = parser.parse_args()
+
+if len(args)<1:
+    print 'No job identifier provided.'
+    sys.exit(2)
+jobid = int(args[0])
 
 if options.depth!=None and options.depth<0:
     print 'Depth argument must be positive, but is %.6g.' % options.depth
@@ -27,15 +32,14 @@ extravars = ()
 #extravars = (('phytosize_mean_om',False),('phytosize_var_om',False))
 
 # Connect to database and retrieve best parameter set.
-db = MySQLdb.connect(host='localhost',user='jorn',passwd='1r3z2g6$',db='optimize')
+db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
 c = db.cursor()
-query = "SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run`"
-if options.job!=None: query += " AND `runs`.`job`='%i'" % options.job
+query = "SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run` AND `runs`.`job`='%i'" % jobid
 c.execute(query)
 res = [(strpars,lnlikelihood) for strpars,lnlikelihood in c if lnlikelihood!=None]
 
 # Initialize the GOTM controller.
-job = client.run.getJob(options.job)
+job = client.run.getJob(jobid)
 job.controller.initialize()
 
 res.sort(cmp=lambda x,y: cmp(x[1],y[1]))
