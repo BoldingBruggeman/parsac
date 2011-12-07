@@ -7,18 +7,24 @@ db = MySQLdb.connect(host=mysqlinfo.host, user='root',passwd=pw)
 c = db.cursor()
 
 print 'Connected to MySQL server %s.' % mysqlinfo.host
-resp = ''
-while resp not in ('y','n'):
-    resp = raw_input('Are you sure you want to delete any existing database "%s" and create a new one? (y/n): ' % mysqlinfo.database)
-if resp=='n':
-    print 'Database creation cancelled.'
-    sys.exit(0)
+
+# Get list of existing databases.
+c.execute('SHOW DATABASES;')
+dbs = [d[0] for d in c.fetchall()]
+
+if mysqlinfo.database in dbs:
+    resp = ''
+    while resp not in ('y','n'):
+        resp = raw_input('Database "%s" already exists. Do you want to drop it and create a new one? (y/n): ' % mysqlinfo.database)
+    if resp=='n':
+        print 'Database creation cancelled.'
+        sys.exit(0)
+    c.execute('DROP DATABASE `%s`;' % mysqlinfo.database)
 
 #c.execute('ALTER TABLE `runs` ADD COLUMN `job` INT AFTER `time`;')
 #c.execute('ALTER TABLE `results` MODIFY `parameters` VARCHAR(500);')
 
 # Delete and recreate database
-c.execute('DROP DATABASE `%s`;' % mysqlinfo.database)
 c.execute('CREATE DATABASE `%s`;' % mysqlinfo.database)
 
 # Create users and grant minimum permissions
