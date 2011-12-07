@@ -74,9 +74,9 @@ def main():
         
     job.interactive = options.interactive
 
-    repeat = (options.method!='fmin')
-
+    repeat = True
     while repeat:
+        repeat = (options.method!='fmin')   # repeating is only useful for stochastic algorithms - not for deterministic ones
         #job.reportRunStart()
 
         if options.method=='fmin':
