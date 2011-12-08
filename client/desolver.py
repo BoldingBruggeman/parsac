@@ -11,7 +11,12 @@ except ImportError:
     pp = None
 #pp = None
 
-# NB thie function below runs only in remote worker
+if pp is not None:
+    # Override Parallel Pyton timeout
+    import pptransport
+    pptransport.TRANSPORT_SOCKET_TIMEOUT = 600
+
+# NB the function below runs only in remote worker
 def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
     global solver
     import numpy,numpy.random
