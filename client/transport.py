@@ -38,7 +38,7 @@ class MySQL(Transport):
         self.timeout  = timeout
 
     def available(self):
-        return MySQLdb!=None
+        return MySQLdb is not None
 
     def __str__(self):
         return 'MySQL connection to %s' % self.server
@@ -78,7 +78,7 @@ class HTTP(Transport):
         self.path   = path
 
     def available(self):
-        return httplib!=None
+        return httplib is not None
 
     def __str__(self):
         return 'HTTP connection to %s' % self.server
