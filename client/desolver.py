@@ -15,10 +15,10 @@ except ImportError:
 def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
     global solver
     if 'solver' not in globals():
-        # This worker is being run fro the first time.
+        # This worker is being run for the first time.
         # Create a copy of the central (virgin) job object.
         # This job object is uninitialized, so the call to solver.EnergyFunction
-        # will force initializion for this thread only.
+        # will force initialization for this thread only.
         solver = ref_solver
         solver.randomstate = numpy.random.RandomState(seed=None)
         solver.switchToLocal()
