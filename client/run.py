@@ -38,7 +38,7 @@ class Solver(desolver.DESolver):
         self.job.flushResultQueue()
 
 def getJob(jobid,allowedtransports=None):
-    scenpath = os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid)
+    scenpath = os.path.abspath(os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid))
 
     configpath = os.path.join(scenpath,'config.xml')
     if not os.path.isfile(configpath):
