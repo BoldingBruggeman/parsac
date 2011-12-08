@@ -287,7 +287,6 @@ class Job:
         
     def initialize(self):
         assert not self.initialized, 'Job has already been initialized.'
-        self.initialized = True
 
         validtp = []
         for transport in self.transports:
@@ -301,6 +300,8 @@ class Job:
         self.transports = tuple(validtp)
 
         self.controller.initialize()
+
+        self.initialized = True
 
     def evaluateFitness(self,values):
         if not self.initialized: self.initialize()
