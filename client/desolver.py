@@ -14,6 +14,7 @@ except ImportError:
 # NB thie function below runs only in remote worker
 def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
     global solver
+    import numpy,numpy.random
     if 'solver' not in globals():
         # This worker is being run for the first time.
         # Create a copy of the central (virgin) job object.
