@@ -18,7 +18,8 @@ parser.add_option('-o','--orderby',type='choice',choices=('count','lnl'),help='W
 parser.add_option('--maxcount',type='int',help='Maximum number of series to plot')
 parser.add_option('--constraint',type='string',action='append',nargs=3,help='Constraint on parameter (parameter name, minimum, maximum)',dest='constraints')
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
-parser.set_defaults(range=None,bincount=25,orderby='count',maxcount=None,groupby='run',constraints=[],limit=-1)
+parser.add_option('--run', type='int', help='Run number')
+parser.set_defaults(range=None,bincount=25,orderby='count',maxcount=None,groupby='run',constraints=[],limit=-1,run=None)
 (options, args) = parser.parse_args()
 
 if len(args)<1:
@@ -39,15 +40,20 @@ c = db.cursor()
 query = "SELECT `id`,`source`,`description` FROM `runs` WHERE `job`='%i'" % jobid
 c.execute(query)
 run2source = {}
+source2fqn = {}
 for run,source,description in c:
     # Chop of run@ string that is prepended if results arrive via MySQL
     if source.startswith('run@'): source=source[4:]
 
     # Try to resolve IP address, to get the host name.
-    try:
-        (source, aliaslist, ipaddrlist) = socket.gethostbyaddr(source)
-    except:
-        pass
+    if source not in source2fqn:
+        try:
+            (fqn, aliaslist, ipaddrlist) = socket.gethostbyaddr(source)
+        except:
+            fqn = source
+        source2fqn[source] = fqn
+    else:
+        fqn = source2fqn[source]
 
     # Link run identifier to source machine
     run2source[run] = source
@@ -61,8 +67,11 @@ for (name,minval,maxval) in options.constraints:
     parconstraints.append((i,minval,maxval))
 
 # Retrieve all results
+print 'Retrieving results...'
 c = db.cursor()
-query = "SELECT DISTINCT `parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run` AND `runs`.`job`='%i'" % (options.groupby,jobid)
+runcrit = '`runs`.`id`'
+if options.run is not None: runcrit = '%i' % options.run
+query = "SELECT DISTINCT `parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%i'" % (options.groupby,runcrit,jobid)
 if options.limit!=-1: query += ' LIMIT %i' % options.limit
 c.execute(query)
 history = []
