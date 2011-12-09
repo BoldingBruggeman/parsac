@@ -20,7 +20,8 @@ if pp is not None:
 def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
     global solver
     import numpy,numpy.random
-    if 'solver' not in globals():
+
+    if 'solver' not in globals() or solver.jobid!=ref_solver.jobid:
         # This worker is being run for the first time.
         # Create a copy of the central (virgin) job object.
         # This job object is uninitialized, so the call to solver.EnergyFunction
@@ -113,6 +114,10 @@ class DESolver:
             self.population = self.initialpopulation
         else:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
+
+        # Create unique job id that will be used to check worker job ids against.
+        # (this allows the worker to detect stale job objects)
+        self.jobid = self.randomstate.rand()
 
         job_server = None
         if pp is not None: job_server = pp.Server(ncpus=self.ncpus,ppservers=self.ppservers)
