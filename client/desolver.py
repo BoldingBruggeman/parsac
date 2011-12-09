@@ -112,6 +112,8 @@ class DESolver:
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
             jobsperworker = int(numpy.round(self.populationSize/float(nworkers)))
+            if self.populationSize!=jobsperworker*nworkers:
+                print 'Setting population size to %i (was %i) to ensure it is a multiple of number of workers (%i).' % (jobsperworker*nworkers,self.populationSize,nworkers)
             self.populationSize = jobsperworker*nworkers
 
         # a random initial population, returns numpy arrays directly
