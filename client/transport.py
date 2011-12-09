@@ -4,7 +4,7 @@ except Exception,e:
     MySQLdb = None
 
 try:
-    import httplib, urllib
+    import httplib, urllib, socket
 except Exception,e:
     httplib = None
 
@@ -107,15 +107,23 @@ class HTTP(Transport):
                 params['lnlikelihood%i' % ires] = '%.12e' % lnlikelihood
         headers = {'Content-type':'application/x-www-form-urlencoded', 'Accept':'text/plain'}
 
-        # Connect and post results to HTTP server.
-        conn = httplib.HTTPConnection(self.server)
-        conn.request('POST', self.path+'submit.php', urllib.urlencode(params), headers)
+        # Set default socket timeout and remember old value.
+        oldtimeout = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(timeout)
 
-        # Interpret server response.
-        response = conn.getresponse()
-        respstart = response.read(7)
-        if response.status!=httplib.OK or respstart!='success':
-            raise Exception('Unable to send results over HTTP connection. Server response: '+(respstart+response.read()))
+        try:
+            # Connect and post results to HTTP server.
+            conn = httplib.HTTPConnection(self.server)
+            conn.request('POST', self.path+'submit.php', urllib.urlencode(params), headers)
 
-        # Close connection to HTTP server.
-        conn.close()
+            # Interpret server response.
+            response = conn.getresponse()
+            respstart = response.read(7)
+            if response.status!=httplib.OK or respstart!='success':
+                raise Exception('Unable to send results over HTTP connection. Server response: '+(respstart+response.read()))
+
+            # Close connection to HTTP server.
+            conn.close()
+        finally:
+            # Restore old default socket timeout
+            socket.setdefaulttimeout(oldtimeout)
