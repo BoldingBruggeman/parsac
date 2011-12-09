@@ -45,6 +45,7 @@ class Job:
         self.timebetweenreports = -1 # in seconds
         self.reportfailcount = 0
         self.lastreporttime = time.time()
+        self.lastreporttry = time.time()
         self.reportedcount = 0
         self.nexttransportreset = 30
         self.bufferresults = False
@@ -486,8 +487,9 @@ class Job:
         # Report the start of the run, if that was not done before.
         if self.runid is None: self.reportRunStart()
 
-        secsincelastreport = time.time()-self.lastreporttime
-        if secsincelastreport<self.timebetweenreports: return
+        secsincelasttry = time.time()-self.lastreporttry
+        if secsincelasttry<self.timebetweenreports: return
+        self.lastreporttry = time.time()
 
         # Reorder transports, prioritizing last working transport
         # Once in a while we retry the different transports starting from the top.
@@ -523,7 +525,7 @@ class Job:
 
         # If we arrived here, reporting failed.
         self.reportfailcount += 1
-        print 'Unable to report result(s). Last report was sent %i runs/%.0f s ago.' % (self.reportfailcount,secsincelastreport)
+        print 'Unable to report result(s). Last report was sent %i runs/%.0f s ago.' % (self.reportfailcount,time.time()-self.lastreporttime)
 
         # If interaction with user is not allowed, leave the result in the queue and return.
         if not self.interactive: return
