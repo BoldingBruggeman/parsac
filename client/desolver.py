@@ -4,7 +4,8 @@
 # Birmingham, AL 35235 USA
 # email: zunzun@zunzun.com
 
-import numpy, random
+import time, random
+import numpy
 try:
     import pp # http://www.parallelpython.com - can be single CPU, multi-core SMP, or cluster parallelization
 except ImportError:
@@ -108,7 +109,9 @@ class DESolver:
         job_server = None
         if pp is not None:
             job_server = pp.Server(ncpus=self.ncpus,ppservers=self.ppservers)
-
+            if self.ppservers:
+                print 'Giving Parallel Python 5 seconds to connect to nodes...'
+                time.sleep(5)
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
             jobsperworker = int(numpy.round(self.populationSize/float(nworkers)))
