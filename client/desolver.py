@@ -105,6 +105,15 @@ class DESolver:
 
         breakLoop = False
 
+        job_server = None
+        if pp is not None:
+            job_server = pp.Server(ncpus=self.ncpus,ppservers=self.ppservers)
+
+            # Make sure the population size is a multiple of the number of workers
+            nworkers = sum(job_server.get_active_nodes().values())
+            jobsperworker = int(numpy.round(self.populationSize/float(nworkers)))
+            self.populationSize = jobsperworker*nworkers
+
         # a random initial population, returns numpy arrays directly
         # the population will be synchronized with the remote workers at the beginning of each generation
 
@@ -118,9 +127,6 @@ class DESolver:
         # Create unique job id that will be used to check worker job ids against.
         # (this allows the worker to detect stale job objects)
         self.jobid = self.randomstate.rand()
-
-        job_server = None
-        if pp is not None: job_server = pp.Server(ncpus=self.ncpus,ppservers=self.ppservers)
         
         # try/finally block is to ensure remote worker processes are killed
         try:
