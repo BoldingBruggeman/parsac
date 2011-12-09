@@ -50,12 +50,13 @@ def getJob(jobid,allowedtransports=None):
 
 def main():
     parser = optparse.OptionParser()
-    parser.add_option('-m', '--method',      type='choice', choices=('DE','fmin','galileo'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex, galileo = galileo genetic algorithm')
-    parser.add_option('-t', '--transport',   type='choice', choices=('http','mysql'), help='Transport to use for server communication: http or mysql')
-    parser.add_option('-i', '--interactive', action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
-    parser.add_option('-n', '--ncpus',       type='int', help='Number of CPUs to use (only for Differential Evolution genetic algorithm).')
-    parser.add_option('--ppservers',         type='string', help='Comma-separated list of names/IPs of Parallel Python servers to run on.')
-    parser.set_defaults(method='DE',transport=None,interactive=False,ncpus=None,ppservers=None)
+    parser.add_option('-m', '--method',         type='choice', choices=('DE','fmin','galileo'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex, galileo = galileo genetic algorithm')
+    parser.add_option('-t', '--transport',      type='choice', choices=('http','mysql'), help='Transport to use for server communication: http or mysql')
+    parser.add_option('-r', '--reportfrequency',type='int',    help='Time between result reports (seconds).')
+    parser.add_option('-i', '--interactive',    action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
+    parser.add_option('-n', '--ncpus',          type='int',    help='Number of CPUs to use (only for Differential Evolution genetic algorithm).')
+    parser.add_option('--ppservers',            type='string', help='Comma-separated list of names/IPs of Parallel Python servers to run on (only for Differential Evolution genetic algorithm).')
+    parser.set_defaults(method='DE',transport=None,interactive=False,ncpus=None,ppservers=None,reportfrequency=None)
     (options, args) = parser.parse_args()
     if len(args)<1:
         print 'One argument must be provided: the (integer) job identifier.'
@@ -73,6 +74,7 @@ def main():
     job = getJob(jobid,allowedtransports=allowedtransports)
         
     job.interactive = options.interactive
+    if options.reportfrequency is not None: job.timebetweenreports = options.reportfrequency
 
     repeat = True
     while repeat:
