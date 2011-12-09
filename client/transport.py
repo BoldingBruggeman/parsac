@@ -98,13 +98,16 @@ class HTTP(Transport):
 
     def reportResults(self,runid,results,timeout=5):
         # Create POST parameters and header
-        params = {'run': runid, 'count': len(results)}
+        strpars,strlnls = [],[]
         for ires,(values,lnlikelihood) in enumerate(results):
-            params['parameters%i' % ires] = ';'.join('%.12e' % v for v in values)
+            curpars = ';'.join('%.12e' % v for v in values)
             if lnlikelihood is None:
-                params['lnlikelihood%i' % ires] = ''
+                curlnl = ''
             else:
-                params['lnlikelihood%i' % ires] = '%.12e' % lnlikelihood
+                curlnl = '%.12e' % lnlikelihood
+            strpars.append(curpars)
+            strlnls.append(curlnl)
+        params = {'run': runid, 'parameters': ','.join(strpars), 'lnlikelihood': ','.join(strlnls)}
         headers = {'Content-type':'application/x-www-form-urlencoded', 'Accept':'text/plain'}
 
         # Set default socket timeout and remember old value.

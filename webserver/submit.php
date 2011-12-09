@@ -19,37 +19,28 @@
 
 	// Obtain POST arguments
 	$run   = $_POST['run'];
-	$count = $_POST['count'];
-	
+  
 	// Check presence of required arguments.
-	if (empty($run)) err('Run argument is missing.');
+	if (empty($run)) err("\"run\" argument is missing.");
+	if (empty($_POST['parameters'])) err("\"parameters\" argument is missing.");
+	if (empty($_POST['lnlikelihood'])) err("\"lnlikelihood\" argument is missing.");
 
 	// Convert run identifier to integer.
 	$run = (int)$run;
 	
-	// Connect to MySQL server.
+  $parameters = explode(',',$_POST['parameters']);
+  $lnlikelihoods = explode(',',$_POST['lnlikelihood']);
+
+  // Connect to MySQL server.
 	$result = mysql_connect($host,$user,$password);
 	if (!$result) err("Failed to connect to MySQL database!");
 
 	// Select database.
 	$result = mysql_select_db($database);
 	if (!$result) err( "Unable to select database");
-
-	if (empty($count)) {
-		// Only one result is being reported.
-		$parameters   = $_POST['parameters'];
-		$lnlikelihood = $_POST['lnlikelihood'];
-		if (empty($parameters)) err('Parameter argument is missing.');
-		insertrow($parameters,$lnlikelihood);
-	}
-	else {
-		// A series of results is being reported.
-		for ($i=0; $i<$count; $i++) {
-			$parameters   = $_POST["parameters$i"];
-			$lnlikelihood = $_POST["lnlikelihood$i"];
-			if (empty($parameters)) err("Parameter argument for result $i is missing.");
-			insertrow($parameters,$lnlikelihood);
-		}
+  
+  for ($i=0; $i<count($lnlikelihoods); $i++) {
+		insertrow($parameters[$i],$lnlikelihoods[$i]);
 	}
 
 	// Close MySQL connection.
