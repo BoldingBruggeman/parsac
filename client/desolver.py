@@ -4,7 +4,7 @@
 # Birmingham, AL 35235 USA
 # email: zunzun@zunzun.com
 
-import time, random
+import time, random, copy
 import numpy
 try:
     import pp # http://www.parallelpython.com - can be single CPU, multi-core SMP, or cluster parallelization
@@ -82,7 +82,6 @@ class DESolver:
         self.crossOverProbability = crossoverProb
 
         # initial energies for comparison
-        self.popEnergy = numpy.ones(self.populationSize) * 1.0E300
 
         self.bestSolution = numpy.zeros(self.parameterCount)
         self.bestEnergy = 1.0E300
@@ -128,33 +127,35 @@ class DESolver:
             self.population = self.initialpopulation
         else:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
+        self.popEnergy = numpy.ones(self.populationSize) * 1.0E300
 
         # Create unique job id that will be used to check worker job ids against.
         # (this allows the worker to detect stale job objects)
         self.jobid = self.randomstate.rand()
+
+        remotejob = copy.deepcopy(self)
         
         # try/finally block is to ensure remote worker processes are killed
         try:
 
             # now run DE
-            for self.generation in range(self.maxGenerations):
-
+            for remotejob.generation in range(remotejob.maxGenerations):
                 # no need to try another generation if we are done
                 if breakLoop == True:
                     break # from generation loop
                 
                 # synchronize the populations for each worker
                 if job_server is None:
-                    jobs = range(self.populationSize)
+                    jobs = range(remotejob.populationSize)
                 else:
                     jobs = []
-                    for candidate in range(self.populationSize):
-                        jobs.append(job_server.submit(GenerateTrialAndTestInWorker, (candidate,self), (), ('desolver','numpy.random', 'run','optimizer')))
+                    for candidate in range(remotejob.populationSize):
+                        jobs.append(job_server.submit(GenerateTrialAndTestInWorker, (candidate,remotejob), (), ('desolver','numpy.random', 'run','optimizer','threading')))
                         
                 # run this generation remotely
                 for job in jobs:
                     if job_server is None:
-                        candidate, trialSolution, trialEnergy, atSolution, localresult = GenerateTrialAndTestInWorker(job,self)
+                        candidate, trialSolution, trialEnergy, atSolution, localresult = GenerateTrialAndTestInWorker(job,remotejob)
                     else:
                         candidate, trialSolution, trialEnergy, atSolution, localresult = job()
 
@@ -164,15 +165,15 @@ class DESolver:
                     if atSolution == True:
                         breakLoop = True
                         
-                    if trialEnergy < self.popEnergy[candidate]:
+                    if trialEnergy < remotejob.popEnergy[candidate]:
                         # New low for this candidate
-                        self.popEnergy[candidate] = trialEnergy
-                        self.population[candidate] = numpy.copy(trialSolution)
+                        remotejob.popEnergy[candidate] = trialEnergy
+                        remotejob.population[candidate] = numpy.copy(trialSolution)
 
                         # If at an all-time low, save to "best"
-                        if trialEnergy < self.bestEnergy:
-                            self.bestEnergy = self.popEnergy[candidate]
-                            self.bestSolution = numpy.copy(self.population[candidate])
+                        if trialEnergy < remotejob.bestEnergy:
+                            remotejob.bestEnergy = remotejob.popEnergy[candidate]
+                            remotejob.bestSolution = numpy.copy(remotejob.population[candidate])
 
         finally:
             if job_server is not None: job_server.destroy()

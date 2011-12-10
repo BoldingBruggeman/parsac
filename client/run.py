@@ -34,8 +34,7 @@ class Solver(desolver.DESolver):
         return curqueue
 
     def processLocalResult(self,resultqueue):
-        self.job.resultqueue += resultqueue
-        self.job.flushResultQueue()
+        self.job.reportResults(resultqueue)
 
 def getJob(jobid,allowedtransports=None):
     scenpath = os.path.abspath(os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid))

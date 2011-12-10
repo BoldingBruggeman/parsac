@@ -1,5 +1,5 @@
 # Import from standard Python library (>= 2.4)
-import sys,os.path,re,datetime,math,time,cPickle,hashlib
+import sys,os.path,re,datetime,math,time,cPickle,hashlib,threading
 
 # Import third-party modules
 import numpy
@@ -42,13 +42,13 @@ class Job:
         self.resultqueue = []
         self.allowedreportfailcount = None
         self.allowedreportfailperiod = 3600   # in seconds
-        self.timebetweenreports = -1 # in seconds
+        self.timebetweenreports = 60 # in seconds
         self.reportfailcount = 0
         self.lastreporttime = time.time()
-        self.lastreporttry = time.time()
         self.reportedcount = 0
         self.nexttransportreset = 30
         self.bufferresults = False
+        self.queuelock = None
 
         # Whether to allow for interaction with user (via e.g. raw_input)
         self.interactive = interactive
@@ -476,20 +476,38 @@ class Job:
 
         self.runid = runid
 
+    def createReportingThread(self):
+        self.queuelock = threading.Lock()
+        if not self.bufferresults:
+            self.reportingthread = ReportingThread(self)
+            self.reportingthread.start()
+
     def reportResult(self,values,lnlikelihood,error=None):
+        if self.queuelock is None: self.createReportingThread()
+        
         # Append result to queue
+        self.queuelock.acquire()
         self.resultqueue.append((values,lnlikelihood))
+        self.queuelock.release()
 
         # Flush the queue if needed.
-        if not self.bufferresults: self.flushResultQueue()
+        #if not self.bufferresults: self.flushResultQueue()
+
+    def reportResults(self,results):
+        if self.queuelock is None: self.createReportingThread()
+
+        self.queuelock.acquire()
+        self.resultqueue += results
+        self.queuelock.release()
         
     def flushResultQueue(self):
         # Report the start of the run, if that was not done before.
         if self.runid is None: self.reportRunStart()
 
-        secsincelasttry = time.time()-self.lastreporttry
-        if secsincelasttry<self.timebetweenreports: return
-        self.lastreporttry = time.time()
+        self.queuelock.acquire()
+        batch = self.resultqueue
+        self.resultqueue = []
+        self.queuelock.release()
 
         # Reorder transports, prioritizing last working transport
         # Once in a while we retry the different transports starting from the top.
@@ -506,19 +524,18 @@ class Job:
         for transport in curtransports:
             success = True
             try:
-                transport.reportResults(self.runid,self.resultqueue,timeout=5)
+                transport.reportResults(self.runid,batch,timeout=5)
             except Exception,e:
                 print 'Unable to report result(s) over %s. Reason:\n%s' % (str(transport),str(e))
                 success = False
             if success:
-                print 'Successfully delivered %i result(s) over %s.' % (len(self.resultqueue),str(transport))
+                print 'Successfully delivered %i result(s) over %s.' % (len(batch),str(transport))
                 self.lasttransport = transport
                 break
 
         if success:
             # Flush the queue
-            self.reportedcount += len(self.resultqueue)
-            self.resultqueue = []
+            self.reportedcount += len(batch)
             self.reportfailcount = 0
             self.lastreporttime = time.time()
             return
@@ -526,6 +543,12 @@ class Job:
         # If we arrived here, reporting failed.
         self.reportfailcount += 1
         print 'Unable to report result(s). Last report was sent %i runs/%.0f s ago.' % (self.reportfailcount,time.time()-self.lastreporttime)
+
+        # Put unreported results back in queue
+        self.queuelock.acquire()
+        batch += self.resultqueue
+        self.resultqueue = batch
+        self.queuelock.release()
 
         # If interaction with user is not allowed, leave the result in the queue and return.
         if not self.interactive: return
@@ -551,3 +574,14 @@ class Job:
         # We will tolerate this failure (the server-side script may be unavailable temporarily)
         print 'Queuing current result for later reporting.'
         return
+
+class ReportingThread(threading.Thread):
+    def __init__(self,job):
+        threading.Thread.__init__(self)
+        self.job = job
+    
+    def run(self):
+        while 1:
+            self.job.flushResultQueue()
+            time.sleep(self.job.timebetweenreports)
+            
