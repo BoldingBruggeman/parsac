@@ -504,10 +504,13 @@ class Job:
         # Report the start of the run, if that was not done before.
         if self.runid is None: self.reportRunStart()
 
+        # Take all current results from the queue.
         self.queuelock.acquire()
         batch = self.resultqueue
         self.resultqueue = []
         self.queuelock.release()
+
+        if len(batch)==0: return
 
         # Reorder transports, prioritizing last working transport
         # Once in a while we retry the different transports starting from the top.
@@ -542,7 +545,7 @@ class Job:
 
         # If we arrived here, reporting failed.
         self.reportfailcount += 1
-        print 'Unable to report result(s). Last report was sent %i runs/%.0f s ago.' % (self.reportfailcount,time.time()-self.lastreporttime)
+        print 'Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch),time.time()-self.lastreporttime)
 
         # Put unreported results back in queue
         self.queuelock.acquire()
