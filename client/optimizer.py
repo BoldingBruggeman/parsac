@@ -494,18 +494,12 @@ class Reporter:
 
     def reportResult(self,values,lnlikelihood,error=None):
         if self.queuelock is None: self.createReportingThread()
+
+        if not numpy.isfinite(lnlikelihood): lnlikelihood = None
         
         # Append result to queue
         self.queuelock.acquire()
         self.resultqueue.append((values,lnlikelihood))
-        self.queuelock.release()
-
-    def reportResults(self,results):
-        if self.queuelock is None: self.createReportingThread()
-
-        # Append results to queue
-        self.queuelock.acquire()
-        self.resultqueue += results
         self.queuelock.release()
         
     def flushResultQueue(self):
