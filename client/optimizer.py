@@ -10,20 +10,42 @@ import gotmcontroller,transport
 # Regular expression for GOTM datetimes
 datetimere = re.compile('(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
 
+class attributes():
+    def __init__(self,element,description):
+        self.att = dict(element.attrib)
+        self.description = description
+        
+    def get(self,name,type,default=None,required=None,minimum=None,maximum=None):
+        value = self.att.pop(name,None)
+        if value is None:
+            # No value specified - use default or report error.
+            if required is None: required = default is None
+            if required: raise Exception('Attribute "%s" of %s is required.' % (name,self.description))
+            value = default
+        elif type is bool:
+            # Boolean variable
+            if value not in ('True','False'): raise Exception('Attribute "%s" of %s must have value "True" or "False".' % (name,self.description))
+            value = value=='True'
+        elif type in (float,int):
+            # Numeric variable
+            value = type(eval(value))
+            if minimum is not None and value<minimum: raise Exception('The value of "%s" of %s must exceed %s.' % (name,self.description,minimum))
+            if maximum is not None and value>maximum: raise Exception('The value of "%s" of %s must lie below %s.' % (name,self.description,maximum))
+        else:
+            # String
+            value = type(value)
+        return value
+    def testEmpty(self):
+        if self.att:
+            print 'WARNING: the following attributes of %s are ignored: %s' % (self.description,', '.join(['"%s"' % k for k in self.att.keys()]))
+
 class Job:
     verbose = True
 
-    def __init__(self,jobid,scenariodir,gotmexe='./gotm.exe',transports=None,copyexe=False,interactive=True):
+    def __init__(self,jobid,scenariodir,gotmexe='./gotm.exe',copyexe=False):
         self.initialized = False
 
         self.jobid = jobid
-
-        # Transport settings
-        assert transports is not None,'One or more transports must be specified.'
-        self.transports = transports
-
-        # Last working transport (to be set runtime)
-        self.lasttransport = None
 
         # Create GOTM controller that takes care of setting namelist parameters, running GOTM, etc.
         self.controller = gotmcontroller.Controller(scenariodir,gotmexe,copyexe=copyexe)
@@ -31,62 +53,15 @@ class Job:
         # Array to hold observation datasets
         self.observations = []
 
-        # Identifier for current run
-        self.runid = None
-
         # Whether to reject parameter sets outside of initial parameter ranges.
         # Rejection means returning a ln likelihood of negative infinity.
         self.checkparameterranges = True
 
-        # Queue with results yet to be reported.
-        self.resultqueue = []
-        self.allowedreportfailcount = None
-        self.allowedreportfailperiod = 3600   # in seconds
-        self.timebetweenreports = 60 # in seconds
-        self.reportfailcount = 0
-        self.lastreporttime = time.time()
-        self.reportedcount = 0
-        self.nexttransportreset = 30
-        self.bufferresults = False
-        self.queuelock = None
-
-        # Whether to allow for interaction with user (via e.g. raw_input)
-        self.interactive = interactive
-
     @staticmethod
-    def fromConfigurationFile(path,jobid,scenariodir,allowedtransports=None):
+    def fromConfigurationFile(path,jobid,scenariodir):
         import xml.etree.ElementTree
         tree = xml.etree.ElementTree.parse(path)
         
-        class attributes():
-            def __init__(self,element,description):
-                self.att = dict(element.attrib)
-                self.description = description
-                
-            def get(self,name,type,default=None,required=None,minimum=None,maximum=None):
-                value = self.att.pop(name,None)
-                if value is None:
-                    # No value specified - use default or report error.
-                    if required is None: required = default is None
-                    if required: raise Exception('Attribute "%s" of %s is required.' % (name,self.description))
-                    value = default
-                elif type is bool:
-                    # Boolean variable
-                    if value not in ('True','False'): raise Exception('Attribute "%s" of %s must have value "True" or "False".' % (name,self.description))
-                    value = value=='True'
-                elif type in (float,int):
-                    # Numeric variable
-                    value = type(eval(value))
-                    if minimum is not None and value<minimum: raise Exception('The value of "%s" of %s must exceed %s.' % (name,self.description,minimum))
-                    if maximum is not None and value>maximum: raise Exception('The value of "%s" of %s must lie below %s.' % (name,self.description,maximum))
-                else:
-                    # String
-                    value = type(value)
-                return value
-            def testEmpty(self):
-                if self.att:
-                    print 'WARNING: the following attributes of %s are ignored: %s' % (self.description,', '.join(['"%s"' % k for k in self.att.keys()]))
-
         # Parse executable section
         element = tree.find('executable')
         if element is None: raise Exception('The root node must contain a single "executable" element.')
@@ -94,27 +69,8 @@ class Job:
         exe = att.get('path',unicode)
         att.testEmpty()
 
-        # Parse transports section
-        transports = []
-        for itransport,element in enumerate(tree.findall('transports/transport')):
-            att = attributes(element,'transport %i' % (itransport+1))
-            type = att.get('type',unicode)
-            if allowedtransports is not None and type not in allowedtransports: continue
-            if type=='mysql':
-                curtransport = transport.MySQL(server  =att.get('server',  unicode),
-                                               user    =att.get('user',    unicode),
-                                               password=att.get('password',unicode),
-                                               database=att.get('database',unicode))
-            elif type=='http':
-                curtransport = transport.HTTP(server  =att.get('server',  unicode),
-                                              path    =att.get('path',    unicode))
-            else:
-                raise Exception('Unknown transport type "%s".' % type)
-            att.testEmpty()
-            transports.append(curtransport)
-
         # Create job object
-        job = Job(jobid,scenariodir,gotmexe=exe,transports=transports,copyexe=not hasattr(sys,'frozen'))
+        job = Job(jobid,scenariodir,gotmexe=exe,copyexe=not hasattr(sys,'frozen'))
         
         # Parse parameters section
         for ipar,element in enumerate(tree.findall('parameters/parameter')):
@@ -290,17 +246,6 @@ class Job:
     def initialize(self):
         assert not self.initialized, 'Job has already been initialized.'
 
-        validtp = []
-        for transport in self.transports:
-            if transport.available():
-                validtp.append(transport)
-            else:
-                print 'Transport %s is not available.' % str(transport)
-        if not validtp:
-            print 'No transport available; exiting...'
-            sys.exit(1)
-        self.transports = tuple(validtp)
-
         self.controller.initialize()
 
         self.initialized = True
@@ -454,23 +399,89 @@ class Job:
 
         return lnlikelihood
 
-    def reportRunStart(self):
-        if not self.initialized: self.initialize()
+    def reportResult(self,values,lnlikelihood,error=None):
+        pass
 
+class Reporter:
+    @staticmethod
+    def fromConfigurationFile(path,jobid,description,allowedtransports=None,interactive=True):
+        import xml.etree.ElementTree
+        tree = xml.etree.ElementTree.parse(path)
+        
+        # Parse transports section
+        transports = []
+        for itransport,element in enumerate(tree.findall('transports/transport')):
+            att = attributes(element,'transport %i' % (itransport+1))
+            type = att.get('type',unicode)
+            if allowedtransports is not None and type not in allowedtransports: continue
+            if type=='mysql':
+                curtransport = transport.MySQL(server  =att.get('server',  unicode),
+                                               user    =att.get('user',    unicode),
+                                               password=att.get('password',unicode),
+                                               database=att.get('database',unicode))
+            elif type=='http':
+                curtransport = transport.HTTP(server  =att.get('server',  unicode),
+                                              path    =att.get('path',    unicode))
+            else:
+                raise Exception('Unknown transport type "%s".' % type)
+            att.testEmpty()
+            transports.append(curtransport)
+
+        return Reporter(jobid,description,transports,interactive=interactive)
+
+    def __init__(self,jobid,description,transports=None,interactive=True):
+
+        self.jobid = jobid
+        self.description = description
+
+        # Check transports
+        assert transports is not None,'One or more transports must be specified.'
+        validtp = []
+        for transport in transports:
+            if transport.available():
+                validtp.append(transport)
+            else:
+                print 'Transport %s is not available.' % str(transport)
+        if not validtp:
+            print 'No transport available; exiting...'
+            sys.exit(1)
+        self.transports = tuple(validtp)
+
+        # Last working transport (to be set at run time)
+        self.lasttransport = None
+
+        # Identifier for current run
+        self.runid = None
+
+        # Queue with results yet to be reported.
+        self.resultqueue = []
+        self.allowedreportfailcount = None
+        self.allowedreportfailperiod = 3600   # in seconds
+        self.timebetweenreports = 60 # in seconds
+        self.reportfailcount = 0
+        self.lastreporttime = time.time()
+        self.reportedcount = 0
+        self.nexttransportreset = 30
+        self.queuelock = None
+
+        # Whether to allow for interaction with user (via e.g. raw_input)
+        self.interactive = interactive
+        
+    def reportRunStart(self):
         runid = None
         for transport in self.transports:
             if not transport.available(): continue
             try:
-                runid = transport.initialize(self.jobid,self.describe())
+                runid = transport.initialize(self.jobid,self.description)
             except Exception,e:
                 print 'Failed to initialize run over %s.\nReason: %s' % (str(transport),str(e))
                 runid = None
-            if runid!=None:
+            if runid is not None:
                 print 'Successfully initialized run over %s.\nRun identifier = %i' % (str(transport),runid)
                 self.lasttransport = transport
                 break
             
-        if runid==None:
+        if runid is None:
             print 'Unable to initialize run. Exiting...'
             sys.exit(1)
 
@@ -478,9 +489,8 @@ class Job:
 
     def createReportingThread(self):
         self.queuelock = threading.Lock()
-        if not self.bufferresults:
-            self.reportingthread = ReportingThread(self)
-            self.reportingthread.start()
+        self.reportingthread = ReportingThread(self)
+        self.reportingthread.start()
 
     def reportResult(self,values,lnlikelihood,error=None):
         if self.queuelock is None: self.createReportingThread()
@@ -490,12 +500,10 @@ class Job:
         self.resultqueue.append((values,lnlikelihood))
         self.queuelock.release()
 
-        # Flush the queue if needed.
-        #if not self.bufferresults: self.flushResultQueue()
-
     def reportResults(self,results):
         if self.queuelock is None: self.createReportingThread()
 
+        # Append results to queue
         self.queuelock.acquire()
         self.resultqueue += results
         self.queuelock.release()
@@ -510,6 +518,7 @@ class Job:
         self.resultqueue = []
         self.queuelock.release()
 
+        # If there are no results to report, do nothing.
         if len(batch)==0: return
 
         # Reorder transports, prioritizing last working transport
@@ -537,7 +546,7 @@ class Job:
                 break
 
         if success:
-            # Flush the queue
+            # Register success and return.
             self.reportedcount += len(batch)
             self.reportfailcount = 0
             self.lastreporttime = time.time()

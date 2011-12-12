@@ -1,11 +1,6 @@
-# Placed into the public domain by:
-# James R. Phillips
-# 2548 Vera Cruz Drive
-# Birmingham, AL 35235 USA
-# email: zunzun@zunzun.com
-
-import time, random, copy
+import time
 import numpy
+
 try:
     import pp # http://www.parallelpython.com - can be single CPU, multi-core SMP, or cluster parallelization
 except ImportError:
@@ -17,489 +12,184 @@ if pp is not None:
     import pptransport
     pptransport.TRANSPORT_SOCKET_TIMEOUT = 600
 
-# NB the function below runs only in remote worker
-def GenerateTrialAndTestInWorker(in_candidate,ref_solver):
-    global solver
-    import numpy,numpy.random
+def processTrial(newjobid,newjob,trial):
+    global jobid,job
 
-    if 'solver' not in globals() or solver.jobid!=ref_solver.jobid:
-        # This worker is being run for the first time.
-        # Create a copy of the central (virgin) job object.
-        # This job object is uninitialized, so the call to solver.EnergyFunction
-        # will force initialization for this thread only.
-        solver = ref_solver
-        solver.randomstate = numpy.random.RandomState(seed=None)
-        solver.switchToLocal()
-    else:
-        # This worker has been used before. Simply update it with the latest population info.
-        solver.population = ref_solver.population
-        solver.bestEnergy = ref_solver.bestEnergy
-        solver.generation = ref_solver.generation
+    if 'jobid' not in globals() or jobid!=newjobid:
+        # This worker is being run for the first time with the specified job.
+        # Store the job object, which will be reused for all consequentive runs
+        # as long as the job identifier remaisn the same.
+        # This job object is uninitialized, so the call to job.evaluateFitness
+        # will force initialization for this worker only.
+        job,jobid = newjob,newjobid
 
-    # Jorn added: multiply and mutate the selected candidate until obtaining an child that differs.
-    # This may not happen immediately if the cross-over probability is low.
-    while(1):
-        # deStrategy is the name of the DE function to use for mutant generation.
-        eval('solver.' + solver.deStrategy + '(in_candidate)')
-        if (in_candidate!=solver.trialSolution).any(): break
+    # Evaluate the cost function (*less is better*)
+    score = -job.evaluateFitness(trial)
 
-    # Jorn added: reflect parameter values if they have digressed beyond the specified boundaries.
-    # This may need to be done multiple times, if the allowed range is small and the parameter deviation large.
-    if solver.checkbounds:
-        while numpy.logical_or(solver.trialSolution<solver.minInitialValue,solver.trialSolution>solver.maxInitialValue).any():
-            print 'Mirroring out-of-bound parameter values.'
-            solver.trialSolution = solver.minInitialValue + numpy.abs(solver.minInitialValue-solver.trialSolution)
-            solver.trialSolution = solver.maxInitialValue - numpy.abs(solver.maxInitialValue-solver.trialSolution)
-        solver.trialSolution = tuple(solver.trialSolution)
-            
-    # Evaluate the current energy level (*less is better*)
-    energy, atSolution = solver.EnergyFunction(solver.trialSolution)
-    
-    if solver.polishTheBestTrials == True and energy < solver.bestEnergy and solver.generation > 0: # not the first generation
-        # try to polish these new coefficients a bit.
-        solver.trialSolution = scipy.optimize.fmin(solver.externalEnergyFunction, solver.trialSolution, disp = 0) # don't print warning messages to stdout
-        energy, atSolution = solver.EnergyFunction(solver.trialSolution) # recalc with polished coefficients
-
-    return[in_candidate, solver.trialSolution, energy, atSolution,solver.getLocalResult()]
-
-
+    return trial,score
 
 class DESolver:
 
-    def __init__(self, parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials, initialpopulation = None, ncpus=None, ppservers=()):
+    def __init__(self, job, populationSize, maxGenerations, minInitialValue, maxInitialValue, diffScale, crossoverProb, initialpopulation = None, ncpus=None, ppservers=(), reporter = None):
+        # Store job (with fitness function) and reporter objects.
+        self.job = job
+        self.reporter = reporter
 
-        self.polishTheBestTrials = polishTheBestTrials # see the Solve method where this flag is used
-        self.maxGenerations = maxGenerations
-        self.parameterCount = parameterCount
-        self.populationSize = populationSize
-        self.cutoffEnergy   = cutoffEnergy
+        # Check whether minimum and maximum vector have equal length.
+        assert len(minInitialValue)==len(maxInitialValue),'Lengths of minimum and maximum vectors do not match.'
+
+        # Constrains on parameters, population size, generation count.
         self.minInitialValue = numpy.asarray(minInitialValue)
         self.maxInitialValue = numpy.asarray(maxInitialValue)
-        self.deStrategy     = deStrategy # deStrategy is the name of the DE function to use
-        self.useClassRandomNumberMethods = useClassRandomNumberMethods
+        self.parameterCount = len(minInitialValue)
+        self.populationSize = populationSize
+        self.maxGenerations = maxGenerations
 
+        # Differential Evolution scale and cross-over probability parameters.
         self.scale = diffScale
         self.crossOverProbability = crossoverProb
 
-        # initial energies for comparison
+        # Whether to force parameetr vectors to stay withi specified bounds.
+        self.strictbounds = True
 
-        self.bestSolution = numpy.zeros(self.parameterCount)
-        self.bestEnergy = 1.0E300
-
-        # Jorn added!
-        self.randomstate = numpy.random.RandomState(seed=None)
-        self.checkbounds = True
-        self.initialpopulation = initialpopulation
+        # Parallel Python settings
         if ncpus is None: ncpus = 'autodetect'
         self.ncpus = ncpus
         self.ppservers = ppservers
 
+        # Store initial population (if provided) and perform basic checks.
+        self.initialpopulation = initialpopulation
         if self.initialpopulation is not None:
             assert self.initialpopulation.ndim==2, 'Initial population must be a NumPy matrix.'
-            assert self.initialpopulation.shape[0]>=self.populationSize, 'Initial population must be a matrix with at least %i rows (current row count = %i).' % (self.populationSize,self.initialpopulation.shape[0])
             assert self.initialpopulation.shape[1]==self.parameterCount, 'Initial population must be a matrix with %i columns (current column count = %i).' % (self.parameterCount,self.initialpopulation.shape[1])
-            self.initialpopulation = self.initialpopulation[-self.populationSize:,:]
-            assert self.initialpopulation.shape[0]==self.populationSize, 'After checking, the initial population must be a matrix with exactly %i rows (current row count = %i).' % (self.populationSize,self.initialpopulation.shape[0])
+
+        # Create random number generator.
+        self.randomstate = numpy.random.RandomState(seed=None)
 
     def Solve(self):
 
-        breakLoop = False
-
         job_server = None
         if pp is not None:
+            # Create job server and give it time to conenct to nodes.
             job_server = pp.Server(ncpus=self.ncpus,ppservers=self.ppservers)
             if self.ppservers:
                 print 'Giving Parallel Python 5 seconds to connect to nodes...'
                 time.sleep(5)
+                
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
             jobsperworker = int(numpy.round(self.populationSize/float(nworkers)))
             if self.populationSize!=jobsperworker*nworkers:
                 print 'Setting population size to %i (was %i) to ensure it is a multiple of number of workers (%i).' % (jobsperworker*nworkers,self.populationSize,nworkers)
-            self.populationSize = jobsperworker*nworkers
+                self.populationSize = jobsperworker*nworkers
 
-        # a random initial population, returns numpy arrays directly
-        # the population will be synchronized with the remote workers at the beginning of each generation
-
-        # Changed by Jorn!
-        #self.population = numpy.random.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
+        # Create initial population.
         if self.initialpopulation is not None:
-            self.population = self.initialpopulation
+            assert self.initialpopulation.shape[0]>=self.populationSize, 'Initial population must be a matrix with at least %i rows (current row count = %i).' % (self.populationSize,self.initialpopulation.shape[0])
+            self.population = self.initialpopulation[-self.populationSize:,:]
         else:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
-        self.popEnergy = numpy.ones(self.populationSize) * 1.0E300
+        cost = numpy.empty(self.population.shape[0])
+        cost[:] = numpy.Inf
+
+        ibest = None
 
         # Create unique job id that will be used to check worker job ids against.
         # (this allows the worker to detect stale job objects)
-        self.jobid = self.randomstate.rand()
-
-        remotejob = copy.deepcopy(self)
+        jobid = self.randomstate.rand()
         
         # try/finally block is to ensure remote worker processes are killed
         try:
 
-            # now run DE
-            for remotejob.generation in range(remotejob.maxGenerations):
-                # no need to try another generation if we are done
-                if breakLoop == True:
-                    break # from generation loop
+            for igeneration in range(self.maxGenerations):
                 
-                # synchronize the populations for each worker
-                if job_server is None:
-                    jobs = range(remotejob.populationSize)
-                else:
-                    jobs = []
-                    for candidate in range(remotejob.populationSize):
-                        jobs.append(job_server.submit(GenerateTrialAndTestInWorker, (candidate,remotejob), (), ('desolver','numpy.random', 'run','optimizer','threading')))
-                        
-                # run this generation remotely
-                for job in jobs:
+                # Generate list with target,trial vector combinations to try.
+                # If using Parallel Python, submit these trials to the workers.
+                trials = []
+                for itarget in range(self.population.shape[0]):
+                    trial = self.generateNew(itarget,ibest,F=self.scale,CR=self.crossOverProbability,strictbounds=self.strictbounds)
+                    if job_server is not None:
+                        trial = job_server.submit(processTrial, (jobid,self.job,trial), (), ('run',))
+                    trials.append(trial)
+
+                # Process the individual target,trial combinations.
+                for itarget,trial in enumerate(trials):
                     if job_server is None:
-                        candidate, trialSolution, trialEnergy, atSolution, localresult = GenerateTrialAndTestInWorker(job,remotejob)
+                        trial,score = processTrial(jobid,self.job,trial)
                     else:
-                        candidate, trialSolution, trialEnergy, atSolution, localresult = job()
+                        trial,score = trial()
 
-                    if localresult is not None: self.processLocalResult(localresult)
-                    
-                    # if we've reached a sufficient solution we can stop
-                    if atSolution == True:
-                        breakLoop = True
-                        
-                    if trialEnergy < remotejob.popEnergy[candidate]:
-                        # New low for this candidate
-                        remotejob.popEnergy[candidate] = trialEnergy
-                        remotejob.population[candidate] = numpy.copy(trialSolution)
+                    if self.reporter is not None: self.reporter.reportResult(trial,-score)
 
-                        # If at an all-time low, save to "best"
-                        if trialEnergy < remotejob.bestEnergy:
-                            remotejob.bestEnergy = remotejob.popEnergy[candidate]
-                            remotejob.bestSolution = numpy.copy(remotejob.population[candidate])
-
+                    # Determine whether trial vector is better than target vector.
+                    # If so, replace target with trial.
+                    if score<=cost[itarget]:
+                        self.population[itarget,:] = trial
+                        cost[itarget] = score
+                        if ibest is None or score<cost[ibest]: ibest = itarget
         finally:
             if job_server is not None: job_server.destroy()
 
-        return atSolution
+        return False
 
-    def switchToLocal(self):
-        pass
+    def drawVectors(self,n,exclude=()):
+        """Draws n vectors at random from the population, ensuring they
+        do not overlap.
+        """
+        vectors = []
+        excluded = list(exclude)
+        for i in range(n):
+            ind = self.randomstate.randint(self.population.shape[0]-len(excluded))
+            excluded.sort()
+            for oldind in excluded:
+                if ind>=oldind: ind += 1
+            vectors.append(self.population[ind,:])
+            excluded.append(ind)
+        return vectors
 
-    def processLocalResult(self,result):
-        pass
+    def generateNew(self,itarget,ibest,CR=0.9,strictbounds=True,ndiffvector=1,F=0.5,randomancestor=True):
+        """Generates a new trial vector according to the Differential Evolution
+        algorithm.
 
-    def getLocalResult(self):
-        return None
-
-    def SetupClassRandomNumberMethods(self):
-        assert False,'Base SetupClassRandomNumberMethods should never be called!'
-        numpy.random.seed(3) # this yields same results each time Solve() is run
-        self.nonStandardRandomCount = self.populationSize * self.parameterCount * 3
-        if self.nonStandardRandomCount < 523: # set a minimum number of random numbers
-            self.nonStandardRandomCount = 523
-            
-        self.ArrayOfRandomIntegersBetweenZeroAndParameterCount = numpy.random.random_integers(0, self.parameterCount-1, size=(self.nonStandardRandomCount))
-        self.ArrayOfRandomRandomFloatBetweenZeroAndOne = numpy.random.uniform(size=(self.nonStandardRandomCount))
-        self.ArrayOfRandomIntegersBetweenZeroAndPopulationSize = numpy.random.random_integers(0, self.populationSize-1, size=(self.nonStandardRandomCount))
-        self.randCounter1 = 0
-        self.randCounter2 = 0
-        self.randCounter3 = 0
-
-
-    def GetClassRandomIntegerBetweenZeroAndParameterCount(self):
-        self.randCounter1 += 1
-        if self.randCounter1 >= self.nonStandardRandomCount:
-            self.randCounter1 = 0
-        return self.ArrayOfRandomIntegersBetweenZeroAndParameterCount[self.randCounter1]
-
-    def GetClassRandomFloatBetweenZeroAndOne(self):
-        self.randCounter2 += 1
-        if self.randCounter2 >= self.nonStandardRandomCount:
-            self.randCounter2 = 0
-        return self.ArrayOfRandomRandomFloatBetweenZeroAndOne[self.randCounter2]
+        Details in Storn, R. & Price, K. 1997. Differential evolution - A simple
+        and efficient heuristic for global optimization over continuous spaces.
+        Journal of Global Optimization 11:341-59.
+        """
+        if ibest is None: randomancestor = True
         
-    def GetClassRandomIntegerBetweenZeroAndPopulationSize(self):
-        self.randCounter3 += 1
-        if self.randCounter3 >= self.nonStandardRandomCount:
-            self.randCounter3 = 0
-        return self.ArrayOfRandomIntegersBetweenZeroAndPopulationSize[self.randCounter3]
-
-
-    # this class might normally be subclassed and this method overridden, or the
-    # externalEnergyFunction set and this method used directly
-    def EnergyFunction(self, trial):
-        try:
-            energy = self.externalEnergyFunction(trial)
-        except ArithmeticError:
-            energy = 1.0E300 # high energies for arithmetic exceptions
-        except FloatingPointError:
-            energy = 1.0E300 # high energies for floating point exceptions
-
-        # we will be "done" if the energy is less than or equal to the cutoff energy
-        if energy <= self.cutoffEnergy:
-            return energy, True
+        # Draw random vectors
+        if randomancestor:
+            vectors = self.drawVectors(ndiffvector*2+1,exclude=(itarget,))
         else:
-            return energy, False
+            vectors = self.drawVectors(ndiffvector*2,  exclude=(itarget,ibest))
 
-    def Best1Exp(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,0,0,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
+        # Determine target vector
+        if randomancestor:
+            # Randomly picked ancestor
+            ref = vectors.pop()
         else:
-            n = random.randint(0, self.parameterCount-1)
+            # Ancestor is current best
+            ref = self.population[ibest,:]
 
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.bestSolution[n] + self.scale * (self.population[r1][n] - self.population[r2][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
+        # Create difference vector
+        delta = numpy.zeros_like(ref)
+        for i in range(ndiffvector):
+            r1 = vectors.pop()
+            r2 = vectors.pop()
+            delta += r1-r2
+        mutant = ref + F*delta
 
+        # Cross-over
+        cross = self.randomstate.random_sample(delta.size)<=CR
+        cross[self.randomstate.randint(delta.size)] = True
+        trial = numpy.where(cross,mutant,self.population[itarget,:])
 
-    def Rand1Exp(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,1,0,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
+        # Reflect parameter values if they have digressed beyond the specified boundaries.
+        # This may need to be done multiple times, if the allowed range is small and the parameter deviation large.
+        if strictbounds:
+            while numpy.logical_or(trial<self.minInitialValue,trial>self.maxInitialValue).any():
+                trial = self.minInitialValue + numpy.abs(self.minInitialValue-trial)
+                trial = self.maxInitialValue - numpy.abs(self.maxInitialValue-trial)
 
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.population[r1][n] + self.scale * (self.population[r2][n] - self.population[r3][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
+        return trial
 
-    def Rand1Exp_jorn(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,1,0,0)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        for i in range(self.parameterCount):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k <= self.crossOverProbability:
-                self.trialSolution[i] = self.population[r1][i] + self.scale * (self.population[r2][i] - self.population[r3][i])
-
-    def RandToBest1Exp(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,0,0,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] += self.scale * (self.bestSolution[n] - self.trialSolution[n]) + self.scale * (self.population[r1][n] - self.population[r2][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def Best2Exp(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,1,1,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.bestSolution[n] + self.scale * (self.population[r1][n] + self.population[r2][n] - self.population[r3][n] - self.population[r4][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def Rand2Exp(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,1,1,1)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.population[r1][n] + self.scale * (self.population[r2][n] + self.population[r3][n] - self.population[r4][n] - self.population[r5][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def Best1Bin(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,0,0,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.bestSolution[n] + self.scale * (self.population[r1][n] - self.population[r2][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def Rand1Bin(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,1,0,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.population[r1][n] + self.scale * (self.population[r2][n] - self.population[r3][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def RandToBest1Bin(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,0,0,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] += self.scale * (self.bestSolution[n] - self.trialSolution[n]) + self.scale * (self.population[r1][n] - self.population[r2][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def Best2Bin(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,1,1,0)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.bestSolution[n] + self.scale * (self.population[r1][n] + self.population[r2][n] - self.population[r3][n] - self.population[r4][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def Rand2Bin(self, candidate):
-        r1,r2,r3,r4,r5 = self.SelectSamples(candidate, 1,1,1,1,1)
-        if True == self.useClassRandomNumberMethods:
-            n = self.GetClassRandomIntegerBetweenZeroAndParameterCount()
-        else:
-            n = random.randint(0, self.parameterCount-1)
-
-        self.trialSolution = numpy.copy(self.population[candidate])
-        i = 0
-        while(1):
-            if True == self.useClassRandomNumberMethods:
-                k = self.GetClassRandomFloatBetweenZeroAndOne()
-            else:
-                k = random.uniform(0.0, 1.0)
-            if k >= self.crossOverProbability or i == self.parameterCount:
-                break
-            self.trialSolution[n] = self.population[r1][n] + self.scale * (self.population[r2][n] + self.population[r3][n] - self.population[r4][n] - self.population[r5][n])
-            n = (n + 1) % self.parameterCount
-            i += 1
-
-
-    def SelectSamples(self, candidate, r1, r2, r3, r4, r5):
-        if r1:
-            while(1):
-                if True == self.useClassRandomNumberMethods:
-                    r1 = self.GetClassRandomIntegerBetweenZeroAndPopulationSize()
-                else:
-                    r1 = random.randint(0, self.populationSize-1)
-                if r1 != candidate:
-                    break
-        if r2:
-            while(1):
-                if True == self.useClassRandomNumberMethods:
-                    r2 = self.GetClassRandomIntegerBetweenZeroAndPopulationSize()
-                else:
-                    r2 = random.randint(0, self.populationSize-1)
-                if r2 != candidate and r2 != r1:
-                    break
-        if r3:
-            while(1):
-                if True == self.useClassRandomNumberMethods:
-                    r3 = self.GetClassRandomIntegerBetweenZeroAndPopulationSize()
-                else:
-                    r3 = random.randint(0, self.populationSize-1)
-                if r3 != candidate and r3 != r1 and r3 != r2:
-                    break
-        if r4:
-            while(1):
-                if True == self.useClassRandomNumberMethods:
-                    r4 = self.GetClassRandomIntegerBetweenZeroAndPopulationSize()
-                else:
-                    r4 = random.randint(0, self.populationSize-1)
-                if r4 != candidate and r4 != r1 and r4 != r2 and r4 != r3:
-                    break
-        if r5:
-            while(1):
-                if True == self.useClassRandomNumberMethods:
-                    r5 = self.GetClassRandomIntegerBetweenZeroAndPopulationSize()
-                else:
-                    r5 = random.randint(0, self.populationSize-1)
-                if r5 != candidate and r5 != r1 and r5 != r2 and r5 != r3 and r5 != r4:
-                    break
-
-        return r1, r2, r3, r4, r5

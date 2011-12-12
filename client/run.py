@@ -1,42 +1,12 @@
 #!/usr/bin/python
 
 # Import from standard Python library
-import os.path,sys,optparse,datetime
+import os.path,sys,optparse
 
 # Import personal custom stuff
 import optimizer
 
-import desolver
-class Solver(desolver.DESolver):
-    def __init__(self,job,*args,**kwargs):
-        desolver.DESolver.__init__(self,*args,**kwargs)
-        self.job = job
-        
-    # Functions for random number generation
-    def SetupClassRandomNumberMethods(self):
-        pass
-    def GetClassRandomIntegerBetweenZeroAndParameterCount(self):
-        return self.randomstate.random_integers(0, self.parameterCount-1)
-    def GetClassRandomFloatBetweenZeroAndOne(self):
-        return self.randomstate.uniform()
-    def GetClassRandomIntegerBetweenZeroAndPopulationSize(self):
-        return self.randomstate.random_integers(0, self.populationSize-1)
-        
-    def externalEnergyFunction(self,trial):
-        return -self.job.evaluateFitness(trial)
-
-    def switchToLocal(self):
-        self.job.bufferresults = True
-
-    def getLocalResult(self):
-        curqueue = self.job.resultqueue
-        self.job.resultqueue = []
-        return curqueue
-
-    def processLocalResult(self,resultqueue):
-        self.job.reportResults(resultqueue)
-
-def getJob(jobid,allowedtransports=None):
+def getJob(jobid,returnreporter=False,allowedtransports=None):
     scenpath = os.path.abspath(os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid))
 
     configpath = os.path.join(scenpath,'config.xml')
@@ -45,7 +15,14 @@ def getJob(jobid,allowedtransports=None):
         return None
 
     print 'Reading configuration from %s...' % configpath
-    return optimizer.Job.fromConfigurationFile(configpath,jobid,scenpath,allowedtransports=allowedtransports)
+    job = optimizer.Job.fromConfigurationFile(configpath,jobid,scenpath)
+    if returnreporter:
+        f = open(configpath)
+        xml = f.read()
+        f.close()
+        reporter = optimizer.Reporter.fromConfigurationFile(configpath,jobid,xml,allowedtransports=allowedtransports)
+        return job,reporter
+    return job
 
 def main():
     parser = optparse.OptionParser()
@@ -70,33 +47,43 @@ def main():
     if options.ppservers is not None:
         ppservers = tuple(options.ppservers.split(','))
 
-    job = getJob(jobid,allowedtransports=allowedtransports)
-        
-    job.interactive = options.interactive
-    if options.reportfrequency is not None: job.timebetweenreports = options.reportfrequency
+    job,reporter = getJob(jobid,returnreporter=True,allowedtransports=allowedtransports)
+
+    # Configure result reporter
+    reporter.interactive = options.interactive
+    if options.reportfrequency is not None: reporter.timebetweenreports = options.reportfrequency
 
     repeat = True
     while repeat:
         repeat = (options.method!='fmin')   # repeating is only useful for stochastic algorithms - not for deterministic ones
-        #job.reportRunStart()
 
         if options.method=='fmin':
+            def costFunction(x):
+                fitness = job.evaluateFitness(x)
+                reporter.reportResult(x,fitness)
+                return -fitness
+            
             job.initialize()
             import scipy.optimize.optimize
-            xopt = scipy.optimize.optimize.fmin(lambda x: -job.evaluateFitness(x),job.controller.createParameterSet())
+            xopt = scipy.optimize.optimize.fmin(costFunction,job.controller.createParameterSet())
 
             print 'Best parameter set:'
             vals = job.controller.untransformParameterValues(xopt)
             for parinfo,val in zip(job.controller.parameters,vals):
                 print '  %s = %.6g' % (parinfo['name'],val)
         elif options.method=='galileo':
+            def fitnessFunction(x):
+                fitness = job.evaluateFitness(x)
+                reporter.reportResult(x,fitness)
+                return fitness
+
             import galileo
             
             popsize = 10*len(job.controller.parameters)
             maxgen = min(popsize,40)
 
             P = galileo.Population(popsize)
-            P.evalFunc = job.evaluateFitness
+            P.evalFunc = fitnessFunction
             P.chromoMinValues,P.chromoMaxValues = job.controller.getParameterBounds()
             P.useInteger = 0
             P.crossoverRate = 1.0
@@ -128,6 +115,7 @@ def main():
                 for parinfo,val in zip(job.controller.parameters,vals):
                     print '  %s = %.6g' % (parinfo['name'],val)
         elif options.method=='DE':
+            import desolver
 
             minpar,maxpar = job.controller.getParameterBounds()
             
@@ -142,7 +130,7 @@ def main():
                 startpop = numpy.load(startpoppath)
 
             # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-            solver = Solver(job, len(minpar), popsize, maxgen, minpar, maxpar, 'Rand1Exp_jorn', 0.5, 0.9, 0.01, True, False, initialpopulation=startpop, ncpus=options.ncpus, ppservers=ppservers)
+            solver = desolver.DESolver(job, popsize, maxgen, minpar, maxpar, 0.5, 0.9, initialpopulation=startpop, ncpus=options.ncpus, ppservers=ppservers, reporter=reporter)
             solver.Solve()
 
             #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
