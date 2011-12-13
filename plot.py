@@ -80,10 +80,10 @@ group2maxlnl = {}
 badcount = 0
 i = 1
 for strpars,lnlikelihood,group in c:
-    if lnlikelihood==None:
+    if lnlikelihood is None:
         badcount += 1
     else:
-        parameters = map(float,strpars.split(';'))
+        parameters = numpy.array(strpars.split(';'),dtype=numpy.float)
         valid = True
         for (ipar,minval,maxval) in parconstraints:
             if parameters[ipar]<minval or parameters[ipar]>maxval:
@@ -116,20 +116,20 @@ maxlnl = res[maxindex,-1]
 minlnl = res[:,-1].min()
 print 'Best parameter set is # %i with ln likelihood = %.6g:' % (maxindex,maxlnl)
 for i in range(res.shape[1]-1):
-    val = res[maxindex,i]
+    bestval = res[maxindex,i]
     pi = job.controller.parameters[i]
-    val0,val2 = '',''
+    lbound,rbound = None,None
     for j in indices[-2::-1]:
-        if val0=='' and res[j,i]<val and res[j,-1]<maxlnl-1.92: val0 = res[j,i]
-        if val2=='' and res[j,i]>val and res[j,-1]<maxlnl-1.92: val2 = res[j,i]
-        if val0!='' and val2!='': break
+        if lbound is None and res[j,i]<bestval and res[j,-1]<maxlnl-1.92: lbound = res[j,i]
+        if rbound is None and res[j,i]>bestval and res[j,-1]<maxlnl-1.92: rbound = res[j,i]
+        if lbound is not None and rbound is not None: break
     if pi['logscale']:
-        val = math.pow(10.,val)
-        if val0!='': val0 = math.pow(10.,val0)
-        if val2!='': val2 = math.pow(10.,val2)
-    if val0!='': val0 = '%.6g' % val0
-    if val2!='': val2 = '%.6g' % val2
-    print '   %s = %.6g (%s - %s)' % (pi['name'],val,val0,val2)
+        bestval = math.pow(10.,bestval)
+        if lbound is not None: lbound = 10.**lbound
+        if rbound is not None: rbound = 10.**rbound
+    if lbound is not None: lbound = '%.6g' % lbound
+    if rbound is not None: rbound = '%.6g' % rbound
+    print '   %s = %.6g (%s - %s)' % (pi['name'],bestval,lbound,rbound)
 
 # Create the figure
 matplotlib.pylab.figure(figsize=(12,8))
