@@ -205,15 +205,18 @@ for ipar in range(npar):
 
     # Set axes boundaries
     minpar,maxpar = pi['minimum'],pi['maximum']
-    if pi['logscale']: minpar,maxpar = math.log10(minpar),math.log10(maxpar)
+    lbound,rbound = lbounds[ipar],rbounds[ipar]
+    if pi['logscale']:
+        minpar,maxpar = math.log10(minpar),math.log10(maxpar)
+        lbound,rbound = math.log10(lbound),math.log10(rbound)
     matplotlib.pylab.xlim(minpar,maxpar)
-    lbound = minlnl-maxlnl
-    if options.range!=None: lbound = options.range
-    matplotlib.pylab.ylim(lbound,0)
+    ymin = minlnl-maxlnl
+    if options.range is not None: ymin = options.range
+    matplotlib.pylab.ylim(ymin,0)
 
     # Show confidence interval
-    matplotlib.pylab.axvline(lbounds[ipar],color='k',linestyle='--')
-    matplotlib.pylab.axvline(rbounds[ipar],color='k',linestyle='--')
+    matplotlib.pylab.axvline(lbound,color='k',linestyle='--')
+    matplotlib.pylab.axvline(rbound,color='k',linestyle='--')
 
 #matplotlib.pylab.legend(numpoints=1)
 matplotlib.pylab.savefig('estimates.png',dpi=300)
