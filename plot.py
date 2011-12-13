@@ -103,33 +103,40 @@ print 'Found %i results, of which %i were invalid.' % (len(history)+badcount,bad
 if len(history)==0: sys.exit(0)
 
 # Convert results into numpy array
-res = numpy.zeros((len(history),len(history[0][0])+1))
+res = numpy.empty((len(history),len(history[0][0])+1))
 for i,(v,l) in enumerate(history):
-    if len(v)!=len(history[0][0]): continue
     res[i,:-1] = v
     res[i,-1] = l
 
 # Show best parameter set
 indices = res[:,-1].argsort()
-maxindex = indices[-1]
-maxlnl = res[maxindex,-1]
-minlnl = res[:,-1].min()
-print 'Best parameter set is # %i with ln likelihood = %.6g:' % (maxindex,maxlnl)
-for i in range(res.shape[1]-1):
-    bestval = res[maxindex,i]
-    pi = job.controller.parameters[i]
-    lbound,rbound = None,None
-    for j in indices[-2::-1]:
-        if lbound is None and res[j,i]<bestval and res[j,-1]<maxlnl-1.92: lbound = res[j,i]
-        if rbound is None and res[j,i]>bestval and res[j,-1]<maxlnl-1.92: rbound = res[j,i]
-        if lbound is not None and rbound is not None: break
+maxlnl = res[indices[-1],-1]
+minlnl = res[indices[ 0],-1]
+res = res[indices,:]
+iinc = res[:,-1].searchsorted(maxlnl-1.92)
+lbounds,rbounds = res[iinc:,:-1].min(axis=0),res[iinc:,:-1].max(axis=0)
+best = res[-1,:-1]
+outside = res[:iinc,:-1]
+print 'Best parameter set is # %i with ln likelihood = %.6g:' % (indices[-1],maxlnl)
+for ipar in range(res.shape[1]-1):
+    # Get conservative confidence interval by extending it to the first point
+    # from the boundary that has a likelihood value outside the allowed range.
+    lvalid = outside[:,ipar]<lbounds[ipar]
+    rvalid = outside[:,ipar]>rbounds[ipar]
+    if lvalid.any(): lbounds[ipar] = outside[lvalid,ipar].max()
+    if rvalid.any(): rbounds[ipar] = outside[rvalid,ipar].min()
+
+    # Get parameter info
+    pi = job.controller.parameters[ipar]
+
+    # Undo log-transform (if any)
     if pi['logscale']:
-        bestval = math.pow(10.,bestval)
-        if lbound is not None: lbound = 10.**lbound
-        if rbound is not None: rbound = 10.**rbound
-    if lbound is not None: lbound = '%.6g' % lbound
-    if rbound is not None: rbound = '%.6g' % rbound
-    print '   %s = %.6g (%s - %s)' % (pi['name'],bestval,lbound,rbound)
+        best[ipar] = math.pow(10.,best[ipar])
+        lbounds[ipar] = 10.**lbounds[ipar]
+        rbounds[ipar] = 10.**rbounds[ipar]
+
+    # Report estimate and confidence interval
+    print '   %s = %.6g (%.6g - %.6g)' % (pi['name'],best[ipar],lbounds[ipar],rbounds[ipar])
 
 # Create the figure
 matplotlib.pylab.figure(figsize=(12,8))
@@ -203,6 +210,10 @@ for ipar in range(npar):
     lbound = minlnl-maxlnl
     if options.range!=None: lbound = options.range
     matplotlib.pylab.ylim(lbound,0)
+
+    # Show confidence interval
+    matplotlib.pylab.axvline(lbounds[ipar],color='k',linestyle='--')
+    matplotlib.pylab.axvline(rbounds[ipar],color='k',linestyle='--')
 
 #matplotlib.pylab.legend(numpoints=1)
 matplotlib.pylab.savefig('estimates.png',dpi=300)
