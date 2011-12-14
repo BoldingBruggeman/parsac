@@ -1,4 +1,5 @@
-import MySQLdb,sys
+import sys,getpass
+import MySQLdb
 import mysqlinfo
 
 # Get user name and password to be used to connect to MySQL server.
@@ -6,7 +7,7 @@ user = 'root'
 print 'Connecting to MySQL server %s in order to create database.' % mysqlinfo.host
 user = raw_input('User name [root]: ')
 if not user: user = 'root'
-pw = raw_input('Password for user %s: ' % user)
+pw = getpass.getpass('Password for user %s: ' % user)
 
 db = MySQLdb.connect(host=mysqlinfo.host, user=user,passwd=pw)
 c = db.cursor()
