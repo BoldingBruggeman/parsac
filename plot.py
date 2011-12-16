@@ -5,7 +5,6 @@ import sys,math,optparse,socket,pickle
 
 # Import third-party modules
 import numpy
-import matplotlib.pylab
 
 # Import custom modules
 import mysqlinfo
@@ -140,6 +139,7 @@ for ipar in range(res.shape[1]-1):
     print '   %s = %.6g (%.6g - %.6g)' % (pi['name'],best[ipar],lbounds[ipar],rbounds[ipar])
 
 # Create the figure
+import matplotlib.pylab
 matplotlib.pylab.figure(figsize=(12,8))
 matplotlib.pylab.subplots_adjust(left=0.075,right=0.95,top=0.95,bottom=0.05,hspace=.3)
 
