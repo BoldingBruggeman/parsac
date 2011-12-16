@@ -138,37 +138,52 @@ for ipar in range(res.shape[1]-1):
     # Report estimate and confidence interval
     print '   %s = %.6g (%.6g - %.6g)' % (pi['name'],best[ipar],lbounds[ipar],rbounds[ipar])
 
-# Create the figure
-import matplotlib.pylab
-matplotlib.pylab.figure(figsize=(12,8))
-matplotlib.pylab.subplots_adjust(left=0.075,right=0.95,top=0.95,bottom=0.05,hspace=.3)
-
-# Set up subplots (one per parameter)
+# Create parameter bins for histogram
 npar = len(job.controller.parameters)
-nrow = math.ceil(math.sqrt(0.5*npar))
-ncol = math.ceil(npar/nrow)
 parbinbounds = numpy.empty((npar,options.bincount+1))
 parbins = numpy.empty((npar,options.bincount))
 parbins[:,:] = 1.1*(minlnl-maxlnl)
 for ipar in range(npar):
     pi = job.controller.parameters[ipar]
-    matplotlib.pylab.subplot(nrow,ncol,ipar+1)
-    matplotlib.pylab.hold(True)
     if pi['logscale']:
         parbinbounds[ipar,:] = numpy.linspace(math.log10(pi['minimum']),math.log10(pi['maximum']),options.bincount+1)
     else:
         parbinbounds[ipar,:] = numpy.linspace(pi['minimum'],pi['maximum'],options.bincount+1)
 
-# Plot likelihood values per parameters
+# Order sources (runs or clients) according to counts or ln likelihood.
 print 'Points per %s:' % options.groupby
 sources = source2history.keys()
 if options.orderby=='count':
     sources = sorted(sources,cmp=lambda x,y: cmp(len(source2history[y]),len(source2history[x])))
 else:
     sources = sorted(sources,cmp=lambda x,y: cmp(group2maxlnl[y],group2maxlnl[x]))
-    
-if options.maxcount!=None and len(sources)>options.maxcount: sources[options.maxcount:] = []
+if options.maxcount is not None and len(sources)>options.maxcount: sources[options.maxcount:] = []
 for source in sources:
+    dat = source2history[source]
+    label = source
+    if options.groupby=='run': label = '%s (%s)' % (source,run2source[source])
+    print '%s: %i points, best lnl = %.8g.' % (label,len(dat),group2maxlnl[source])
+
+# Try importing MatPlotLib
+try:
+    import matplotlib.pylab
+except ImportError:
+    print 'MatPlotLib not found - skipping plotting.'
+    sys.exit(1)
+    
+# Create the figure
+matplotlib.pylab.figure(figsize=(12,8))
+matplotlib.pylab.subplots_adjust(left=0.075,right=0.95,top=0.95,bottom=0.05,hspace=.3)
+
+# Create subplots
+nrow = math.ceil(math.sqrt(0.5*npar))
+ncol = math.ceil(npar/nrow)
+for ipar in range(npar):
+    matplotlib.pylab.subplot(nrow,ncol,ipar+1)
+    matplotlib.pylab.hold(True)
+    
+for source in sources:
+    # Combine results for current source (run or client) into single array.
     dat = source2history[source]
     curres = numpy.zeros((len(dat),len(dat[0][0])+1))
     for i,(v,l) in enumerate(dat):
@@ -176,15 +191,20 @@ for source in sources:
         curres[i,:-1] = v
         curres[i,-1] = l
     curres[:,-1] -= maxlnl
+
+    # Determine label for current source.
     label = source
     if options.groupby=='run': label = '%s (%s)' % (source,run2source[source])
+    
     for ipar in range(npar):
+        # Plot results for current source.
         matplotlib.pylab.subplot(nrow,ncol,ipar+1)
         matplotlib.pylab.plot(curres[:,ipar],curres[:,-1],'.',label=label)
+
+        # Update histogram based on current source results.
         ind = parbinbounds[ipar,:].searchsorted(curres[:,ipar])-1
         for i,ibin in enumerate(ind):
             parbins[ipar,ibin] = max(parbins[ipar,ibin],curres[i,-1])
-    print '%s: %i points, best lnl = %.8g.' % (label,len(dat),group2maxlnl[source])
 
 # Put finishing touches on subplots
 for ipar in range(npar):
