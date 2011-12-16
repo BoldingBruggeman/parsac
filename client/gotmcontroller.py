@@ -257,10 +257,12 @@ class Controller:
         if not os.path.isfile(self.gotmexe):
             raise Exception('Cannot locate GOTM executable at "%s".' % self.gotmexe)
 
-        # Create a temporary directory for the scenario on disk
-        # (decreases runtime compared to network because GOTM can access observations faster)
+        # Check for presence of custom temporary directory (if set)
         if self.tempdir is not None and not os.path.isdir(self.tempdir):
             raise Exception('Custom temporary directory "%s" does not exist.' % self.tempdir)
+
+        # Create a temporary directory for the scenario on disk
+        # (decreases runtime compared to network because GOTM can access observations faster)
         tempscenariodir = tempfile.mkdtemp(prefix='gotmopt',dir=self.tempdir)
         atexit.register(shutil.rmtree,tempscenariodir,True)
         print 'Copying files for model setup...'
