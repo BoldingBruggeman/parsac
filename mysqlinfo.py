@@ -38,9 +38,11 @@ def connect(task=None):
         
     # Connect to database
     kwargs = {}
-    if username is not None: kwargs['user'] = username
+    if host     is not None: kwargs['host']   = host
+    if database is not None: kwargs['db']     = database
+    if username is not None: kwargs['user']   = username
     if password is not None: kwargs['passwd'] = password
     if defaultfile is not None: kwargs['read_default_file'] = defaultfile
-    db = MySQLdb.connect(host=host,db=database,**kwargs)
+    db = MySQLdb.connect(**kwargs)
     
     return db
