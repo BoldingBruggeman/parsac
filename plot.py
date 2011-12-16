@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Import from standard Python library
 import sys,math,optparse,socket,pickle
 

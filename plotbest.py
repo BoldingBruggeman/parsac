@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys,math,optparse,shutil
 
 # Import third-party modules
