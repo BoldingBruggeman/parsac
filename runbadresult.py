@@ -1,8 +1,5 @@
 import sys,math,optparse
 
-# Import third-party modules
-import MySQLdb
-
 import client.run
 import client.gotmcontroller
 import mysqlinfo
@@ -20,7 +17,7 @@ jobid = int(args[0])
 print 'Looking for bad result %i of job %i.' % (options.index,jobid)
 
 # Connect to database and retrieve best parameter set.
-db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
+db = mysqlinfo.connect(mysqlinfo.select)
 c = db.cursor()
 c.execute("SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE (`runs`.`id`=`results`.`run` AND `runs`.`job`=%i AND `lnlikelihood` IS NULL) LIMIT %i,1" % (jobid,options.index))
 parameters = None

@@ -4,7 +4,6 @@ import sys,math,optparse,socket,pickle
 # Import third-party modules
 import numpy
 import matplotlib.pylab
-import MySQLdb
 
 # Import custom modules
 import mysqlinfo
@@ -33,7 +32,7 @@ if options.range!=None and options.range>0:
     print 'Range argument must be less than zero.'
     sys.exit(1)
 
-db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
+db = mysqlinfo.connect(mysqlinfo.select)
 
 # Build map from run identifier to source machine
 c = db.cursor()

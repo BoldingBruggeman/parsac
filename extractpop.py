@@ -1,10 +1,8 @@
 # Import from standard Python library
-import sys,math,optparse,socket,pickle
+import sys,optparse
 
 # Import third-party modules
 import numpy
-import matplotlib.pylab
-import MySQLdb
 
 # Import custom modules
 import mysqlinfo
@@ -14,7 +12,7 @@ parser = optparse.OptionParser()
 
 assert len(args)>1, 'First argument must be the run identifier, second argument the file to save to.'
 
-db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
+db = mysqlinfo.connect(mysqlinfo.select)
 
 # Retrieve all results
 c = db.cursor()

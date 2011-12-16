@@ -3,7 +3,6 @@ import sys,math,optparse,shutil
 # Import third-party modules
 import numpy
 import matplotlib.pylab,matplotlib.cm
-import MySQLdb
 
 import client.run,client.gotmcontroller
 import mysqlinfo
@@ -32,7 +31,7 @@ extravars = ()
 #extravars = (('phytosize_mean_om',False),('phytosize_var_om',False))
 
 # Connect to database and retrieve best parameter set.
-db = MySQLdb.connect(host=mysqlinfo.host,user=mysqlinfo.viewuser,passwd=mysqlinfo.viewpassword,db=mysqlinfo.database)
+db = mysqlinfo.connect(mysqlinfo.select)
 c = db.cursor()
 query = "SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run` AND `runs`.`job`='%i'" % jobid
 c.execute(query)

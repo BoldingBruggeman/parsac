@@ -1,7 +1,5 @@
 import optparse,sys
 
-import MySQLdb
-
 import mysqlinfo
 
 parser = optparse.OptionParser()
@@ -9,7 +7,7 @@ parser.add_option('-r', '--run', type='int', help='run identifier')
 parser.add_option('-j', '--job', type='int', help='job identifier')
 (options, args) = parser.parse_args()
 
-db = MySQLdb.connect(host=mysqlinfo.host, user='root',passwd='1r3z2g6',db=mysqlinfo.database)
+db = mysqlinfo.connect(mysqlinfo.admin)
 
 c = db.cursor()
 
