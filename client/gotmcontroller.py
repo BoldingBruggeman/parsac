@@ -184,8 +184,6 @@ class Controller:
 
         if self.tempdir is not None:
             self.tempdir = os.path.abspath(self.tempdir)
-            if not os.path.isdir(self.tempdir):
-                raise Exception('Custom temporary directory "%s" does not exist.' % self.tempdir)
 
         # Check for existence of scenario directory
         # (we need it now already to find start/stop of simulation)
@@ -261,6 +259,8 @@ class Controller:
 
         # Create a temporary directory for the scenario on disk
         # (decreases runtime compared to network because GOTM can access observations faster)
+        if self.tempdir is not None and not os.path.isdir(self.tempdir):
+            raise Exception('Custom temporary directory "%s" does not exist.' % self.tempdir)
         tempscenariodir = tempfile.mkdtemp(prefix='gotmopt',dir=self.tempdir)
         atexit.register(shutil.rmtree,tempscenariodir,True)
         print 'Copying files for model setup...'
