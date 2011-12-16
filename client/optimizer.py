@@ -42,13 +42,13 @@ class attributes():
 class Job:
     verbose = True
 
-    def __init__(self,jobid,scenariodir,gotmexe='./gotm.exe',copyexe=False):
+    def __init__(self,jobid,scenariodir,gotmexe='./gotm.exe',copyexe=False,tempdir=None):
         self.initialized = False
 
         self.jobid = jobid
 
         # Create GOTM controller that takes care of setting namelist parameters, running GOTM, etc.
-        self.controller = gotmcontroller.Controller(scenariodir,gotmexe,copyexe=copyexe)
+        self.controller = gotmcontroller.Controller(scenariodir,gotmexe,copyexe=copyexe,tempdir=tempdir)
 
         # Array to hold observation datasets
         self.observations = []
@@ -58,7 +58,7 @@ class Job:
         self.checkparameterranges = True
 
     @staticmethod
-    def fromConfigurationFile(path,jobid,scenariodir):
+    def fromConfigurationFile(path,jobid,scenariodir,**kwargs):
         import xml.etree.ElementTree
         tree = xml.etree.ElementTree.parse(path)
         
@@ -70,7 +70,7 @@ class Job:
         att.testEmpty()
 
         # Create job object
-        job = Job(jobid,scenariodir,gotmexe=exe,copyexe=not hasattr(sys,'frozen'))
+        job = Job(jobid,scenariodir,gotmexe=exe,copyexe=not hasattr(sys,'frozen'),**kwargs)
         
         # Parse parameters section
         for ipar,element in enumerate(tree.findall('parameters/parameter')):

@@ -174,12 +174,18 @@ def interp2(x,y,z,X,Y,info=None,returninfo=False):
 class Controller:
     verbose = True
 
-    def __init__(self,scenariodir,gotmexe='./gotm.exe',copyexe=False):
+    def __init__(self,scenariodir,gotmexe='./gotm.exe',copyexe=False,tempdir=None):
         self.scenariodir = scenariodir
         self.gotmexe = os.path.realpath(gotmexe)
         self.copyexe = copyexe
+        self.tempdir = tempdir
         self.parameters = []
         self.parametertransforms = []
+
+        if self.tempdir is not None:
+            self.tempdir = os.path.abspath(self.tempdir)
+            if not os.path.isdir(self.tempdir):
+                raise Exception('Custom temporary directory "%s" does not exist.' % self.tempdir)
 
         # Check for existence of scenario directory
         # (we need it now already to find start/stop of simulation)
@@ -255,7 +261,7 @@ class Controller:
 
         # Create a temporary directory for the scenario on disk
         # (decreases runtime compared to network because GOTM can access observations faster)
-        tempscenariodir = tempfile.mkdtemp(prefix='gotmopt')
+        tempscenariodir = tempfile.mkdtemp(prefix='gotmopt',dir=self.tempdir)
         atexit.register(shutil.rmtree,tempscenariodir,True)
         print 'Copying files for model setup...'
         for name in os.listdir(self.scenariodir):
