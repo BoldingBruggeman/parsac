@@ -29,13 +29,14 @@ class Dummy(Transport):
         pass
 
 class MySQL(Transport):
-    def __init__(self,server,user,password,database,timeout=30):
+    def __init__(self,server,user,password,database,timeout=30,defaultfile=None):
         Transport.__init__(self)
         self.server   = server
         self.user     = user
         self.password = password
         self.database = database
         self.timeout  = timeout
+        self.defaultfile = defaultfile
 
     def available(self):
         return MySQLdb is not None
@@ -43,8 +44,18 @@ class MySQL(Transport):
     def __str__(self):
         return 'MySQL connection to %s' % self.server
 
+    def connect(self):
+        kwargs = {}
+        if self.server      is not None: kwargs['host']              = self.server
+        if self.user        is not None: kwargs['user']              = self.user
+        if self.password    is not None: kwargs['passwd']            = self.password
+        if self.database    is not None: kwargs['db']                = self.database
+        if self.defaultfile is not None: kwargs['read_default_file'] = self.defaultfile
+        if self.timeout     is not None: kwargs['connect_timeout']   = self.timeout 
+        return MySQLdb.connect(**kwargs)
+
     def initialize(self,jobid,description):
-        db = MySQLdb.connect(host=self.server,user=self.user,passwd=self.password,db=self.database,connect_timeout=self.timeout)
+        db = self.connect()
         c = db.cursor()
         c.execute("INSERT INTO `runs` (`source`,`time`,`job`,`description`) values(USER(),NOW(),'%i','%s');" % (jobid,MySQLdb.escape_string(description)))
         runid = db.insert_id()
@@ -54,7 +65,7 @@ class MySQL(Transport):
 
     def reportResults(self,runid,results,timeout=5):
         # Connect to MySQL database and obtain cursor.
-        db = MySQLdb.connect(host=self.server,user=self.user,passwd=self.password,db=self.database,connect_timeout=timeout)
+        db = self.connect()
         c = db.cursor()
 
         # Enumerate over results and insert them in the database.            

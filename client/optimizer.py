@@ -415,10 +415,12 @@ class Reporter:
             type = att.get('type',unicode)
             if allowedtransports is not None and type not in allowedtransports: continue
             if type=='mysql':
-                curtransport = transport.MySQL(server  =att.get('server',  unicode),
-                                               user    =att.get('user',    unicode),
-                                               password=att.get('password',unicode),
-                                               database=att.get('database',unicode))
+                defaultfile = att.get('defaultfile',unicode,required=False)
+                curtransport = transport.MySQL(server  =att.get('server',  unicode,required=(defaultfile is None)),
+                                               user    =att.get('user',    unicode,required=(defaultfile is None)),
+                                               password=att.get('password',unicode,required=(defaultfile is None)),
+                                               database=att.get('database',unicode,required=(defaultfile is None)),
+                                               defaultfile = defaultfile)
             elif type=='http':
                 curtransport = transport.HTTP(server  =att.get('server',  unicode),
                                               path    =att.get('path',    unicode))
