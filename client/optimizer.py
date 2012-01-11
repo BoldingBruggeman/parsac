@@ -77,16 +77,16 @@ class Job:
             att = attributes(element,'parameter %i' % (ipar+1))
             if att.get('dummy',bool,default=False):
                 job.controller.addDummyParameter('dummy',att.get('minimum',float,default=0.),att.get('maximum',float,default=1.))
-                continue
-            infile   = att.get('file',    unicode)
-            namelist = att.get('namelist',unicode)
-            variable = att.get('variable',unicode)
-            att.description = 'parameter %s/%s/%s' % (infile,namelist,variable)
-            minimum = att.get('minimum',float)
-            maximum = att.get('maximum',float)
-            job.controller.addParameter(infile,namelist,variable,
-                                        minimum,maximum,
-                                        logscale=att.get('logscale',bool,default=False))
+            else:
+                infile   = att.get('file',    unicode)
+                namelist = att.get('namelist',unicode)
+                variable = att.get('variable',unicode)
+                att.description = 'parameter %s/%s/%s' % (infile,namelist,variable)
+                minimum = att.get('minimum',float)
+                maximum = att.get('maximum',float)
+                job.controller.addParameter(infile,namelist,variable,
+                                            minimum,maximum,
+                                            logscale=att.get('logscale',bool,default=False))
             att.testEmpty()
 
         # Parse observations section
