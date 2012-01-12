@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys,math,optparse,shutil
+import sys,math,optparse,shutil,datetime
 
 # Import third-party modules
 import numpy
@@ -75,7 +75,19 @@ res = job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
 nc.close()
 
 # Copy NetCDF file
-if options.savenc!=None: shutil.copyfile(ncpath,options.savenc)
+if options.savenc is not None:
+    print 'Saving NetCDF output to %s...' % options.savenc,
+    shutil.copyfile(ncpath,options.savenc)
+    fout = open('%s.info' % options.savenc,'w')
+    fout.write('job %i, %ith best parameter set\n' % (jobid,options.rank))
+    fout.write('%s\n' % datetime.datetime.today().isoformat())
+    fout.write('parameter values:\n')
+    for i,val in enumerate(parameters_utf):
+        pi = job.controller.externalparameters[i]
+        fout.write('  %s = %.6g\n' % (pi['name'],val))
+    fout.write('ln likelihood = %.8g\n' % lnl)
+    fout.close()
+    print ' done'
 
 # Shortcuts to coordinates
 tim_cent,z_cent,z1_cent = res['time_center'],res['z_center'],res['z1_center']
