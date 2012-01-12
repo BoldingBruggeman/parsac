@@ -28,7 +28,7 @@ def connect(task=None):
     # If we do not have a user name yet, and we do not have a default file either, ask the user interactively.
     if username is None and defaultfile is None:
         username = 'root'
-        print 'Connecting to MySQL server %s in order to create database.' % host
+        print 'Connecting to MySQL server %s.' % host
         username = raw_input('User name [root]: ')
         if not username: username = 'root'
 
