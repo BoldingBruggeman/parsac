@@ -71,7 +71,7 @@ print 'Retrieving results...'
 c = db.cursor()
 runcrit = '`runs`.`id`'
 if options.run is not None: runcrit = '%i' % options.run
-query = "SELECT DISTINCT `parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%i'" % (options.groupby,runcrit,jobid)
+query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%i'" % (options.groupby,runcrit,jobid)
 if options.limit!=-1: query += ' LIMIT %i' % options.limit
 c.execute(query)
 history = []
@@ -79,22 +79,36 @@ source2history = {}
 group2maxlnl = {}
 badcount = 0
 i = 1
-for strpars,lnlikelihood,group in c:
+strlength = None
+for rowid,strpars,lnlikelihood,group in c:
+    # Make sure the lengths of all parameter strings match.
+    if strlength is None:
+        strlength = len(strpars)
+    elif strlength!=len(strpars):
+        continue
+    
     if lnlikelihood is None:
         badcount += 1
     else:
-        parameters = numpy.array(strpars.split(';'),dtype=numpy.float)
         valid = True
-        for (ipar,minval,maxval) in parconstraints:
-            if parameters[ipar]<minval or parameters[ipar]>maxval:
-                valid = False
-                break
-        if not valid: continue
-        assert len(parameters)==len(job.controller.parameters),'Row %i: Number of parameters (%i) does not match that of run (%i).' % (i,len(parameters),len(job.controller.parameters))
-        dat = (parameters,lnlikelihood)
-        if lnlikelihood>group2maxlnl.get(group,-numpy.Inf): group2maxlnl[group]=lnlikelihood
-        history.append(dat)
-        source2history.setdefault(group,[]).append(dat)
+        try:
+            parameters = numpy.array(strpars.split(';'),dtype=numpy.float)
+        except ValueError:
+            print 'Row %i: cannot parse "%s".' % (rowid,strpars)
+            valid = False
+        if valid and len(parameters)!=len(job.controller.parameters):
+            print 'Row %i: Number of parameters (%i) does not match that of run (%i).' % (rowid,len(parameters),len(job.controller.parameters))
+            valid = False
+        if valid:
+            for (ipar,minval,maxval) in parconstraints:
+                if parameters[ipar]<minval or parameters[ipar]>maxval:
+                    valid = False
+                    break
+        if valid:
+            dat = (parameters,lnlikelihood)
+            if lnlikelihood>group2maxlnl.get(group,-numpy.Inf): group2maxlnl[group]=lnlikelihood
+            history.append(dat)
+            source2history.setdefault(group,[]).append(dat)
     i += 1
 db.close()
 print 'Found %i results, of which %i were invalid.' % (len(history)+badcount,badcount)
