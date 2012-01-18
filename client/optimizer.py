@@ -504,84 +504,85 @@ class Reporter:
         self.resultqueue.append((values,lnlikelihood))
         self.queuelock.release()
         
-    def flushResultQueue(self):
+    def flushResultQueue(self,maxbatchsize=100):
         # Report the start of the run, if that was not done before.
         if self.runid is None: self.reportRunStart()
 
-        # Take all current results from the queue.
-        self.queuelock.acquire()
-        batch = self.resultqueue
-        self.resultqueue = []
-        self.queuelock.release()
+        while 1:
+            # Take current results from the queue.
+            self.queuelock.acquire()
+            batch = self.resultqueue[:maxbatchsize]
+            del self.resultqueue[:maxbatchsize]
+            self.queuelock.release()
 
-        # If there are no results to report, do nothing.
-        if len(batch)==0: return
+            # If there are no results to report, do nothing.
+            if len(batch)==0: return
 
-        # Reorder transports, prioritizing last working transport
-        # Once in a while we retry the different transports starting from the top.
-        curtransports = []
-        if self.reportedcount<self.nexttransportreset:
-            if self.lasttransport is not None: curtransports.append(self.lasttransport)
-        else:
-            self.nexttransportreset += 30
-            self.lasttransport = None
-        for transport in self.transports:
-            if self.lasttransport is None or transport is not self.lasttransport: curtransports.append(transport)
+            # Reorder transports, prioritizing last working transport
+            # Once in a while we retry the different transports starting from the top.
+            curtransports = []
+            if self.reportedcount<self.nexttransportreset:
+                if self.lasttransport is not None: curtransports.append(self.lasttransport)
+            else:
+                self.nexttransportreset += 30
+                self.lasttransport = None
+            for transport in self.transports:
+                if self.lasttransport is None or transport is not self.lasttransport: curtransports.append(transport)
 
-        # Try to report the results
-        for transport in curtransports:
-            success = True
-            try:
-                transport.reportResults(self.runid,batch,timeout=5)
-            except Exception,e:
-                print 'Unable to report result(s) over %s. Reason:\n%s' % (str(transport),str(e))
-                success = False
+            # Try to report the results
+            for transport in curtransports:
+                success = True
+                try:
+                    transport.reportResults(self.runid,batch,timeout=5)
+                except Exception,e:
+                    print 'Unable to report result(s) over %s. Reason:\n%s' % (str(transport),str(e))
+                    success = False
+                if success:
+                    print 'Successfully delivered %i result(s) over %s.' % (len(batch),str(transport))
+                    self.lasttransport = transport
+                    break
+
             if success:
-                print 'Successfully delivered %i result(s) over %s.' % (len(batch),str(transport))
-                self.lasttransport = transport
-                break
+                # Register success and continue to report any remaining results.
+                self.reportedcount += len(batch)
+                self.reportfailcount = 0
+                self.lastreporttime = time.time()
+                continue
 
-        if success:
-            # Register success and return.
-            self.reportedcount += len(batch)
-            self.reportfailcount = 0
-            self.lastreporttime = time.time()
+            # If we arrived here, reporting failed.
+            self.reportfailcount += 1
+            print 'Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch),time.time()-self.lastreporttime)
+
+            # Put unreported results back in queue
+            self.queuelock.acquire()
+            batch += self.resultqueue
+            self.resultqueue = batch
+            self.queuelock.release()
+
+            # If interaction with user is not allowed, leave the result in the queue and return.
+            if not self.interactive: return
+                
+            # Check if the report failure tolerances (count and period) have been exceeded.
+            exceeded = False
+            if self.allowedreportfailcount is not None and self.reportfailcount>self.allowedreportfailcount:
+                print 'Maximum number of reporting failures (%i) exceeded.' % self.allowedreportfailcount
+                exceeded = True
+            elif self.allowedreportfailperiod is not None and time.time()>(self.lastreporttime+self.allowedreportfailperiod):
+                print 'Maximum period of reporting failure (%i s) exceeded.' % self.allowedreportfailperiod
+                exceeded = True
+
+            # If the report failure tolerance has been exceeded, ask the user whether to continue.
+            if exceeded:
+                resp = None
+                while resp not in ('y','n'):
+                    resp = raw_input('To report results, connectivity to the server should be restored. Continue for now (y/n)? ')
+                if resp=='n': sys.exit(1)
+                self.reportfailcount = 0
+                self.lastreporttime = time.time()
+
+            # We will tolerate this failure (the server-side script may be unavailable temporarily)
+            print 'Queuing current result for later reporting.'
             return
-
-        # If we arrived here, reporting failed.
-        self.reportfailcount += 1
-        print 'Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch),time.time()-self.lastreporttime)
-
-        # Put unreported results back in queue
-        self.queuelock.acquire()
-        batch += self.resultqueue
-        self.resultqueue = batch
-        self.queuelock.release()
-
-        # If interaction with user is not allowed, leave the result in the queue and return.
-        if not self.interactive: return
-            
-        # Check if the report failure tolerances (count and period) have been exceeded.
-        exceeded = False
-        if self.allowedreportfailcount is not None and self.reportfailcount>self.allowedreportfailcount:
-            print 'Maximum number of reporting failures (%i) exceeded.' % self.allowedreportfailcount
-            exceeded = True
-        elif self.allowedreportfailperiod is not None and time.time()>(self.lastreporttime+self.allowedreportfailperiod):
-            print 'Maximum period of reporting failure (%i s) exceeded.' % self.allowedreportfailperiod
-            exceeded = True
-
-        # If the report failure tolerance has been exceeded, ask the user whether to continue.
-        if exceeded:
-            resp = None
-            while resp not in ('y','n'):
-                resp = raw_input('To report results, connectivity to the server should be restored. Continue for now (y/n)? ')
-            if resp=='n': sys.exit(1)
-            self.reportfailcount = 0
-            self.lastreporttime = time.time()
-
-        # We will tolerate this failure (the server-side script may be unavailable temporarily)
-        print 'Queuing current result for later reporting.'
-        return
 
 class ReportingThread(threading.Thread):
     def __init__(self,job):
