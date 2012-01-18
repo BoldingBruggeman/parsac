@@ -39,11 +39,11 @@
 	$result = mysql_select_db($database);
 	if (!$result) err( "Unable to select database");
 
-	if (!mysql_query("START TRANSACTION;")) err("Unable to start transaction.");
+	if (!mysql_query("START TRANSACTION")) err("Unable to start transaction.");
 	for ($i=0; $i<count($lnlikelihoods); $i++) {
 		insertrow($parameters[$i],$lnlikelihoods[$i]);
 	}
-	if (!mysql_query("COMMIT;")) err("Unable to commit transaction.");
+	if (!mysql_query("COMMIT")) err("Unable to commit transaction.");
 
 	// Close MySQL connection.
 	mysql_close();
