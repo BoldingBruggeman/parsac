@@ -37,6 +37,6 @@ c.execute('GRANT INSERT ON `%s`.* TO \'%s\'@\'%%\';' % (mysqlinfo.database,mysql
 # Create tables
 c.execute('USE `%s`;' % mysqlinfo.database)
 c.execute('CREATE TABLE `runs`    (`id` INT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE PRIMARY KEY,`source` VARCHAR(50) NOT NULL,`time` DATETIME NOT NULL,`job` INT,`description` TEXT);')
-c.execute('CREATE TABLE `results` (`id` INT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE PRIMARY KEY,`run` INT UNSIGNED NOT NULL,`time` DATETIME NOT NULL,`parameters` VARCHAR(200) NOT NULL,`lnlikelihood` DOUBLE);')
+c.execute('CREATE TABLE `results` (`id` INT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE PRIMARY KEY,`run` INT UNSIGNED NOT NULL,`time` DATETIME NOT NULL,`parameters` VARCHAR(500) NOT NULL,`lnlikelihood` DOUBLE);')
 
 db.close()
