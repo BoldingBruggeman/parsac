@@ -15,7 +15,8 @@ parser.add_option('-r', '--rank',  type='int',   help='Rank of the result to plo
 parser.add_option('-d', '--depth', type='float', help='Depth range to show (> 0)')
 parser.add_option('-g', '--grid',  action='store_true', help='Whether to grid the observations.')
 parser.add_option('--savenc',      type='string', help='Path to copy NetCDF output file to.')
-parser.set_defaults(rank=1,depth=None,grid=False,savenc=None)
+parser.add_option('--simulationdir',type='string', help='Directory to run simulation in.')
+parser.set_defaults(rank=1,depth=None,grid=False,savenc=None,simulationdir=None)
 (options, args) = parser.parse_args()
 
 if len(args)<1:
@@ -40,7 +41,7 @@ c.execute(query)
 res = [(strpars,lnlikelihood) for strpars,lnlikelihood in c if lnlikelihood!=None]
 
 # Initialize the GOTM controller.
-job = client.run.getJob(jobid)
+job = client.run.getJob(jobid,simulationdir=options.simulationdir)
 job.controller.initialize()
 
 res.sort(cmp=lambda x,y: cmp(x[1],y[1]))

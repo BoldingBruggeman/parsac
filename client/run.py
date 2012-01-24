@@ -6,7 +6,7 @@ import os.path,sys,optparse
 # Import personal custom stuff
 import optimizer
 
-def getJob(jobid,returnreporter=False,allowedtransports=None,tempdir=None):
+def getJob(jobid,returnreporter=False,allowedtransports=None,tempdir=None,simulationdir=None):
     scenpath = os.path.abspath(os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid))
 
     configpath = os.path.join(scenpath,'config.xml')
@@ -15,7 +15,7 @@ def getJob(jobid,returnreporter=False,allowedtransports=None,tempdir=None):
         return None
 
     print 'Reading configuration from %s...' % configpath
-    job = optimizer.Job.fromConfigurationFile(configpath,jobid,scenpath,tempdir=tempdir)
+    job = optimizer.Job.fromConfigurationFile(configpath,jobid,scenpath,tempdir=tempdir,simulationdir=simulationdir)
     if returnreporter:
         f = open(configpath)
         xml = f.read()

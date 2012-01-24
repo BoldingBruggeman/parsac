@@ -42,13 +42,13 @@ class attributes():
 class Job:
     verbose = True
 
-    def __init__(self,jobid,scenariodir,gotmexe='./gotm.exe',copyexe=False,tempdir=None):
+    def __init__(self,jobid,scenariodir,gotmexe='./gotm.exe',copyexe=False,tempdir=None,simulationdir=None):
         self.initialized = False
 
         self.jobid = jobid
 
         # Create GOTM controller that takes care of setting namelist parameters, running GOTM, etc.
-        self.controller = gotmcontroller.Controller(scenariodir,gotmexe,copyexe=copyexe,tempdir=tempdir)
+        self.controller = gotmcontroller.Controller(scenariodir,gotmexe,copyexe=copyexe,tempdir=tempdir,simulationdir=simulationdir)
 
         # Array to hold observation datasets
         self.observations = []
@@ -187,9 +187,11 @@ class Job:
 
             mindate = self.controller.start+datetime.timedelta(days=spinupyears*365)
             mint,maxt = gotmcontroller.date2num(mindate),gotmcontroller.date2num(self.controller.stop)
-            valid = numpy.logical_and(numpy.logical_and(observeddata[:,0]>=mint,observeddata[:,0]<=maxt),observeddata[:,1]>-maxdepth)
+            if (observeddata[:,1]>0.).any(): print 'WARNING: %i of %i values above surface.' % ((observeddata[:,1]>0.).sum(),observeddata.shape[0])
+            valid = numpy.logical_and(numpy.logical_and(numpy.logical_and(observeddata[:,0]>=mint,observeddata[:,0]<=maxt),observeddata[:,1]>-maxdepth),observeddata[:,1]<=0.)
             print '%i of %i observations lie within active time and depth range.' % (valid.sum(),observeddata.shape[0])
             observeddata = observeddata[valid,:]
+            #print '  observation range: %s - %s' % (observeddata[:,2].min(),observeddata[:,2].max())
         else:
             assert False, 'Currently observations must be supplied as path to an 3-column ASCII file.'
 

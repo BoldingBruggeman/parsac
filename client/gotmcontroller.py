@@ -164,7 +164,7 @@ def interp2_frominfo(z,info):
             z[x_high,y_high]*info['weight_highhigh'])
 
 def interp2(x,y,z,X,Y,info=None,returninfo=False):
-    if info==None: info = interp2_info(x,y,X,Y)
+    if info is None: info = interp2_info(x,y,X,Y)
     Z = interp2_frominfo(z,info)
     if returninfo:
         return Z,info
@@ -174,11 +174,12 @@ def interp2(x,y,z,X,Y,info=None,returninfo=False):
 class Controller:
     verbose = True
 
-    def __init__(self,scenariodir,gotmexe='./gotm.exe',copyexe=False,tempdir=None):
+    def __init__(self,scenariodir,gotmexe='./gotm.exe',copyexe=False,tempdir=None,simulationdir=None):
         self.scenariodir = scenariodir
         self.gotmexe = os.path.realpath(gotmexe)
         self.copyexe = copyexe
         self.tempdir = tempdir
+        self.simulationdir = simulationdir
         self.parameters = []
         self.parametertransforms = []
 
@@ -261,10 +262,16 @@ class Controller:
         if self.tempdir is not None and not os.path.isdir(self.tempdir):
             raise Exception('Custom temporary directory "%s" does not exist.' % self.tempdir)
 
-        # Create a temporary directory for the scenario on disk
-        # (decreases runtime compared to network because GOTM can access observations faster)
-        tempscenariodir = tempfile.mkdtemp(prefix='gotmopt',dir=self.tempdir)
-        atexit.register(shutil.rmtree,tempscenariodir,True)
+        if self.simulationdir is not None:
+            # A specific directory in which to simulate has been provided.
+            tempscenariodir = os.path.abspath(self.simulationdir)
+            if not os.path.isdir(tempscenariodir): os.mkdir(tempscenariodir)
+        else:           
+            # Create a temporary directory for the scenario on disk
+            # (decreases runtime compared to network because GOTM can access observations faster)
+            tempscenariodir = tempfile.mkdtemp(prefix='gotmopt',dir=self.tempdir)
+            atexit.register(shutil.rmtree,tempscenariodir,True)
+
         print 'Copying files for model setup...'
         for name in os.listdir(self.scenariodir):
             if name.endswith('.nc'): continue
