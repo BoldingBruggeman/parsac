@@ -85,6 +85,7 @@ for rowid,strpars,lnlikelihood,group in c:
     if strlength is None:
         strlength = len(strpars)
     elif strlength!=len(strpars):
+        print 'Skipping row %i because length of parameter string (%i) is less than expected (%i).' % (rowid,len(strpars),strlength)
         continue
     
     if lnlikelihood is None:
