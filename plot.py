@@ -60,7 +60,7 @@ for run,source,description in c:
 c.close()
 
 parconstraints = []
-parnames = [p['name'] for p in job.controller.parameters]
+parnames = [p['name'] for p in job.controller.externalparameters]
 for (name,minval,maxval) in options.constraints:
     minval,maxval = float(minval),float(maxval)
     i = parnames.index(name)
@@ -97,8 +97,8 @@ for rowid,strpars,lnlikelihood,group in c:
         except ValueError:
             print 'Row %i: cannot parse "%s".' % (rowid,strpars)
             valid = False
-        if valid and len(parameters)!=len(job.controller.parameters):
-            print 'Row %i: Number of parameters (%i) does not match that of run (%i).' % (rowid,len(parameters),len(job.controller.parameters))
+        if valid and len(parameters)!=len(job.controller.externalparameters):
+            print 'Row %i: Number of parameters (%i) does not match that of run (%i).' % (rowid,len(parameters),len(job.controller.externalparameters))
             valid = False
         if valid:
             for (ipar,minval,maxval) in parconstraints:
@@ -142,7 +142,7 @@ for ipar in range(res.shape[1]-1):
     if rvalid.any(): rbounds[ipar] = outside[rvalid,ipar].min()
 
     # Get parameter info
-    pi = job.controller.parameters[ipar]
+    pi = job.controller.externalparameters[ipar]
 
     # Undo log-transform (if any)
     if pi['logscale']:
@@ -154,12 +154,12 @@ for ipar in range(res.shape[1]-1):
     print '   %s = %.6g (%.6g - %.6g)' % (pi['name'],best[ipar],lbounds[ipar],rbounds[ipar])
 
 # Create parameter bins for histogram
-npar = len(job.controller.parameters)
+npar = len(job.controller.externalparameters)
 parbinbounds = numpy.empty((npar,options.bincount+1))
 parbins = numpy.empty((npar,options.bincount))
 parbins[:,:] = 1.1*(minlnl-maxlnl)
 for ipar in range(npar):
-    pi = job.controller.parameters[ipar]
+    pi = job.controller.externalparameters[ipar]
     if pi['logscale']:
         parbinbounds[ipar,:] = numpy.linspace(math.log10(pi['minimum']),math.log10(pi['maximum']),options.bincount+1)
     else:
@@ -223,7 +223,7 @@ for source in sources:
 
 # Put finishing touches on subplots
 for ipar in range(npar):
-    pi = job.controller.parameters[ipar]
+    pi = job.controller.externalparameters[ipar]
     
     matplotlib.pylab.subplot(nrow,ncol,ipar+1)
     #matplotlib.pylab.legend(sources,numpoints=1)

@@ -33,9 +33,11 @@ def parseNamelistFile(path):
     return nmls,tuple(nmlorder)
 
 class ParameterTransform:
-    def __init__(self,bounds=None):
-        if bounds is None: bounds = {}
-        self.bounds = bounds
+    def __init__(self,bounds=None,logscale=None):
+        if bounds   is None: bounds = {}
+        if logscale is None: logscale = {}
+        self.bounds   = bounds
+        self.logscale = logscale
 
     def getOriginalParameters(self):
         assert False, 'getOriginalParameters must be implemented by class deriving from ParameterTransform'
@@ -48,6 +50,9 @@ class ParameterTransform:
     def getExternalParameterBounds(self,name):
         assert name in self.bounds,'Boundaries for %s have not been set.' % name
         return self.bounds[name]
+
+    def hasLogScale(self,name):
+        return self.logscale.get(name,False)
 
     def undoTransform(self,values):
         assert False, 'undoTransform must be implemented by class deriving from ParameterTransform'
@@ -237,22 +242,26 @@ class Controller:
     def getInfo(self):
         return {'parameters':self.externalparameters}
 
-    def initialize(self):
-        assert not self.initialized, 'Controller has already been initialized.'
-        self.initialized = True
-
+    def processTransforms(self):
         self.externalparameters = list(self.parameters)
         self.namelistparameters = [(pi['namelistfile'],pi['namelistname'],pi['name']) for pi in self.parameters]
         for transform in self.parametertransforms:
             self.namelistparameters += transform.getOriginalParameters()
             for extpar in transform.getExternalParameters():
                 minval,maxval = transform.getExternalParameterBounds(extpar)
+                haslogscale = transform.hasLogScale(extpar)
                 self.externalparameters.append({'namelistfile':'none',
                              'namelistname':'none',
                              'name':extpar,
                              'minimum':minval,
                              'maximum':maxval,
-                             'logscale':False})
+                             'logscale':haslogscale})
+
+    def initialize(self):
+        assert not self.initialized, 'Controller has already been initialized.'
+        self.initialized = True
+
+        self.processTransforms()
 
         # Check for presence of GOTM executable.
         if not os.path.isfile(self.gotmexe):
@@ -311,13 +320,14 @@ class Controller:
                 raise Exception('Namelist "%s" does not exist in "%s".' % (nmlname,path))
             self.namelistfiles[path] = nmls
             self.namelistorder[path] = tuple(nmlorder)
-            
+
     def setParameters(self,values):
         assert self.initialized, 'Job has not been initialized yet.'
 
+        values = self.untransformParameterValues(values)
+
         # Update the value of all untransformed namelist parameters
         for parinfo,value in zip(self.parameters,values):
-            if parinfo['logscale']: value = math.pow(10.,value)
             if parinfo['namelistfile'] is not None:
                 nmlpath = os.path.join(self.scenariodir,parinfo['namelistfile'])
                 #print 'Setting %s/%s/%s to %s.' % (nmlpath,parinfo['namelistname'],parinfo['name'],value)
@@ -369,13 +379,13 @@ class Controller:
 
     def untransformParameterValues(self,values):
         res = list(values)
-        for i,parinfo in enumerate(self.parameters):
+        for i,parinfo in enumerate(self.externalparameters):
             if parinfo['logscale']: res[i] = math.pow(10.,res[i])
         return res
 
     def transformParameterValues(self,values):
         res = list(values)
-        for i,parinfo in enumerate(self.parameters):
+        for i,parinfo in enumerate(self.externalparameters):
             if parinfo['logscale']: res[i] = math.log10(res[i])
         return res
 

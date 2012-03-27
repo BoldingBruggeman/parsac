@@ -10,6 +10,35 @@ import gotmcontroller,transport
 # Regular expression for GOTM datetimes
 datetimere = re.compile('(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
 
+class RunTimeTransform(gotmcontroller.ParameterTransform):
+    def __init__(self,ins,outs):
+        self.expressions = []
+        self.outvars = []
+        for infile,namelist,variable,value in outs:
+            self.outvars.append((infile,namelist,variable))
+            self.expressions.append(value)
+        self.outvars = tuple(self.outvars)
+        
+        self.innames = []
+        bounds,logscale = {},{}
+        for name,minval,maxval,haslogscale in ins:
+            self.innames.append(name)
+            bounds[name] = minval,maxval
+            logscale[name] = haslogscale
+        self.innames = tuple(self.innames)
+            
+        gotmcontroller.ParameterTransform.__init__(self,bounds,logscale)
+        
+    def getOriginalParameters(self):
+        return self.outvars
+
+    def getExternalParameters(self):
+        return self.innames
+
+    def undoTransform(self,values):
+        workspace = dict(zip(self.innames,values))
+        return tuple([eval(expr,workspace) for expr in self.expressions])
+
 class attributes():
     def __init__(self,element,description):
         self.att = dict(element.attrib)
@@ -89,6 +118,28 @@ class Job:
                                             logscale=att.get('logscale',bool,default=False))
             att.testEmpty()
 
+        # Parse transforms
+        for ipar,element in enumerate(tree.findall('parameters/transform')):
+            att = attributes(element,'transform %i' % (ipar+1,))
+            att.testEmpty()
+            ins,outs = [],[]
+            for iin,inelement in enumerate(element.findall('in')):
+                att = attributes(inelement,'transform %i, input %i' % (ipar+1,iin+1))
+                name = att.get('name',unicode)
+                att.description = 'transform %i, input %s' % (ipar+1,name)
+                ins.append((name,att.get('minimum',float),att.get('maximum',float),att.get('logscale',bool,default=False)))
+                att.testEmpty()
+            for iout,outelement in enumerate(element.findall('out')):
+                att = attributes(outelement,'transform %i, output %i' % (ipar+1,iout+1))
+                infile   = att.get('file',    unicode)
+                namelist = att.get('namelist',unicode)
+                variable = att.get('variable',unicode)
+                att.description = 'transform %i, output %s/%s/%s' % (ipar+1,infile,namelist,variable)
+                outs.append((infile,namelist,variable,att.get('value',unicode)))
+                att.testEmpty()
+            tf = RunTimeTransform(ins,outs)
+            job.controller.addParameterTransform(tf)
+
         # Parse observations section
         for iobs,element in enumerate(tree.findall('observations/variable')):
             att = attributes(element,'observed variable %i' % (iobs+1))
@@ -109,6 +160,8 @@ class Job:
                                sd                =att.get('sd',                 float,required=False,minimum=0.),
                                cache=True)
             att.testEmpty()
+
+        job.controller.processTransforms()
 
         return job
             
