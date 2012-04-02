@@ -305,25 +305,28 @@ class Job:
 
         self.initialized = True
 
-    def evaluateFitness(self,values):
+    def evaluateFitness(self,values,nc=None):
         if not self.initialized: self.initialize()
         
         print 'Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values])
 
-        # If required, check whether all parameters are within their respective range.
-        if self.checkparameterranges:
-            errors = self.controller.checkParameters(values)
-            if errors is not None:
-                print errors
-                return -numpy.Inf
-
-        nc = self.controller.run(values)
-
         if nc is None:
-            # Run failed
-            print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
-            self.reportResult(values,None,error='Run stopped prematurely')
-            return -numpy.Inf
+            # If required, check whether all parameters are within their respective range.
+            if self.checkparameterranges:
+                errors = self.controller.checkParameters(values)
+                if errors is not None:
+                    print errors
+                    return -numpy.Inf
+
+            nc = self.controller.run(values)
+
+            if nc is None:
+                # Run failed
+                print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                self.reportResult(values,None,error='Run stopped prematurely')
+                return -numpy.Inf
+        else:
+            print 'Using provided precalculated result.'
 
         # Check if this is the first model run/evaluation of the likelihood.
         if not hasattr(self,'ncvariables'):

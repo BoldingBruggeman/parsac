@@ -42,7 +42,7 @@ res = [(strpars,lnlikelihood) for strpars,lnlikelihood in c if lnlikelihood!=Non
 
 # Initialize the GOTM controller.
 job = client.run.getJob(jobid,simulationdir=options.simulationdir)
-job.controller.initialize()
+job.initialize()
 
 res.sort(cmp=lambda x,y: cmp(x[1],y[1]))
 parameters,lnl = res[-options.rank]
@@ -68,12 +68,13 @@ for vardata in extravars:
 
 # Run and retrieve results.
 ncpath = job.controller.run(parameters,showoutput=True,returnncpath=True)
-if ncpath==None:
+if ncpath is None:
     print 'GOTM run failed - exiting.'
     sys.exit(1)
 nc = NetCDFFile(ncpath,'r')
 res = job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
-nc.close()
+#nc.close()
+job.evaluateFitness(parameters,nc=nc)
 
 # Copy NetCDF file
 if options.savenc is not None:
