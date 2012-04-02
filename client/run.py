@@ -131,7 +131,8 @@ def main():
                 startpop = numpy.load(startpoppath)
 
             # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-            solver = desolver.DESolver(job, popsize, maxgen, minpar, maxpar, 0.5, 0.9, initialpopulation=startpop, ncpus=options.ncpus, ppservers=ppservers, reporter=reporter)
+            solver = desolver.DESolver(job, popsize, maxgen, minpar, maxpar, 0.5, 0.9, initialpopulation=startpop,
+                                       ncpus=options.ncpus, ppservers=ppservers, modules=('run',), reporter=reporter)
             solver.Solve()
 
             #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)

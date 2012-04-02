@@ -30,7 +30,8 @@ def processTrial(newjobid,newjob,trial):
 
 class DESolver:
 
-    def __init__(self, job, populationSize, maxGenerations, minInitialValue, maxInitialValue, diffScale, crossoverProb, initialpopulation = None, ncpus=None, ppservers=(), reporter = None):
+    def __init__(self, job, populationSize, maxGenerations, minInitialValue, maxInitialValue, diffScale, crossoverProb,
+                 initialpopulation = None, ncpus=None, ppservers=(), reporter = None, functions = (), modules =()):
         # Store job (with fitness function) and reporter objects.
         self.job = job
         self.reporter = reporter
@@ -65,6 +66,9 @@ class DESolver:
 
         # Create random number generator.
         self.randomstate = numpy.random.RandomState(seed=None)
+
+        self.functions = functions
+        self.modules = modules
 
     def Solve(self):
 
@@ -109,7 +113,7 @@ class DESolver:
                 for itarget in range(self.population.shape[0]):
                     trial = self.generateNew(itarget,ibest,F=self.scale,CR=self.crossOverProbability,strictbounds=self.strictbounds)
                     if job_server is not None:
-                        trial = job_server.submit(processTrial, (jobid,self.job,trial), (), ('run',))
+                        trial = job_server.submit(processTrial, (jobid,self.job,trial), self.functions, self.modules)
                     trials.append(trial)
 
                 # Process the individual target,trial combinations.
