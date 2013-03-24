@@ -8,7 +8,8 @@ import matplotlib.pylab,matplotlib.cm
 
 import client.run,client.gotmcontroller
 import mysqlinfo
-from Scientific.IO.NetCDF import NetCDFFile
+#from Scientific.IO.NetCDF import NetCDFFile
+from netCDF4 import Dataset as NetCDFFile
 
 parser = optparse.OptionParser()
 parser.add_option('-r', '--rank',  type='int',   help='Rank of the result to plot (default = 1, i.e., the very best result)')
