@@ -29,9 +29,7 @@ jobid = int(args[0])
 
 job = client.run.getJob(jobid)
 
-if options.range!=None and options.range>0:
-    print 'Range argument must be less than zero.'
-    sys.exit(1)
+if options.range is not None and options.range>0: options.range = -options.range
 
 db = mysqlinfo.connect(mysqlinfo.select)
 
