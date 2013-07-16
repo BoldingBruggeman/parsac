@@ -435,7 +435,7 @@ class Controller:
                     if prog>=nextprogress:
                         print '%i %% done.' % (prog*100.)
                         nextprogress += .1
-            if ': Finished on ' in line: cleanfinish = True
+            if ' finished on ' in line.lower(): cleanfinish = True
         proc.wait()
 
         # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
