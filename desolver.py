@@ -105,8 +105,11 @@ class DESolver:
             if self.verbose: print 'Starting Parallel Python server...'
             job_server = pp.Server(ncpus=self.ncpus,ppservers=self.ppservers,socket_timeout=self.socket_timeout)
             if self.ppservers:
-                if self.verbose: print 'Giving Parallel Python 5 seconds to connect to nodes...'
-                time.sleep(5)
+                if self.verbose: print 'Giving Parallel Python 10 seconds to connect to nodes...'
+                time.sleep(10)
+                if self.verbose:
+                    print 'Running on:'
+                    for node,ncpu in job_server.get_active_nodes().iteritems(): print '   %s: %i cpus' % (node,ncpu)
                 
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
