@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 
-import sys,math,optparse,shutil,datetime
+import sys,math,optparse,shutil,datetime,os.path
 
 # Import third-party modules
 import numpy
 import matplotlib.pylab,matplotlib.cm
 
 import client.run,client.gotmcontroller
-import mysqlinfo
-#from Scientific.IO.NetCDF import NetCDFFile
-from netCDF4 import Dataset as NetCDFFile
+
+import netCDF4
 
 parser = optparse.OptionParser()
+parser.add_option('--database',type='string',help='Path to database (SQLite only)')
 parser.add_option('-r', '--rank',  type='int',   help='Rank of the result to plot (default = 1, i.e., the very best result)')
 parser.add_option('-d', '--depth', type='float', help='Depth range to show (> 0)')
 parser.add_option('-g', '--grid',  action='store_true', help='Whether to grid the observations.')
@@ -21,11 +21,11 @@ parser.set_defaults(rank=1,depth=None,grid=False,savenc=None,simulationdir=None)
 (options, args) = parser.parse_args()
 
 if len(args)<1:
-    print 'No job identifier provided.'
+    print 'This script takes one required argument: path to job configuration file (xml).'
     sys.exit(2)
-jobid = int(args[0])
+jobid = os.path.splitext(os.path.basename(args[0]))[0]
 
-if options.depth!=None and options.depth<0:
+if options.depth is not None and options.depth<0:
     print 'Depth argument must be positive, but is %.6g.' % options.depth
     sys.exit(2)
 
@@ -34,15 +34,21 @@ extravars = ()
 #extravars = [('mean_1',False),('mean_2',False),('var_1_1',False),('var_2_2',False),('cor_2_1',False)]
 #extravars = (('phytosize_mean_om',False),('phytosize_var_om',False))
 
+if options.database is None:
+   import mysqlinfo
+   db = mysqlinfo.connect(mysqlinfo.select)
+else:
+   import sqlite3
+   db = sqlite3.connect(options.database)
+
 # Connect to database and retrieve best parameter set.
-db = mysqlinfo.connect(mysqlinfo.select)
 c = db.cursor()
-query = "SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run` AND `runs`.`job`='%i'" % jobid
+query = "SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run` AND `runs`.`job`='%s'" % jobid
 c.execute(query)
 res = [(strpars,lnlikelihood) for strpars,lnlikelihood in c if lnlikelihood!=None]
 
 # Initialize the GOTM controller.
-job = client.run.getJob(jobid,simulationdir=options.simulationdir)
+job = client.run.getJob(args[0],simulationdir=options.simulationdir)
 job.initialize()
 
 res.sort(cmp=lambda x,y: cmp(x[1],y[1]))
@@ -68,8 +74,8 @@ for vardata in extravars:
         outputvars.append(vardata[0])
 
 # Run and retrieve results.
-ncpath = job.controller.run(parameters,showoutput=True,returnncpath=True)
-if ncpath is None:
+returncode = job.controller.run(parameters,showoutput=True)
+if returncode!=0:
     print 'GOTM run failed - exiting.'
     sys.exit(1)
 nc = NetCDFFile(ncpath,'r')
