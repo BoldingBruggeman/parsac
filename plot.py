@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 
 # Import from standard Python library
-import sys,math,optparse,socket,pickle
+import sys,math,optparse,socket,pickle,os
 
 # Import third-party modules
 import numpy
 
 # Import custom modules
-import mysqlinfo
 import client.run
 
 parser = optparse.OptionParser()
+parser.add_option('-d','--database',type='string',help='Path to database (SQLite only)')
 parser.add_option('-r', '--range', type='float', help='Lower boundary for relative ln likelihood (always < 0)')
 parser.add_option('--bincount', type='int', help='Number of bins for ln likelihood marginals')
 parser.add_option('-g','--groupby',type='choice',choices=('source','run'),help='What identifier to group the results by, i.e., "source" or "run".')
@@ -19,23 +19,28 @@ parser.add_option('--maxcount',type='int',help='Maximum number of series to plot
 parser.add_option('--constraint',type='string',action='append',nargs=3,help='Constraint on parameter (parameter name, minimum, maximum)',dest='constraints')
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
 parser.add_option('--run', type='int', help='Run number')
-parser.set_defaults(range=None,bincount=25,orderby='count',maxcount=None,groupby='run',constraints=[],limit=-1,run=None)
+parser.set_defaults(range=None,bincount=25,orderby='count',maxcount=None,groupby='run',constraints=[],limit=-1,run=None,database=None,scenarios=None)
 (options, args) = parser.parse_args()
 
 if len(args)<1:
-    print 'No job identifier provided.'
+    print 'This script takes one required argument: path to job configuration file (xml).'
     sys.exit(2)
-jobid = int(args[0])
 
-job = client.run.getJob(jobid)
+job = client.run.getJob(args[0])
+jobid = os.path.splitext(os.path.basename(args[0]))[0]
 
 if options.range is not None and options.range>0: options.range = -options.range
 
-db = mysqlinfo.connect(mysqlinfo.select)
+if options.database is None:
+   import mysqlinfo
+   db = mysqlinfo.connect(mysqlinfo.select)
+else:
+   import sqlite3
+   db = sqlite3.connect(options.database)
 
 # Build map from run identifier to source machine
 c = db.cursor()
-query = "SELECT `id`,`source`,`description` FROM `runs` WHERE `job`='%i'" % jobid
+query = "SELECT `id`,`source`,`description` FROM `runs` WHERE `job`='%s'" % jobid
 c.execute(query)
 run2source = {}
 source2fqn = {}
@@ -69,7 +74,7 @@ print 'Retrieving results...'
 c = db.cursor()
 runcrit = '`runs`.`id`'
 if options.run is not None: runcrit = '%i' % options.run
-query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%i'" % (options.groupby,runcrit,jobid)
+query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'" % (options.groupby,runcrit,jobid)
 if options.limit!=-1: query += ' LIMIT %i' % options.limit
 c.execute(query)
 history = []

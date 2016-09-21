@@ -119,7 +119,7 @@ class NamelistFile:
             try:
                 nmlfile = open(nmlfile,'rU')
             except Exception,e:
-                raise NamelistParseException('Cannot open namelist file. Error: %s' % (str(e),),path)
+                raise NamelistParseException('Cannot open namelist file. Error: %s' % (str(e),),nmlfile)
             self.path = nmlfile
         else:
             self.path = ''

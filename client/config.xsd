@@ -5,6 +5,7 @@
     <xs:restriction base="xs:string">
       <xs:enumeration value="http"/>
       <xs:enumeration value="mysql"/>
+      <xs:enumeration value="sqlite"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -24,7 +25,7 @@
   <xs:element name="transport">
     <xs:complexType>
       <xs:attribute name="type"        type="transporttype" use="required" />
-      <xs:attribute name="server"      type="xs:string"     use="required" />
+      <xs:attribute name="server"      type="xs:string"     use="optional" />
       <xs:attribute name="user"        type="xs:string"     use="optional" />
       <xs:attribute name="password"    type="xs:string"     use="optional" />
       <xs:attribute name="database"    type="xs:string"     use="optional" />

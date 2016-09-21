@@ -3,9 +3,6 @@ import sys,os,os.path,re,subprocess,shutil,time,datetime,tempfile,atexit,math
 
 # Import third-party modules
 import numpy
-#from Scientific.IO.NetCDF import NetCDFFile
-import netCDF4
-NetCDFFile = netCDF4.Dataset
 
 # Import personal custom stuff
 import namelist
@@ -129,24 +126,31 @@ def date2num(dt):
                  )
     return base
 
-def interp2_info(x,y,X,Y):
+def interp2_info(x_1d,y_2d,X,Y):
     # Find upper/lower boundary indices for time.
-    x_high = x.searchsorted(X)
-    x_low  = x_high-1
-    x_high = x_high.clip(min=0,max=x.shape[0]-1)
-    x_low  = x_low.clip (min=0,max=x.shape[0]-1)
+    assert numpy.ndim(x_1d)==1
+    assert numpy.ndim(y_2d)==2 and y_2d.shape[0]==x_1d.shape[0]
+    assert numpy.ndim(X)==1
+    assert X.shape==Y.shape
+    x_high = x_1d.searchsorted(X)
+    x_high = x_high.clip(min=1,max=x_1d.shape[0]-1)
 
     # Find upper/lower boundary indices for depth.
-    y_high = y.searchsorted(Y)
-    y_low  = y_high-1
-    y_high = y_high.clip(min=0,max=y.shape[0]-1)
-    y_low  = y_low.clip (min=0,max=y.shape[0]-1)
+    y_high = numpy.empty_like(x_high)
+    for i,(ix,x,y) in enumerate(zip(x_high,X,Y)):
+       delta_y = (y_2d[ix,:]-y_2d[ix-1,:])/(x_1d[ix]-x_1d[ix-1])
+       y_1d = y_2d[ix-1,:] + delta_y*(x-x_1d[ix-1])
+       y_high[i] = y_1d.searchsorted(y)
+    y_high = y_high.clip(min=1,max=y_2d.shape[-1]-1)
+
+    x_low = x_high - 1
+    y_low = y_high - 1
 
     # Calculate the weight of each corner of the rectangle
-    weight_lowlow   = abs(x[x_high]-X)*abs(y[y_high]-Y)
-    weight_lowhigh  = abs(x[x_high]-X)*abs(Y-y[y_low])
-    weight_highlow  = abs(X-x[x_low]) *abs(y[y_high]-Y)
-    weight_highhigh = abs(X-x[x_low]) *abs(Y-y[y_low])
+    weight_lowlow   = abs(x_1d[x_high]-X)*abs(y_2d[x_high,y_high]-Y)
+    weight_lowhigh  = abs(x_1d[x_high]-X)*abs(Y-y_2d[x_high,y_low])
+    weight_highlow  = abs(X-x_1d[x_low]) *abs(y_2d[x_low,y_high]-Y)
+    weight_highhigh = abs(X-x_1d[x_low]) *abs(Y-y_2d[x_low,y_low])
     totweight = weight_lowlow+weight_lowhigh+weight_highlow+weight_highhigh
     weight_lowlow   /= totweight
     weight_lowhigh  /= totweight
@@ -399,7 +403,7 @@ class Controller:
             i+=1
         return None
 
-    def run(self,values,showoutput=False,returnncpath=False):
+    def run(self,values,showoutput=False):
         # Check number of parameters
         npar = len(self.getParameterBounds()[0])
         assert len(values)==npar, 'run was called with %i parameters, but the model was configured for %i parameters.' % (len(values),npar)
@@ -420,7 +424,6 @@ class Controller:
         # Process GOTM output and show progress every now and then.
         nextprogress = .1
         span = float((self.stop-self.start).days)
-        cleanfinish = False
         while 1:
             line = proc.stdout.readline()
             if line=='': break
@@ -435,24 +438,17 @@ class Controller:
                     if prog>=nextprogress:
                         print '%i %% done.' % (prog*100.)
                         nextprogress += .1
-            if ' finished on ' in line.lower(): cleanfinish = True
-        proc.wait()
+        proc.communicate()
 
         # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
         elapsed = time.time()-time_start
         print 'Model run took %.1f s.' % elapsed
-        if not cleanfinish:
-            print 'WARNING: model run stopped prematurely - an error must have occured.'
-            return None
-
-        if returnncpath: return self.outputpath
-            
-        # Open NetCDF file
-        return NetCDFFile(self.outputpath)
+        if proc.returncode!=0: print 'WARNING: model run stopped prematurely - an error must have occured.'
+        return proc.returncode
 
     def getNetCDFVariables(self,nc,expressions,addcoordinates=False,ncvariables=None):
         # Check if this is the first model run/evaluation of the likelihood.
-        if ncvariables==None:
+        if ncvariables is None:
             # Find a list of all NetCDF variables that we need.
             ncvariables = set()
             varre = re.compile('(?<!\w)('+'|'.join(nc.variables.keys())+')(?!\w)')  # variable name that is not preceded and followed by a "word" character

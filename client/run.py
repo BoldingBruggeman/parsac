@@ -6,21 +6,18 @@ import os.path,sys,optparse
 # Import personal custom stuff
 import optimizer
 
-def getJob(jobid,returnreporter=False,allowedtransports=None,tempdir=None,simulationdir=None):
-    scenpath = os.path.abspath(os.path.join(os.path.dirname(__file__),'./scenarios/%i' % jobid))
-
-    configpath = os.path.join(scenpath,'config.xml')
+def getJob(configpath,returnreporter=False,allowedtransports=None,tempdir=None,simulationdir=None):
     if not os.path.isfile(configpath):
         print 'Configuration file "%s" not found.' % configpath
         return None
 
     print 'Reading configuration from %s...' % configpath
-    job = optimizer.Job.fromConfigurationFile(configpath,jobid,scenpath,tempdir=tempdir,simulationdir=simulationdir)
+    job = optimizer.Job.fromConfigurationFile(configpath,tempdir=tempdir,simulationdir=simulationdir)
     if returnreporter:
         f = open(configpath)
         xml = f.read()
         f.close()
-        reporter = optimizer.Reporter.fromConfigurationFile(configpath,jobid,xml,allowedtransports=allowedtransports)
+        reporter = optimizer.Reporter.fromConfigurationFile(configpath,xml,allowedtransports=allowedtransports)
         return job,reporter
     return job
 
@@ -33,12 +30,12 @@ def main():
     parser.add_option('-n', '--ncpus',          type='int',    help='Number of CPUs to use (only for Differential Evolution genetic algorithm).')
     parser.add_option('--tempdir',              type='string', help='Temporary directory for GOTM setups.')
     parser.add_option('--ppservers',            type='string', help='Comma-separated list of names/IPs of Parallel Python servers to run on (only for Differential Evolution genetic algorithm).')
-    parser.set_defaults(method='DE',transport=None,interactive=False,ncpus=None,ppservers=None,reportfrequency=None,tempdir=None)
+    parser.set_defaults(method='DE',transport=None,interactive=False,ncpus=None,ppservers=None,reportfrequency=None,tempdir=None,scenarios='.')
     (options, args) = parser.parse_args()
     if len(args)<1:
-        print 'One argument must be provided: the (integer) job identifier.'
+        print 'One argument must be provided: path to job configuration file (xml).'
         sys.exit(2)
-    jobid = int(args[0])
+    jobid = os.path.splitext(os.path.basename(args[0]))[0]
 
     allowedtransports = None
     if options.transport is not None:
@@ -48,7 +45,7 @@ def main():
     if options.ppservers is not None:
         ppservers = tuple(options.ppservers.split(','))
 
-    job,reporter = getJob(jobid,returnreporter=True,allowedtransports=allowedtransports,tempdir=options.tempdir)
+    job,reporter = getJob(args[0],returnreporter=True,allowedtransports=allowedtransports,tempdir=options.tempdir)
 
     # Configure result reporter
     reporter.interactive = options.interactive

@@ -3,6 +3,7 @@ import sys,os.path,re,datetime,math,time,cPickle,hashlib,threading
 
 # Import third-party modules
 import numpy
+import netCDF4
 
 # Import personal custom stuff
 import gotmcontroller,transport
@@ -87,15 +88,26 @@ class Job:
         self.checkparameterranges = True
 
     @staticmethod
-    def fromConfigurationFile(path,jobid,scenariodir,**kwargs):
+    def fromConfigurationFile(path,**kwargs):
         import xml.etree.ElementTree
         tree = xml.etree.ElementTree.parse(path)
-        
+
+        jobid = os.path.splitext(os.path.basename(path))[0]
+
+        # Allow overwrite of setup directory
+        element = tree.find('setup')
+        if element is not None:
+           att = attributes(element,'the setup element')
+           scenariodir = os.path.join(os.path.dirname(path),att.get('path',unicode))
+           att.testEmpty()
+        else:
+           scenariodir = os.path.dirname(path)
+
         # Parse executable section
         element = tree.find('executable')
         if element is None: raise Exception('The root node must contain a single "executable" element.')
         att = attributes(element,'the executable element')
-        exe = att.get('path',unicode)
+        exe = os.path.join(os.path.dirname(path),att.get('path',unicode))
         att.testEmpty()
 
         # Create job object
@@ -141,33 +153,39 @@ class Job:
             job.controller.addParameterTransform(tf)
 
         # Parse observations section
+        n = 0
         for iobs,element in enumerate(tree.findall('observations/variable')):
             att = attributes(element,'observed variable %i' % (iobs+1))
             source = att.get('source',unicode)
             att.description = 'observation set %s' % source
-            sourcepath = os.path.normpath(os.path.join(scenariodir,source))
+            sourcepath = os.path.normpath(os.path.join(os.path.dirname(path),source))
             assert os.path.isfile(sourcepath),'Observation source file "%s" does not exist.' % sourcepath
             modelvariable = att.get('modelvariable',unicode)
-            job.addObservation(sourcepath,modelvariable,
-                               maxdepth          =att.get('maxdepth',           float,required=False,minimum=0.),
-                               spinupyears       =att.get('spinupyears',        int,  default=0,     minimum=0),
-                               logscale          =att.get('logscale',           bool, default=False),
-                               relativefit       =att.get('relativefit',        bool, default=False),
-                               min_scale_factor  =att.get('minscalefactor',     float,required=False),
-                               max_scale_factor  =att.get('maxscalefactor',     float,required=False),
-                               fixed_scale_factor=att.get('constantscalefactor',float,required=False),
-                               minimum           =att.get('minimum',            float,default=0.1),
-                               sd                =att.get('sd',                 float,required=False,minimum=0.),
-                               cache=True)
+            modelpath = att.get('modelpath',unicode)
+            n += job.addObservation(sourcepath,modelvariable,modelpath,
+                                    maxdepth          =att.get('maxdepth',           float,required=False,minimum=0.),
+                                    mindepth          =att.get('mindepth',           float,required=False,minimum=0.),
+                                    spinupyears       =att.get('spinupyears',        int,  default=0,     minimum=0),
+                                    logscale          =att.get('logscale',           bool, default=False),
+                                    relativefit       =att.get('relativefit',        bool, default=False),
+                                    min_scale_factor  =att.get('minscalefactor',     float,required=False),
+                                    max_scale_factor  =att.get('maxscalefactor',     float,required=False),
+                                    fixed_scale_factor=att.get('constantscalefactor',float,required=False),
+                                    minimum           =att.get('minimum',            float,default=0.1),
+                                    sd                =att.get('sd',                 float,required=False,minimum=0.),
+                                    cache=True)
             att.testEmpty()
+        if n==0:
+           raise Exception('No valid observations found within specified depth and timee range.')
 
         job.controller.processTransforms()
 
         return job
             
-    def addObservation(self,observeddata,outputvariable,spinupyears=0,relativefit=False,min_scale_factor=None,max_scale_factor=None,sd=None,maxdepth=None,cache=True,fixed_scale_factor=None,logscale=False,minimum=None):
+    def addObservation(self,observeddata,outputvariable,outputpath,spinupyears=0,relativefit=False,min_scale_factor=None,max_scale_factor=None,sd=None,maxdepth=None,mindepth=None,cache=True,fixed_scale_factor=None,logscale=False,minimum=None):
         sourcepath = None
-        if maxdepth==None: maxdepth = self.controller.depth
+        if mindepth is None: mindepth = -numpy.inf
+        if maxdepth is None: maxdepth = self.controller.depth
         assert maxdepth>0, 'Argument "maxdepth" must be positive but is %.6g  (distance from surface in meter).' % maxdepth
 
         def getMD5(path):
@@ -240,8 +258,8 @@ class Job:
 
             mindate = self.controller.start+datetime.timedelta(days=spinupyears*365)
             mint,maxt = gotmcontroller.date2num(mindate),gotmcontroller.date2num(self.controller.stop)
-            if (observeddata[:,1]>0.).any(): print 'WARNING: %i of %i values above surface.' % ((observeddata[:,1]>0.).sum(),observeddata.shape[0])
-            valid = numpy.logical_and(numpy.logical_and(numpy.logical_and(observeddata[:,0]>=mint,observeddata[:,0]<=maxt),observeddata[:,1]>-maxdepth),observeddata[:,1]<=0.)
+            if (observeddata[:,1]>0.).any(): print 'WARNING: %i of %i values above z=0 m.' % ((observeddata[:,1]>0.).sum(),observeddata.shape[0])
+            valid = numpy.logical_and(numpy.logical_and(numpy.logical_and(observeddata[:,0]>=mint,observeddata[:,0]<=maxt),observeddata[:,1]>-maxdepth),observeddata[:,1]<=-mindepth)
             print '%i of %i observations lie within active time and depth range.' % (valid.sum(),observeddata.shape[0])
             observeddata = observeddata[valid,:]
             #print '  observation range: %s - %s' % (observeddata[:,2].min(),observeddata[:,2].max())
@@ -252,6 +270,7 @@ class Job:
             raise Exception('For log scale fitting, the (relevant) minimum value must be specified.')
 
         self.observations.append({'outputvariable':outputvariable,
+                                  'outputpath':outputpath,
                                   'observeddata':  observeddata,
                                   'relativefit':   relativefit,
                                   'min_scale_factor':min_scale_factor,
@@ -261,6 +280,8 @@ class Job:
                                   'sourcepath':    sourcepath,
                                   'logscale':      logscale,
                                   'minimum':       minimum})
+
+        return len(observeddata)
 
     def excludeObservationPeriod(self,start,stop):
         print 'Excluding observations between %s and %s.' % (str(start),str(stop))
@@ -305,87 +326,94 @@ class Job:
 
         self.initialized = True
 
-    def evaluateFitness(self,values,nc=None):
+    def evaluateFitness(self,values):
         if not self.initialized: self.initialize()
-        
+
         print 'Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values])
 
-        if nc is None:
-            # If required, check whether all parameters are within their respective range.
-            if self.checkparameterranges:
-                errors = self.controller.checkParameters(values)
-                if errors is not None:
-                    print errors
-                    return -numpy.Inf
+        # If required, check whether all parameters are within their respective range.
+        if self.checkparameterranges:
+              errors = self.controller.checkParameters(values)
+              if errors is not None:
+                 print errors
+                 return -numpy.Inf
 
-            nc = self.controller.run(values)
+        returncode = self.controller.run(values)
 
-            if nc is None:
-                # Run failed
-                print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
-                self.reportResult(values,None,error='Run stopped prematurely')
-                return -numpy.Inf
-        else:
-            print 'Using provided precalculated result.'
+        if returncode!=0:
+              # Run failed
+              print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+              self.reportResult(values,None,error='Run stopped prematurely')
+              return -numpy.Inf
+
+        resultroot = self.controller.scenariodir
 
         # Check if this is the first model run/evaluation of the likelihood.
-        if not hasattr(self,'ncvariables'):
+        if not hasattr(self,'file2variables'):
             # This is the first time that we evaluate the likelihood.
             # Find a list of all NetCDF variables that we need.
             # Also find the coordinates in the result arrays and the weights that should be
             # used to interpolate to the observations.
             
-            self.ncvariables = set()
-            varre = re.compile('(?<!\w)('+'|'.join(nc.variables.keys())+')(?!\w)')  # variable name that is not preceded and followed by a "word" character
+            self.file2variables = {}
+            file2re = {}
             for obsinfo in self.observations:
-                obsvar,obsdata = obsinfo['outputvariable'],obsinfo['observeddata']
+                obsvar,outputpath,obsdata = obsinfo['outputvariable'],obsinfo['outputpath'],obsinfo['observeddata']
 
-                # Find variable names in expression.
-                curncvars = set(varre.findall(obsvar))
-                assert len(curncvars)>0,'No variables in found in NetCDF file that match %s.' % obsvar
-                self.ncvariables |= curncvars
+                with netCDF4.Dataset(os.path.join(resultroot,outputpath)) as nc:
+                   if outputpath not in file2re: file2re[outputpath] = re.compile('(?<!\w)('+'|'.join(nc.variables.keys())+')(?!\w)')  # variable name that is not preceded and followed by a "word" character
+                   if outputpath not in self.file2variables: self.file2variables[outputpath] = set()
 
-                # Check dimensions of all used NetCDF variables
-                firstvar,dimnames = None,None
-                for varname in curncvars:
-                    curdimnames = tuple(nc.variables[varname].dimensions)
-                    if dimnames is None:
-                        firstvar,dimnames = varname,curdimnames
-                        assert len(dimnames)==4, 'Do not know how to handle variables with != 4 dimensions. "%s" has %i dimensions.' % (varname,len(dimnames))
-                        assert dimnames[0]=='time', 'Dimension 1 of variable %s must be time, but is "%s".' % (varname,dimnames[0])
-                        assert dimnames[1] in ('z','z1'),'Dimension 2 of variable %s must be depth (z or z1), but is "%s".' % (varname,dimnames[1])
-                        assert dimnames[-2:]==('lat','lon'), 'Last two dimensions of variable %s must be latitude and longitude, but are "%s".'  % (varname,dimnames[-2:])
-                    else:
-                        assert curdimnames==dimnames, 'Dimensions of %s %s do not match dimensions of %s %s. Cannot combine both in one expression.' % (varname,curdimnames,firstvar,dimnames)
+                   # Find variable names in expression.
+                   curncvars = set(file2re[outputpath].findall(obsvar))
+                   assert len(curncvars)>0,'No variables in found in NetCDF file %s that match %s.' % (outputpath,obsvar)
+                   self.file2variables[outputpath] |= curncvars
 
-                print 'Calculating coordinates for linear interpolation to "%s" observations...' % obsvar
+                   # Check dimensions of all used NetCDF variables
+                   firstvar,dimnames = None,None
+                   for varname in curncvars:
+                       curdimnames = tuple(nc.variables[varname].dimensions)
+                       if dimnames is None:
+                           firstvar,dimnames = varname,curdimnames
+                           assert len(dimnames)==4, 'Do not know how to handle variables with != 4 dimensions. "%s" has %i dimensions.' % (varname,len(dimnames))
+                           assert dimnames[0]=='time', 'Dimension 1 of variable %s must be time, but is "%s".' % (varname,dimnames[0])
+                           assert dimnames[1] in ('z','z1'),'Dimension 2 of variable %s must be depth (z or z1), but is "%s".' % (varname,dimnames[1])
+                           assert dimnames[-2:]==('lat','lon'), 'Last two dimensions of variable %s must be latitude and longitude, but are "%s".'  % (varname,dimnames[-2:])
+                       else:
+                           assert curdimnames==dimnames, 'Dimensions of %s %s do not match dimensions of %s %s. Cannot combine both in one expression.' % (varname,curdimnames,firstvar,dimnames)
 
-                # Get reference date used in NetCDF file (according to COARDS convention).
-                dateref = gotmcontroller.getReferenceTime(nc)
+                   print 'Calculating coordinates for linear interpolation to "%s" observations...' % obsvar
 
-                # Get coordinates
-                time_vals = nc.variables['time'     ][:]/86400+gotmcontroller.date2num(dateref)
-                z_vals    = nc.variables[dimnames[1]][:]
+                   # Get reference date used in NetCDF file (according to COARDS convention).
+                   dateref = gotmcontroller.getReferenceTime(nc)
 
-                # Get and cache information for interpolation from model grid to observations.
-                obsinfo['interp2_info'] = gotmcontroller.interp2_info(time_vals,z_vals,obsdata[:,0],obsdata[:,1])
+                   # Get coordinates
+                   time_vals = nc.variables['time'     ][:]/86400+gotmcontroller.date2num(dateref)
+                   if dimnames[1]=='z':
+                      h = nc.variables['h'][:,:,0,0]
+                      z_vals = h.cumsum(axis=1)-h[0,:].sum()-h/2
+                   else:
+                      print 'Depth dimension %s not supported.' % dimnames[1]
+
+                   # Get and cache information for interpolation from model grid to observations.
+                   obsinfo['interp2_info'] = gotmcontroller.interp2_info(time_vals,z_vals,obsdata[:,0],obsdata[:,1])
 
         # Get all model variables that we need from the NetCDF file.
-        vardata = dict([(vn,nc.variables[vn][:,:,0,0]) for vn in self.ncvariables])
+        file2vardata  = {}
+        for path,variables in self.file2variables.items():
+           with netCDF4.Dataset(os.path.join(resultroot,path)) as nc:
+              file2vardata[path] = dict([(vn,nc.variables[vn][:,:,0,0]) for vn in variables])
 
-        # Close NetCDF file; we have all data.
-        nc.close()
-        
         # Start with zero ln likelihood (likelihood of 1)
         lnlikelihood = 0.
 
         # Enumerate over the sets of observations.
         for obsinfo in self.observations:
-            obsvar,obsdata = obsinfo['outputvariable'],obsinfo['observeddata']
+            obsvar,outputpath,obsdata = obsinfo['outputvariable'],obsinfo['outputpath'],obsinfo['observeddata']
 
             # Get model predictions on observation coordinates,
             # using linear interpolation into result array.
-            allvals = eval(obsvar,vardata)
+            allvals = eval(obsvar,file2vardata[outputpath])
             modelvals = gotmcontroller.interp2_frominfo(allvals,obsinfo['interp2_info'])
 
             if not numpy.isfinite(modelvals).all():
@@ -462,10 +490,12 @@ class Job:
 
 class Reporter:
     @staticmethod
-    def fromConfigurationFile(path,jobid,description,allowedtransports=None,interactive=True):
+    def fromConfigurationFile(path,description,allowedtransports=None,interactive=True):
         import xml.etree.ElementTree
         tree = xml.etree.ElementTree.parse(path)
-        
+
+        jobid = os.path.splitext(os.path.basename(path))[0]
+
         # Parse transports section
         transports = []
         for itransport,element in enumerate(tree.findall('transports/transport')):
@@ -482,6 +512,8 @@ class Reporter:
             elif type=='http':
                 curtransport = transport.HTTP(server  =att.get('server',  unicode),
                                               path    =att.get('path',    unicode))
+            elif type=='sqlite':
+                curtransport = transport.SQLite()
             else:
                 raise Exception('Unknown transport type "%s".' % type)
             att.testEmpty()

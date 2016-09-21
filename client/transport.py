@@ -1,7 +1,14 @@
+import os.path
+
 try:
     import MySQLdb
 except Exception,e:
     MySQLdb = None
+
+try:
+    import sqlite3
+except Exception,e:
+    sqlite3 = None
 
 try:
     import httplib, urllib, socket
@@ -141,3 +148,51 @@ class HTTP(Transport):
         finally:
             # Restore old default socket timeout
             socket.setdefaulttimeout(oldtimeout)
+
+class SQLite(Transport):
+    def __init__(self):
+        Transport.__init__(self)
+        self.path = None
+
+    def available(self):
+        return sqlite3 is not None
+
+    def __str__(self):
+        return 'SQLite database at %s' % self.path
+
+    def connect(self):
+        assert self.path is not None
+        return sqlite3.connect(self.path)
+
+    def initialize(self,jobid,description):
+        import platform
+        self.path = '%s.db' % jobid
+        create = not os.path.isfile(self.path)
+        db = self.connect()
+        c = db.cursor()
+        if create:
+            c.execute('CREATE TABLE `runs`    (`id` INTEGER PRIMARY KEY,`source` VARCHAR(50) NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`job` TEXT NOT NULL,`description` TEXT);')
+            c.execute('CREATE TABLE `results` (`id` INTEGER PRIMARY KEY,`run` INTEGER UNSIGNED NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`parameters` VARCHAR(500) NOT NULL,`lnlikelihood` DOUBLE);')
+        c.execute("INSERT INTO `runs` (`source`,`job`,`description`) values(?,?,?);",(platform.node(),jobid,description))
+        runid = c.lastrowid
+        db.commit()
+        db.close()
+        return runid
+
+    def reportResults(self,runid,results,timeout=5):
+        # Connect to MySQL database and obtain cursor.
+        db = self.connect()
+        c = db.cursor()
+
+        # Enumerate over results and insert them in the database.            
+        for (values,lnlikelihood) in results:
+            strpars = ';'.join('%.12e' % v for v in values)
+            if lnlikelihood==None:
+                lnlikelihood = 'NULL'
+            else:
+                lnlikelihood = str(lnlikelihood)
+            c.execute("INSERT INTO `results` (`run`,`parameters`,`lnlikelihood`) values(?,?,?);",(runid,strpars,lnlikelihood))
+
+        # Commit and close database connection.
+        db.commit()
+        db.close()
