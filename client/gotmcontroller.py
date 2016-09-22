@@ -82,50 +82,6 @@ def writeNamelistFile(path,nmls,nmlorder):
         f.write('/\n\n')
     f.close()
 
-def getReferenceTime(nc,varname='time'):
-    time_var = nc.variables[varname]
-    fullunit = time_var.units
-    if ' since ' not in fullunit:
-      raise Exception('"units" attribute of variable "time" equals "%s", which does not follow COARDS convention. Problem: string does not contain " since ".' % (fullunit,))
-    timeunit,reftime = fullunit.split(' since ')
-    datematch = re.match(r'(\d\d\d\d)[-\/](\d{1,2})-(\d{1,2})\s*',reftime)
-    if datematch==None:
-        raise Exception('"units" attribute of variable "time" equals "%s", which does not follow COARDS convention. Problem: cannot parse date in "%s".' % (fullunit,reftime))
-    year,month,day = map(int,datematch.group(1,2,3))
-    hour,min,sec = 0,0,0
-    reftime = reftime[datematch.end():]
-    if len(reftime)>0:
-        timematch = re.match(r'(\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d*)?)\s*',reftime)
-        if timematch==None:
-            raise Exception('"units" attribute of variable "time" equals "%s", which does not follow COARDS convention. Problem: cannot parse time in "%s".' % (fullunit,reftime))
-        hour,min,sec = map(int,timematch.group(1,2,3))
-    return datetime.datetime(year,month,day,hour,min,sec)
-
-# Stolen from MatPlotLib's _to_ordinalf
-# (importing MatPlotLib means we would depend on 100s of files)
-HOURS_PER_DAY = 24.
-MINUTES_PER_DAY  = 60.*HOURS_PER_DAY
-SECONDS_PER_DAY =  60.*MINUTES_PER_DAY
-MUSECONDS_PER_DAY = 1e6*SECONDS_PER_DAY
-def date2num(dt):
-    """
-    convert datetime to the Gregorian date as UTC float days,
-    preserving hours, minutes, seconds and microseconds.  return value
-    is a float
-    """
-
-    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
-        delta = dt.tzinfo.utcoffset(dt)
-        if delta is not None:
-            dt -= delta
-
-    base =  float(dt.toordinal())
-    if hasattr(dt, 'hour'):
-        base += (dt.hour/HOURS_PER_DAY + dt.minute/MINUTES_PER_DAY +
-                 dt.second/SECONDS_PER_DAY + dt.microsecond/MUSECONDS_PER_DAY
-                 )
-    return base
-
 def interp2_info(x_1d,y_2d,X,Y):
     # Find upper/lower boundary indices for time.
     assert numpy.ndim(x_1d)==1
@@ -200,26 +156,6 @@ class Controller:
         if not os.path.isdir(self.scenariodir):
             raise Exception('GOTM scenario directory "%s" does not exist.' % self.scenariodir)
 
-        # Parse file with namelists describing the main scenario settings.
-        path = os.path.join(self.scenariodir,'gotmrun.nml')
-        nmls,order = parseNamelistFile(path)
-        assert 'output' in nmls, 'Cannot find namelist named "output" in "%s".' % path
-        assert 'time'   in nmls, 'Cannot find namelist named "time" in "%s".' % path
-
-        # Find start and stop of simulation.
-        # These will be used to prune the observation table.
-        datematch = datetimere.match(nmls['time']['start'][1:-1])
-        assert datematch!=None,'Unable to parse start datetime in "%s".' % nmls['time']['start'][1:-1]
-        self.start = datetime.datetime(*map(int,datematch.group(1,2,3,4,5,6)))
-        datematch = datetimere.match(nmls['time']['stop'][1:-1])
-        assert datematch!=None,'Unable to parse stop datetime in "%s".' % nmls['time']['stop'][1:-1]
-        self.stop = datetime.datetime(*map(int,datematch.group(1,2,3,4,5,6)))
-
-        # Find the (relative) path where the NetCDF file will be written.
-        self.outputpath = os.path.join(nmls['output']['out_dir'][1:-1],nmls['output']['out_fn'][1:-1]+'.nc')
-
-        self.depth = float(nmls['station']['depth'])
-
         self.initialized = False
 
     def addDummyParameter(self,name,minimum,maximum,logscale=False):
@@ -287,8 +223,13 @@ class Controller:
 
         print 'Copying files for model setup...'
         for name in os.listdir(self.scenariodir):
-            if name.endswith('.nc'): continue
+            if name.endswith('.nc'):
+               print '   skipping %s because it is a NetCDF file' % name
+               continue
             srcname = os.path.join(self.scenariodir,name)
+            if os.path.isdir(srcname):
+               print '   skipping %s because it is a directory' % name
+               continue
             dstname = os.path.join(tempscenariodir,name)
             shutil.copy(srcname, dstname)
         self.scenariodir = tempscenariodir
@@ -298,9 +239,6 @@ class Controller:
             dstname = os.path.join(self.scenariodir,os.path.basename(self.gotmexe))
             shutil.copy(self.gotmexe, dstname)
             self.gotmexe = dstname
-
-        # Adjust output path to use temporary scenario directory
-        self.outputpath = os.path.normpath(os.path.join(self.scenariodir,self.outputpath))
 
         self.namelistfiles,self.namelistorder = {},{}
         for nmlfile,nmlname,parname in self.namelistparameters:
@@ -422,22 +360,11 @@ class Controller:
 
         # GOTM is now running
         # Process GOTM output and show progress every now and then.
-        nextprogress = .1
-        span = float((self.stop-self.start).days)
-        while 1:
-            line = proc.stdout.readline()
-            if line=='': break
-            if showoutput:
-                print line,
-            else:
-                datematch = gotmdatere.search(line)
-                if datematch!=None:
-                    refvals = map(int,datematch.group(1,2,3,4,5,6)) # Convert matched strings into integers
-                    curtime = datetime.datetime(*refvals)
-                    prog = (curtime-self.start).days/span
-                    if prog>=nextprogress:
-                        print '%i %% done.' % (prog*100.)
-                        nextprogress += .1
+        if showoutput:
+            while 1:
+                line = proc.stdout.readline()
+                if line=='': break
+                if showoutput: print line,
         proc.communicate()
 
         # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.

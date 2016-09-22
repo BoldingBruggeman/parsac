@@ -185,8 +185,9 @@ class Job:
     def addObservation(self,observeddata,outputvariable,outputpath,spinupyears=0,relativefit=False,min_scale_factor=None,max_scale_factor=None,sd=None,maxdepth=None,mindepth=None,cache=True,fixed_scale_factor=None,logscale=False,minimum=None):
         sourcepath = None
         if mindepth is None: mindepth = -numpy.inf
-        if maxdepth is None: maxdepth = self.controller.depth
-        assert maxdepth>0, 'Argument "maxdepth" must be positive but is %.6g  (distance from surface in meter).' % maxdepth
+        if maxdepth is None: maxdepth = numpy.inf
+        if maxdepth<0: print 'WARNING: maxdepth=%s, but typically should be positive (downward distance from surface in meter).' % maxdepth
+        assert maxdepth>mindepth,'ERROR: maxdepth=%s should be greater than mindepth=%s' % (maxdepth,mindepth)
 
         def getMD5(path):
             #print 'Calculating MD5 hash of %s...' % path
@@ -217,18 +218,22 @@ class Job:
                     observeddata = cPickle.load(f)
                 f.close()
                 
-            if observeddata is None:
+            if observeddata is None or not isinstance(observeddata,tuple):
                 # Parse ASCII file and store observations as matrix.
                 if self.verbose:
                     print 'Reading observations for variable "%s" from "%s".' % (outputvariable,sourcepath)
                 if not os.path.isfile(sourcepath):
                     raise Exception('"%s" is not a file.' % sourcepath)
-                obs = []
+                times,zs,values = [],[],[]
                 f = open(sourcepath,'rU')
-                iline = 1
+                iline = 0
                 while 1:
                     line = f.readline()
                     if not line: break
+                    iline += 1
+                    if self.verbose and iline%20000==0:
+                        print 'Read "%s" upto line %i.' % (sourcepath,iline)
+
                     if line[0]=='#': continue
                     datematch = datetimere.match(line)
                     if datematch is None:
@@ -238,31 +243,26 @@ class Job:
                     data = line[datematch.end():].split()
                     if len(data)!=2:
                         raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline,len(data)))
-                    depth,value = map(float,data)
-                    obs.append((gotmcontroller.date2num(curtime),depth,value))
-                    if self.verbose and iline%20000==0:
-                        print 'Read "%s" upto line %i.' % (sourcepath,iline)
-                    iline += 1
+                    z,value = map(float,data)
+                    if -z<mindepth or -z>maxdepth: continue
+                    times.append(curtime)
+                    zs.append(z)
+                    values.append(value)
                 f.close()
-                observeddata = numpy.array(obs)
+                zs = numpy.array(zs)
+                values = numpy.array(values)
 
                 # Try to store cached copy of observations
                 if cache:
                     try:
                         f = open(sourcepath+'.cache','wb')
-                        cPickle.dump(md5,         f,cPickle.HIGHEST_PROTOCOL)
-                        cPickle.dump(observeddata,f,cPickle.HIGHEST_PROTOCOL)
+                        cPickle.dump(md5,              f,cPickle.HIGHEST_PROTOCOL)
+                        cPickle.dump((times,zs,values),f,cPickle.HIGHEST_PROTOCOL)
                         f.close()
                     except Exception,e:
                         print 'Unable to store cached copy of observation file. Reason: %s' % e
-
-            mindate = self.controller.start+datetime.timedelta(days=spinupyears*365)
-            mint,maxt = gotmcontroller.date2num(mindate),gotmcontroller.date2num(self.controller.stop)
-            if (observeddata[:,1]>0.).any(): print 'WARNING: %i of %i values above z=0 m.' % ((observeddata[:,1]>0.).sum(),observeddata.shape[0])
-            valid = numpy.logical_and(numpy.logical_and(numpy.logical_and(observeddata[:,0]>=mint,observeddata[:,0]<=maxt),observeddata[:,1]>-maxdepth),observeddata[:,1]<=-mindepth)
-            print '%i of %i observations lie within active time and depth range.' % (valid.sum(),observeddata.shape[0])
-            observeddata = observeddata[valid,:]
-            #print '  observation range: %s - %s' % (observeddata[:,2].min(),observeddata[:,2].max())
+            else:
+                times,zs,values = observeddata
         else:
             assert False, 'Currently observations must be supplied as path to an 3-column ASCII file.'
 
@@ -271,7 +271,9 @@ class Job:
 
         self.observations.append({'outputvariable':outputvariable,
                                   'outputpath':outputpath,
-                                  'observeddata':  observeddata,
+                                  'times':  times,
+                                  'zs': zs,
+                                  'values': values,
                                   'relativefit':   relativefit,
                                   'min_scale_factor':min_scale_factor,
                                   'max_scale_factor':max_scale_factor,
@@ -281,7 +283,7 @@ class Job:
                                   'logscale':      logscale,
                                   'minimum':       minimum})
 
-        return len(observeddata)
+        return len(values)
 
     def excludeObservationPeriod(self,start,stop):
         print 'Excluding observations between %s and %s.' % (str(start),str(stop))
@@ -308,11 +310,11 @@ class Job:
                 infocopy[key] = obsinfo[key]
 
             # Add attributes describing the data matrix
-            data = obsinfo['observeddata']
+            times,zs,values = obsinfo['times'],obsinfo['zs'],obsinfo['values']
             infocopy['observationcount'] = data.shape[0]
-            infocopy['timerange']  = (float(data[:,0].min()),float(data[:,0].max()))
-            infocopy['depthrange'] = (float(data[:,1].min()),float(data[:,1].max()))
-            infocopy['valuerange'] = (float(data[:,2].min()),float(data[:,2].max()))
+            infocopy['timerange']  = (min(times),max(times))
+            infocopy['depthrange'] = (-float(zs.max()),-float(zs.min()))
+            infocopy['valuerange'] = (float(values.min()),float(values.max()))
             obs.append(infocopy)
         info = self.controller.getInfo()
         info['observations'] = obs
@@ -358,7 +360,7 @@ class Job:
             self.file2variables = {}
             file2re = {}
             for obsinfo in self.observations:
-                obsvar,outputpath,obsdata = obsinfo['outputvariable'],obsinfo['outputpath'],obsinfo['observeddata']
+                obsvar,outputpath = obsinfo['outputvariable'],obsinfo['outputpath']
 
                 with netCDF4.Dataset(os.path.join(resultroot,outputpath)) as nc:
                    if outputpath not in file2re: file2re[outputpath] = re.compile('(?<!\w)('+'|'.join(nc.variables.keys())+')(?!\w)')  # variable name that is not preceded and followed by a "word" character
@@ -384,19 +386,29 @@ class Job:
 
                    print 'Calculating coordinates for linear interpolation to "%s" observations...' % obsvar
 
-                   # Get reference date used in NetCDF file (according to COARDS convention).
-                   dateref = gotmcontroller.getReferenceTime(nc)
+                   # Get time coordinates
+                   nctime = nc.variables['time']
+                   time_vals = nctime[:]
+                   if 'numtimes' not in obsinfo: obsinfo['numtimes'] = netCDF4.date2num(obsinfo['times'],nctime.units)
 
                    # Get coordinates
-                   time_vals = nc.variables['time'     ][:]/86400+gotmcontroller.date2num(dateref)
                    if dimnames[1]=='z':
                       h = nc.variables['h'][:,:,0,0]
                       z_vals = h.cumsum(axis=1)-h[0,:].sum()-h/2
                    else:
                       print 'Depth dimension %s not supported.' % dimnames[1]
 
+                   # Filter times and depths outside range
+                   if 'filtered' not in obsinfo: 
+                      valid = numpy.logical_and(obsinfo['numtimes']>=time_vals[0],obsinfo['numtimes']<=time_vals[-1])
+                      obsinfo['times'] = [t for t,v in zip(obsinfo['times'],valid) if v]
+                      obsinfo['numtimes'] = obsinfo['numtimes'][valid]
+                      obsinfo['zs'      ] = obsinfo['zs'      ][valid]
+                      obsinfo['values'  ] = obsinfo['values'  ][valid]
+                      obsinfo['filtered'] = True
+
                    # Get and cache information for interpolation from model grid to observations.
-                   obsinfo['interp2_info'] = gotmcontroller.interp2_info(time_vals,z_vals,obsdata[:,0],obsdata[:,1])
+                   obsinfo['interp2_info'] = gotmcontroller.interp2_info(time_vals,z_vals,obsinfo['numtimes'],obsinfo['zs'])
 
         # Get all model variables that we need from the NetCDF file.
         file2vardata  = {}
@@ -409,7 +421,7 @@ class Job:
 
         # Enumerate over the sets of observations.
         for obsinfo in self.observations:
-            obsvar,outputpath,obsdata = obsinfo['outputvariable'],obsinfo['outputpath'],obsinfo['observeddata']
+            obsvar,outputpath,obsvals = obsinfo['outputvariable'],obsinfo['outputpath'],obsinfo['values']
 
             # Get model predictions on observation coordinates,
             # using linear interpolation into result array.
@@ -422,7 +434,6 @@ class Job:
                 self.reportResult(values,None,error='Some model values for %s are not finite' % obsvar)
                 return -numpy.Inf
 
-            obsvals = obsdata[:,2]
             if obsinfo['logscale']:
                 modelvals = numpy.log10(numpy.maximum(modelvals,obsinfo['minimum']))
                 obsvals   = numpy.log10(numpy.maximum(obsvals,  obsinfo['minimum']))
