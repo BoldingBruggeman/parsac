@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../client/config.xsd">
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../client/config.xsd">
   <transports>
     <transport type="sqlite"/>
   </transports>
@@ -7,9 +7,10 @@
   <setup path="../../glm2gotm/test"/>
   <parameters>
     <parameter file="airsea.nml" namelist="airsea" variable="wind_factor" minimum="0." maximum="3."/>
+    <parameter file="gotmturb.nml" namelist="turb_param" variable="k_min" minimum="1e-7" maximum="1e-5" logscale="True"/>
     <parameter dummy="True"                                               minimum="0." maximum="1"/>
   </parameters>
   <observations>
-    <variable source="../../glm2gotm/test/sst_extracted.dat" modelpath="output.nc" modelvariable="temp" spinupyears="2" maxdepth="310"/>
+    <variable source="../../glm2gotm/test/temp.obs" modelpath="output.nc" modelvariable="temp" spinupyears="2"/>
   </observations>
 </config>
