@@ -392,11 +392,15 @@ class Job:
                    if 'numtimes' not in obsinfo: obsinfo['numtimes'] = netCDF4.date2num(obsinfo['times'],nctime.units)
 
                    # Get coordinates
+                   h = nc.variables['h'][:,:,0,0]
                    if dimnames[1]=='z':
-                      h = nc.variables['h'][:,:,0,0]
+                      # Centres (all)
                       z_vals = h.cumsum(axis=1)-h[0,:].sum()-h/2
+                   elif dimnames[1]=='z1':
+                      # Interfaces (all except bottom)
+                      z_vals = h.cumsum(axis=1)-h[0,:].sum()
                    else:
-                      print 'Depth dimension %s not supported.' % dimnames[1]
+                      assert False,'Unknown depth dimension %s' % dimnames[1]
 
                    # Filter times and depths outside range
                    if 'filtered' not in obsinfo: 
@@ -414,7 +418,7 @@ class Job:
         file2vardata  = {}
         for path,variables in self.file2variables.items():
            with netCDF4.Dataset(os.path.join(resultroot,path)) as nc:
-              file2vardata[path] = dict([(vn,nc.variables[vn][:,:,0,0]) for vn in variables])
+              file2vardata[path] = dict([(vn,nc.variables[vn][...,0,0]) for vn in variables])
 
         # Start with zero ln likelihood (likelihood of 1)
         lnlikelihood = 0.
@@ -480,17 +484,19 @@ class Job:
             diff = modelvals-obsvals
 
             # Calculate sum of squares
-            ssq = numpy.sum(diff*diff)
+            ssq = (diff**2).sum()
+            n = len(diff)
 
             # Add to likelihood, weighing according to standard deviation of current data.
-            if obsinfo['sd'] is None:
+            sd = obsinfo['sd']
+            if sd is None:
                 # No standard deviation specified: calculate the optimal s.d.
-                print 'Using optimal s.d. for %s = %.6g.' % (obsvar,math.sqrt(ssq/len(diff)))
-                lnlikelihood -= len(diff)/2.*math.log(ssq)
-            else:
-                # Use the specified standard deviation
-                lnlikelihood -= ssq/2./obsinfo['sd']/obsinfo['sd']
-            
+                sd = math.sqrt(ssq/(n-1))
+                print 'Using optimal s.d. for %s = %.6g.' % (obsvar,sd)
+
+            # Note: assuming normally distributed errors, and eliminating constant terms in the log likelihood = -n*ln(2*pi)/2
+            lnlikelihood += -n*numpy.log(sd)-ssq/2/sd/sd
+
         print 'ln Likelihood = %.6g.' % lnlikelihood
         self.reportResult(values,lnlikelihood)
 
