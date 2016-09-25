@@ -4,6 +4,7 @@
 import os.path,sys,optparse
 
 # Import personal custom stuff
+import optimize
 import optimizer
 
 def getJob(configpath,returnreporter=False,allowedtransports=None,tempdir=None,simulationdir=None):
@@ -51,24 +52,15 @@ def main():
     reporter.interactive = options.interactive
     if options.reportfrequency is not None: reporter.timebetweenreports = options.reportfrequency
 
+    opt = optimize.Optimizer(job, reportfunction=reporter.reportResult)
+
     repeat = True
     while repeat:
         repeat = (options.method!='fmin')   # repeating is only useful for stochastic algorithms - not for deterministic ones
 
         if options.method=='fmin':
-            def costFunction(x):
-                fitness = job.evaluateFitness(x)
-                reporter.reportResult(x,fitness)
-                return -fitness
-            
             job.initialize()
-            import scipy.optimize.optimize
-            xopt = scipy.optimize.optimize.fmin(costFunction,job.controller.createParameterSet())
-
-            print 'Best parameter set:'
-            vals = job.controller.untransformParameterValues(xopt)
-            for parinfo,val in zip(job.controller.parameters,vals):
-                print '  %s = %.6g' % (parinfo['name'],val)
+            vals = opt.run(method=optimize.SIMPLEX,par_ini=job.controller.createParameterSet())
         elif options.method=='galileo':
             def fitnessFunction(x):
                 fitness = job.evaluateFitness(x)
@@ -113,10 +105,8 @@ def main():
                 for parinfo,val in zip(job.controller.parameters,vals):
                     print '  %s = %.6g' % (parinfo['name'],val)
         elif options.method=='DE':
-            import desolver
-
             minpar,maxpar = job.controller.getParameterBounds()
-            
+
             popsize = 10*len(job.controller.parameters)
             maxgen = 4000
             startpoppath = 'startpop.dat'
@@ -128,15 +118,14 @@ def main():
                 startpop = numpy.load(startpoppath)
 
             # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-            solver = desolver.DESolver(job, popsize, maxgen, minpar, maxpar, 0.5, 0.9, initialpopulation=startpop,
-                                       ncpus=options.ncpus, ppservers=ppservers, modules=('run',), reporter=reporter)
-            solver.Solve()
+            vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION,par_min=minpar,par_max=maxpar,popsize=popsize,maxgen=maxgen,F=0.5,CR=0.9,initialpopulation=startpop,ncpus=options.ncpus, ppservers=ppservers, modules=('run',))
 
             #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
-            print 'Best parameter set:'
-            vals = job.controller.untransformParameterValues(solver.bestSolution)
-            for parinfo,val in zip(job.controller.parameters,vals):
-                print '  %s = %.6g' % (parinfo['name'],val)
+
+        print 'Best parameter set:'
+        vals = job.controller.untransformParameterValues(vals)
+        for parinfo,val in zip(job.controller.parameters,vals):
+              print '  %s = %.6g' % (parinfo['name'],val)
 
 if __name__ == '__main__':
     main()

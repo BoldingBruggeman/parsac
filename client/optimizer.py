@@ -6,6 +6,7 @@ import numpy
 import netCDF4
 
 # Import personal custom stuff
+import optimize
 import gotmcontroller,transport
 
 # Regular expression for GOTM datetimes
@@ -44,7 +45,7 @@ class attributes():
     def __init__(self,element,description):
         self.att = dict(element.attrib)
         self.description = description
-        
+
     def get(self,name,type,default=None,required=None,minimum=None,maximum=None):
         value = self.att.pop(name,None)
         if value is None:
@@ -69,7 +70,7 @@ class attributes():
         if self.att:
             print 'WARNING: the following attributes of %s are ignored: %s' % (self.description,', '.join(['"%s"' % k for k in self.att.keys()]))
 
-class Job:
+class Job(optimize.OptimizationProblem):
     verbose = True
 
     def __init__(self,jobid,scenariodir,gotmexe='./gotm.exe',copyexe=False,tempdir=None,simulationdir=None):
@@ -112,7 +113,7 @@ class Job:
 
         # Create job object
         job = Job(jobid,scenariodir,gotmexe=exe,copyexe=not hasattr(sys,'frozen'),**kwargs)
-        
+
         # Parse parameters section
         for ipar,element in enumerate(tree.findall('parameters/parameter')):
             att = attributes(element,'parameter %i' % (ipar+1))
@@ -181,7 +182,7 @@ class Job:
         job.controller.processTransforms()
 
         return job
-            
+
     def addObservation(self,observeddata,outputvariable,outputpath,spinupyears=0,relativefit=False,min_scale_factor=None,max_scale_factor=None,sd=None,maxdepth=None,mindepth=None,cache=True,fixed_scale_factor=None,logscale=False,minimum=None):
         sourcepath = None
         if mindepth is None: mindepth = -numpy.inf
@@ -201,7 +202,7 @@ class Job:
             return m.digest()
 
         if isinstance(observeddata,basestring):
-            
+
             # Observations are specified as path to ASCII file.
             sourcepath = observeddata
             md5 = getMD5(sourcepath)
@@ -217,7 +218,7 @@ class Job:
                     print 'Getting cached copy of %s...' % sourcepath
                     observeddata = cPickle.load(f)
                 f.close()
-                
+
             if observeddata is None or not isinstance(observeddata,tuple):
                 # Parse ASCII file and store observations as matrix.
                 if self.verbose:
@@ -297,7 +298,7 @@ class Job:
             nrow = obsinfo['observeddata'].shape[0]
             if nrow!=nrowprev:
                 print 'Excluded %i observations of %s.' % (nrowprev-nrow,obsinfo['outputvariable'])
-    
+
     def getObservationPaths(self):
         return [obsinfo['sourcepath'] for obsinfo in self.observations if obsinfo['sourcepath']!=None]
 
@@ -320,7 +321,7 @@ class Job:
         info['observations'] = obs
         import pickle
         return pickle.dumps(info)
-        
+
     def initialize(self):
         assert not self.initialized, 'Job has already been initialized.'
 
@@ -356,7 +357,7 @@ class Job:
             # Find a list of all NetCDF variables that we need.
             # Also find the coordinates in the result arrays and the weights that should be
             # used to interpolate to the observations.
-            
+
             self.file2variables = {}
             file2re = {}
             for obsinfo in self.observations:
@@ -575,7 +576,7 @@ class Reporter:
 
         # Whether to allow for interaction with user (via e.g. raw_input)
         self.interactive = interactive
-        
+
     def reportRunStart(self):
         runid = None
         for transport in self.transports:
@@ -605,12 +606,12 @@ class Reporter:
         if self.queuelock is None: self.createReportingThread()
 
         if not numpy.isfinite(lnlikelihood): lnlikelihood = None
-        
+
         # Append result to queue
         self.queuelock.acquire()
         self.resultqueue.append((values,lnlikelihood))
         self.queuelock.release()
-        
+
     def flushResultQueue(self,maxbatchsize=100):
         # Report the start of the run, if that was not done before.
         if self.runid is None: self.reportRunStart()
@@ -695,9 +696,9 @@ class ReportingThread(threading.Thread):
     def __init__(self,job):
         threading.Thread.__init__(self)
         self.job = job
-    
+
     def run(self):
         while 1:
             self.job.flushResultQueue()
             time.sleep(self.job.timebetweenreports)
-            
+
