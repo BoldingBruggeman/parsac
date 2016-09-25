@@ -78,7 +78,7 @@ class MySQL(Transport):
         # Enumerate over results and insert them in the database.            
         for (values,lnlikelihood) in results:
             strpars = ';'.join('%.12e' % v for v in values)
-            if lnlikelihood==None:
+            if lnlikelihood is None:
                 lnlikelihood = 'NULL'
             else:
                 lnlikelihood = '\'%.12e\'' % lnlikelihood
@@ -158,7 +158,7 @@ class SQLite(Transport):
         return sqlite3 is not None
 
     def __str__(self):
-        return 'SQLite database at %s' % self.path
+        return 'SQLite database %s' % self.path
 
     def connect(self):
         assert self.path is not None
@@ -187,10 +187,7 @@ class SQLite(Transport):
         # Enumerate over results and insert them in the database.            
         for (values,lnlikelihood) in results:
             strpars = ';'.join('%.12e' % v for v in values)
-            if lnlikelihood==None:
-                lnlikelihood = 'NULL'
-            else:
-                lnlikelihood = str(lnlikelihood)
+            if lnlikelihood is None: lnlikelihood = 'NULL'
             c.execute("INSERT INTO `results` (`run`,`parameters`,`lnlikelihood`) values(?,?,?);",(runid,strpars,lnlikelihood))
 
         # Commit and close database connection.
