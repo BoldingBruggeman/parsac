@@ -89,10 +89,10 @@ class Optimizer:
         self.problem = problem
         self.reportfunction = reportfunction
 
-    def run(self,method=SIMPLEX,par_ini=None,par_min=None,par_max=None,logtransform=None,modules=(),maxiter=1000,maxfun=1000,verbose=True,reltol=0.01,abstol=1e-8,maxgen=500,F=0.5,CR=0.9,parallelize=True,ppservers=(),ncpus=None):
+    def run(self,method=SIMPLEX,par_ini=None,par_min=None,par_max=None,logtransform=None,modules=(),maxiter=1000,maxfun=1000,verbose=True,reltol=0.01,abstol=1e-8,popsize=None,maxgen=500,F=0.5,CR=0.9,initialpopulation=None,parallelize=True,ppservers=(),ncpus=None):
         if isinstance(method,(list,tuple)):
             for curmethod in method:
-                par_ini = self.run(curmethod,par_ini,par_min,par_max,logtransform=logtransform,modules=modules,maxiter=maxiter,maxfun=maxfun,verbose=verbose,reltol=reltol,abstol=abstol,maxgen=maxgen,CR=CR,F=F,parallelize=parallelize,ppservers=ppservers,ncpus=ncpus)
+                par_ini = self.run(curmethod,par_ini,par_min,par_max,logtransform=logtransform,modules=modules,maxiter=maxiter,maxfun=maxfun,verbose=verbose,reltol=reltol,abstol=abstol,popsize=popsize,maxgen=maxgen,CR=CR,F=F,initialpopulation=initialpopulation,parallelize=parallelize,ppservers=ppservers,ncpus=ncpus)
             return par_ini
 
         problem = self.problem
@@ -116,6 +116,7 @@ class Optimizer:
             if not parallelize: desolver.pp = None
 
             nfreepar = (numpy.asarray(par_min)!=numpy.asarray(par_max)).sum()
+            if popsize is None: popsize = nfreepar*10
 
             class Reporter:
                 def __init__(self,reportfunction):
@@ -123,8 +124,8 @@ class Optimizer:
                 def reportResult(self,pars,fitness):
                     if self.reportfunction is not None: self.reportfunction(pars,fitness)
             
-            solver = desolver.DESolver(problem,nfreepar*10,maxgen,
-                                       par_min,par_max,F=F,CR=CR,
+            solver = desolver.DESolver(problem,popsize,maxgen,
+                                       par_min,par_max,F=F,CR=CR,initialpopulation=initialpopulation,
                                        ncpus=ncpus,ppservers=ppservers,
                                        reporter=Reporter(self.reportfunction),modules=modules+('optimize',),verbose=verbose,
                                        reltol=reltol,abstol=abstol)
