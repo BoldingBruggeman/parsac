@@ -210,56 +210,48 @@ class Job(optimize.OptimizationProblem):
             observeddata = None
             if cache and os.path.isfile(sourcepath+'.cache'):
                 # Retrieve cached copy of the observations
-                f = open(sourcepath+'.cache','rb')
-                oldmd5 = cPickle.load(f)
-                if oldmd5!=md5:
-                    print 'Cached copy of %s is out of date - file will be reparsed.' % sourcepath
-                else:
-                    print 'Getting cached copy of %s...' % sourcepath
-                    observeddata = cPickle.load(f)
-                f.close()
+                with open(sourcepath+'.cache','rb') as f:
+                    oldmd5 = cPickle.load(f)
+                    if oldmd5!=md5:
+                        print 'Cached copy of %s is out of date - file will be reparsed.' % sourcepath
+                    else:
+                        print 'Getting cached copy of %s...' % sourcepath
+                        observeddata = cPickle.load(f)
 
-            if observeddata is None or not isinstance(observeddata,tuple):
+            if not isinstance(observeddata,tuple):
                 # Parse ASCII file and store observations as matrix.
                 if self.verbose:
                     print 'Reading observations for variable "%s" from "%s".' % (outputvariable,sourcepath)
                 if not os.path.isfile(sourcepath):
                     raise Exception('"%s" is not a file.' % sourcepath)
                 times,zs,values = [],[],[]
-                f = open(sourcepath,'rU')
-                iline = 0
-                while 1:
-                    line = f.readline()
-                    if not line: break
-                    iline += 1
-                    if self.verbose and iline%20000==0:
-                        print 'Read "%s" upto line %i.' % (sourcepath,iline)
-
-                    if line[0]=='#': continue
-                    datematch = datetimere.match(line)
-                    if datematch is None:
-                        raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline,line))
-                    refvals = map(int,datematch.group(1,2,3,4,5,6)) # Convert matched strings into integers
-                    curtime = datetime.datetime(*refvals)
-                    data = line[datematch.end():].split()
-                    if len(data)!=2:
-                        raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline,len(data)))
-                    z,value = map(float,data)
-                    if -z<mindepth or -z>maxdepth: continue
-                    times.append(curtime)
-                    zs.append(z)
-                    values.append(value)
-                f.close()
+                with open(sourcepath,'rU') as f:
+                    for iline,line in enumerate(f):
+                        if self.verbose and (iline+1)%20000==0:
+                            print 'Read "%s" upto line %i.' % (sourcepath,iline)
+                        if line[0]=='#': continue
+                        datematch = datetimere.match(line)
+                        if datematch is None:
+                            raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline+1,line))
+                        refvals = map(int,datematch.group(1,2,3,4,5,6)) # Convert matched strings into integers
+                        curtime = datetime.datetime(*refvals)
+                        data = line[datematch.end():].strip('\n').split()
+                        if len(data)!=2:
+                            raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline,len(data)))
+                        z,value = map(float,data)
+                        if -z<mindepth or -z>maxdepth: continue
+                        times.append(curtime)
+                        zs.append(z)
+                        values.append(value)
                 zs = numpy.array(zs)
                 values = numpy.array(values)
 
                 # Try to store cached copy of observations
                 if cache:
                     try:
-                        f = open(sourcepath+'.cache','wb')
-                        cPickle.dump(md5,              f,cPickle.HIGHEST_PROTOCOL)
-                        cPickle.dump((times,zs,values),f,cPickle.HIGHEST_PROTOCOL)
-                        f.close()
+                        with open(sourcepath+'.cache','wb') as f:
+                            cPickle.dump(md5,              f,cPickle.HIGHEST_PROTOCOL)
+                            cPickle.dump((times,zs,values),f,cPickle.HIGHEST_PROTOCOL)
                     except Exception,e:
                         print 'Unable to store cached copy of observation file. Reason: %s' % e
             else:
@@ -365,7 +357,7 @@ class Job(optimize.OptimizationProblem):
 
                 with netCDF4.Dataset(os.path.join(resultroot,outputpath)) as nc:
                    if outputpath not in file2re: file2re[outputpath] = re.compile('(?<!\w)('+'|'.join(nc.variables.keys())+')(?!\w)')  # variable name that is not preceded and followed by a "word" character
-                   if outputpath not in self.file2variables: self.file2variables[outputpath] = set()
+                   if outputpath not in self.file2variables: self.file2variables[outputpath] = set('h')
 
                    # Find variable names in expression.
                    curncvars = set(file2re[outputpath].findall(obsvar))
@@ -384,36 +376,28 @@ class Job(optimize.OptimizationProblem):
                            assert dimnames[-2:]==('lat','lon'), 'Last two dimensions of variable %s must be latitude and longitude, but are "%s".'  % (varname,dimnames[-2:])
                        else:
                            assert curdimnames==dimnames, 'Dimensions of %s %s do not match dimensions of %s %s. Cannot combine both in one expression.' % (varname,curdimnames,firstvar,dimnames)
+                   obsinfo['depth_dimension'] = dimnames[1]
+                   assert obsinfo['depth_dimension'] in ('z','z1'),'Unknown depth dimension %s' % obsinfo['depth_dimension']
 
                    print 'Calculating coordinates for linear interpolation to "%s" observations...' % obsvar
 
-                   # Get time coordinates
+                   # Get time indices (for left side of bracket for linear interpolation)
                    nctime = nc.variables['time']
                    time_vals = nctime[:]
-                   if 'numtimes' not in obsinfo: obsinfo['numtimes'] = netCDF4.date2num(obsinfo['times'],nctime.units)
-
-                   # Get coordinates
-                   h = nc.variables['h'][:,:,0,0]
-                   if dimnames[1]=='z':
-                      # Centres (all)
-                      z_vals = h.cumsum(axis=1)-h[0,:].sum()-h/2
-                   elif dimnames[1]=='z1':
-                      # Interfaces (all except bottom)
-                      z_vals = h.cumsum(axis=1)-h[0,:].sum()
-                   else:
-                      assert False,'Unknown depth dimension %s' % dimnames[1]
-
-                   # Filter times and depths outside range
-                   if 'filtered' not in obsinfo: 
-                      valid = numpy.logical_and(obsinfo['numtimes']>=time_vals[0],obsinfo['numtimes']<=time_vals[-1])
-                      obsinfo['times'] = [t for t,v in zip(obsinfo['times'],valid) if v]
-                      obsinfo['numtimes'] = obsinfo['numtimes'][valid]
-                      obsinfo['zs'      ] = obsinfo['zs'      ][valid]
-                      obsinfo['values'  ] = obsinfo['values'  ][valid]
-                      obsinfo['filtered'] = True
-
-                   # Get and cache information for interpolation from model grid to observations.
-                   obsinfo['interp2_info'] = gotmcontroller.interp2_info(time_vals,z_vals,obsinfo['numtimes'],obsinfo['zs'])
+                   if 'itimes' not in obsinfo:
+                       itimes_left,iweights_left = [],[]
+                       valid = numpy.zeros((len(obsinfo['times']),),dtype=bool)
+                       for i,numtime in enumerate(netCDF4.date2num(obsinfo['times'],nctime.units)):
+                           iright = time_vals.searchsorted(numtime)
+                           if iright==0 or iright>=len(time_vals): continue
+                           valid[i] = True
+                           itimes_left.append(iright-1)
+                           iweights_left.append((numtime-time_vals[iright-1])/(time_vals[iright]-time_vals[iright-1]))
+                       obsinfo['times'] = [t for t,v in zip(obsinfo['times'],valid) if v]
+                       obsinfo['itimes'] = numpy.array(itimes_left,dtype=int)
+                       obsinfo['time_weights'] = numpy.array(iweights_left,dtype=float)
+                       obsinfo['zs'      ] = obsinfo['zs'    ][valid]
+                       obsinfo['values'  ] = obsinfo['values'][valid]
 
         # Get all model variables that we need from the NetCDF file.
         file2vardata  = {}
@@ -430,8 +414,28 @@ class Job(optimize.OptimizationProblem):
 
             # Get model predictions on observation coordinates,
             # using linear interpolation into result array.
-            allvals = eval(obsvar,file2vardata[outputpath])
-            modelvals = gotmcontroller.interp2_frominfo(allvals,obsinfo['interp2_info'])
+            all_values_model = eval(obsvar,file2vardata[outputpath])
+
+            # Get coordinates (currently expresses depth as distance from current surface elevation!)
+            h = file2vardata[outputpath]['h']
+            h_cumsum = h.cumsum(axis=1)
+            if obsinfo['depth_dimension']=='z':
+                # Centres (all)
+                zs_model = h_cumsum-h_cumsum[:,-1,numpy.newaxis]-h/2
+            elif obsinfo['depth_dimension']=='z1':
+                # Interfaces (all except bottom)
+                zs_model = h_cumsum-h_cumsum[:,-1,numpy.newaxis]
+
+            modelvals = numpy.empty_like(obsvals)
+            iprof = None
+            for i,(ileft,weight,z) in enumerate(zip(obsinfo['itimes'],obsinfo['time_weights'],obsinfo['zs'])):
+                if iprof!=ileft:
+                    zprof     = weight*zs_model        [ileft,:] + (1-weight)*zs_model[ileft+1,:]
+                    valueprof = weight*all_values_model[ileft,:] + (1-weight)*all_values_model[ileft+1,:]
+                    iprof = ileft
+                jright = min(max(1,zprof.searchsorted(z)),len(zprof)-1)
+                z_weight = (z-zprof[jright-1])/(zprof[jright]-zprof[jright-1])
+                modelvals[i] = z_weight*valueprof[jright-1] + (1-z_weight)*valueprof[jright]
 
             if not numpy.isfinite(modelvals).all():
                 print 'WARNING: one or more model values for %s are not finite.' % obsvar
