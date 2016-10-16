@@ -186,7 +186,7 @@ class SQLite(Transport):
 
         # Enumerate over results and insert them in the database.            
         for (values,lnlikelihood) in results:
-            strpars = ';'.join('%.12e' % v for v in values)
+            strpars = ';'.join('%.15e' % v for v in values)
             if lnlikelihood is None: lnlikelihood = 'NULL'
             c.execute("INSERT INTO `results` (`run`,`parameters`,`lnlikelihood`) values(?,?,?);",(runid,strpars,lnlikelihood))
 

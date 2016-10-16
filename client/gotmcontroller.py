@@ -273,7 +273,7 @@ class Controller:
             if parinfo['namelistfile'] is not None:
                 nmlpath = os.path.join(self.scenariodir,parinfo['namelistfile'])
                 #print 'Setting %s/%s/%s to %s.' % (nmlpath,parinfo['namelistname'],parinfo['name'],value)
-                self.namelistfiles[nmlpath][parinfo['namelistname']][parinfo['name']] = '%.8g' % value
+                self.namelistfiles[nmlpath][parinfo['namelistname']][parinfo['name']] = '%.15g' % value
 
         # Update namelist parameters that are governed by transforms
         ipar = len(self.parameters)
@@ -283,7 +283,7 @@ class Controller:
             for p,value in zip(transform.getOriginalParameters(),basevals):
                 nmlpath = os.path.join(self.scenariodir,p[0])
                 #print 'Setting %s/%s/%s to %s.' % (nmlpath,p[1],p[2],value)
-                self.namelistfiles[nmlpath][p[1]][p[2]] = '%.8g' % value
+                self.namelistfiles[nmlpath][p[1]][p[2]] = '%.15g' % value
             ipar += len(ext)
 
         # Write the new namelists to file.
