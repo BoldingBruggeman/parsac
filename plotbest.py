@@ -145,7 +145,6 @@ for i,(oi,(t_interfaces,z_interfaces,all_model_data,model_data)) in enumerate(zi
     # Plot model result
     t_interfaces = matplotlib.pylab.date2num(t_interfaces)
     matplotlib.pylab.subplot(len(obsinfo),2,i*2+1)
-    print t_interfaces.shape,z_interfaces.shape,all_model_data.shape
     pc = matplotlib.pylab.pcolormesh(t_interfaces,z_interfaces,all_model_data)
     matplotlib.pylab.clim(varrange)
     #matplotlib.pylab.ylim(-viewdepth,0)
