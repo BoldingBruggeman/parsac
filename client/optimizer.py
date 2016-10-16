@@ -321,7 +321,7 @@ class Job(optimize.OptimizationProblem):
 
         self.initialized = True
 
-    def evaluateFitness(self,values):
+    def evaluateFitness(self,values,return_model_values=False,show_output=False):
         if not self.initialized: self.initialize()
 
         print 'Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values])
@@ -333,7 +333,7 @@ class Job(optimize.OptimizationProblem):
                  print errors
                  return -numpy.Inf
 
-        returncode = self.controller.run(values)
+        returncode = self.controller.run(values,showoutput=show_output)
 
         if returncode!=0:
               # Run failed
@@ -387,13 +387,15 @@ class Job(optimize.OptimizationProblem):
                    if 'itimes' not in obsinfo:
                        itimes_left,iweights_left = [],[]
                        valid = numpy.zeros((len(obsinfo['times']),),dtype=bool)
-                       for i,numtime in enumerate(netCDF4.date2num(obsinfo['times'],nctime.units)):
+                       obsinfo['numtimes'] = netCDF4.date2num(obsinfo['times'],nctime.units)
+                       for i,numtime in enumerate(obsinfo['numtimes']):
                            iright = time_vals.searchsorted(numtime)
                            if iright==0 or iright>=len(time_vals): continue
                            valid[i] = True
                            itimes_left.append(iright-1)
                            iweights_left.append((numtime-time_vals[iright-1])/(time_vals[iright]-time_vals[iright-1]))
                        obsinfo['times'] = [t for t,v in zip(obsinfo['times'],valid) if v]
+                       obsinfo['numtimes'] = obsinfo['numtimes'][valid]
                        obsinfo['itimes'] = numpy.array(itimes_left,dtype=int)
                        obsinfo['time_weights'] = numpy.array(iweights_left,dtype=float)
                        obsinfo['zs'      ] = obsinfo['zs'    ][valid]
@@ -409,6 +411,7 @@ class Job(optimize.OptimizationProblem):
         lnlikelihood = 0.
 
         # Enumerate over the sets of observations.
+        if return_model_values: model_values = []
         for obsinfo in self.observations:
             obsvar,outputpath,obsvals = obsinfo['outputvariable'],obsinfo['outputpath'],obsinfo['values']
 
@@ -427,12 +430,12 @@ class Job(optimize.OptimizationProblem):
                 zs_model = h_cumsum-h_cumsum[:,-1,numpy.newaxis]
 
             modelvals = numpy.empty_like(obsvals)
-            iprof = None
-            for i,(ileft,weight,z) in enumerate(zip(obsinfo['itimes'],obsinfo['time_weights'],obsinfo['zs'])):
-                if iprof!=ileft:
+            previous_numtime = None
+            for i,(numtime,ileft,weight,z) in enumerate(zip(obsinfo['numtimes'],obsinfo['itimes'],obsinfo['time_weights'],obsinfo['zs'])):
+                if previous_numtime!=numtime:
                     zprof     = weight*zs_model        [ileft,:] + (1-weight)*zs_model[ileft+1,:]
                     valueprof = weight*all_values_model[ileft,:] + (1-weight)*all_values_model[ileft+1,:]
-                    iprof = ileft
+                    previous_numtime = numtime
                 jright = min(max(1,zprof.searchsorted(z)),len(zprof)-1)
                 z_weight = (z-zprof[jright-1])/(zprof[jright]-zprof[jright-1])
                 modelvals[i] = z_weight*valueprof[jright-1] + (1-z_weight)*valueprof[jright]
@@ -442,6 +445,29 @@ class Job(optimize.OptimizationProblem):
                 print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
                 self.reportResult(values,None,error='Some model values for %s are not finite' % obsvar)
                 return -numpy.Inf
+
+            if return_model_values:
+                if obsinfo['depth_dimension']=='z':
+                    # Centres (all)
+                    z_interfaces = numpy.hstack((-h_cumsum[:,-1,numpy.newaxis],h_cumsum-h_cumsum[:,-1,numpy.newaxis]))
+                elif obsinfo['depth_dimension']=='z1':
+                    # Interfaces (all except bottom)
+                    zs_model = h_cumsum-h_cumsum[:,-1,numpy.newaxis]
+                z_interfaces2 = numpy.empty((z_interfaces.shape[0]+1,z_interfaces.shape[1]))
+                delta_z_interfaces = numpy.diff(z_interfaces,axis=0)/2
+                z_interfaces2[0,   :] = z_interfaces[0,  :] - delta_z_interfaces[0,:]
+                z_interfaces2[1:-1,:] = z_interfaces[:-1,:] + delta_z_interfaces
+                z_interfaces2[-1,  :] = z_interfaces[-1, :] + delta_z_interfaces[-1,:]
+                with netCDF4.Dataset(os.path.join(resultroot,outputpath)) as nc:
+                    nctime = nc.variables['time']
+                    time_vals = nctime[:]
+                    dtim = numpy.diff(time_vals)/2
+                    tim_stag = numpy.zeros((len(time_vals)+1,))
+                    tim_stag[0 ] = time_vals[0]-dtim[0]
+                    tim_stag[1:-1] = time_vals[:-1]+dtim
+                    tim_stag[-1] = time_vals[-1]+dtim[-1]
+                    t_interfaces = numpy.repeat(netCDF4.num2date(tim_stag,nctime.units)[:,numpy.newaxis],z_interfaces2.shape[1],axis=1)
+                    model_values.append((t_interfaces,z_interfaces2,all_values_model,modelvals))
 
             if obsinfo['logscale']:
                 modelvals = numpy.log10(numpy.maximum(modelvals,obsinfo['minimum']))
@@ -505,6 +531,7 @@ class Job(optimize.OptimizationProblem):
         print 'ln Likelihood = %.6g.' % lnlikelihood
         self.reportResult(values,lnlikelihood)
 
+        if return_model_values: return lnlikelihood,model_values
         return lnlikelihood
 
     def reportResult(self,values,lnlikelihood,error=None):
