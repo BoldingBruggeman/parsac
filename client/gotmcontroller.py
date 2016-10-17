@@ -102,6 +102,20 @@ class Controller:
         if not os.path.isdir(self.scenariodir):
             raise Exception('GOTM scenario directory "%s" does not exist.' % self.scenariodir)
 
+        # Parse file with namelists describing the main scenario settings.
+        path = os.path.join(self.scenariodir,'gotmrun.nml')
+        nmls,order = parseNamelistFile(path)
+        assert 'time'   in nmls, 'Cannot find namelist named "time" in "%s".' % path
+
+        # Find start and stop of simulation.
+        # These will be used to prune the observation table.
+        datematch = datetimere.match(nmls['time']['start'][1:-1])
+        assert datematch is not None,'Unable to parse start datetime in "%s".' % nmls['time']['start'][1:-1]
+        self.start = datetime.datetime(*map(int,datematch.group(1,2,3,4,5,6)))
+        datematch = datetimere.match(nmls['time']['stop'][1:-1])
+        assert datematch is not None,'Unable to parse stop datetime in "%s".' % nmls['time']['stop'][1:-1]
+        self.stop = datetime.datetime(*map(int,datematch.group(1,2,3,4,5,6)))
+
         self.initialized = False
 
     def addDummyParameter(self,name,minimum,maximum,logscale=False):

@@ -262,6 +262,12 @@ class Job(optimize.OptimizationProblem):
         if logscale and minimum is None:
             raise Exception('For log scale fitting, the (relevant) minimum value must be specified.')
 
+        obsstart = datetime.datetime(self.controller.start.year+spinupyears,self.controller.start.month,self.controller.start.day)
+        valid = numpy.array([t>=obsstart for t   in times],dtype=bool)
+        zs     = zs[valid]
+        values = values[valid]
+        times  = [t for t,v in zip(times,valid) if v]
+
         self.observations.append({'outputvariable':outputvariable,
                                   'outputpath':outputpath,
                                   'times':  times,
