@@ -4,7 +4,7 @@ import sys,math,optparse,shutil,datetime,os.path
 
 # Import third-party modules
 import numpy
-import pylab,matplotlib.cm
+import pylab,matplotlib.cm,matplotlib.gridspec,matplotlib.colorbar
 
 import client.run,client.gotmcontroller
 
@@ -103,6 +103,7 @@ herr = pylab.figure()
 hcor = pylab.figure(figsize=(2.5,9))
 nrow = int(round(math.sqrt(len(obsinfo))))
 ncol = int(math.ceil(len(obsinfo)/float(nrow)))
+gs = matplotlib.gridspec.GridSpec(len(obsinfo), 11)
 for i,(oi,(t_interfaces,z_interfaces,all_model_data,model_data)) in enumerate(zip(obsinfo,model_values)):
     times,observed_values,zs = oi['times'],oi['values'],oi['zs']
 
@@ -137,20 +138,20 @@ for i,(oi,(t_interfaces,z_interfaces,all_model_data,model_data)) in enumerate(zi
 
     # Plot model result
     t_interfaces = pylab.date2num(t_interfaces)
-    pylab.subplot(len(obsinfo),2,i*2+1)
+    pylab.subplot(gs[i,0:5])
     pc = pylab.pcolormesh(t_interfaces,z_interfaces,all_model_data)
     pylab.clim(varrange)
     pylab.ylim(zmin,zmax)
-    pylab.colorbar(pc)
     pylab.xlim(t_interfaces[0,0],t_interfaces[-1,0])
     xax = pylab.gca().xaxis
     loc = matplotlib.dates.AutoDateLocator()
     xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
     xax.set_major_locator(loc)
     pylab.grid(True)
+    pylab.colorbar(pc,cax=pylab.subplot(gs[i,-1]))
 
     # Plot observations
-    pylab.subplot(len(obsinfo),2,i*2+2)
+    pylab.subplot(gs[i,5:-1])
     numtimes = pylab.date2num(times)
     if options.grid:
         import matplotlib.mlab
@@ -165,6 +166,7 @@ for i,(oi,(t_interfaces,z_interfaces,all_model_data,model_data)) in enumerate(zi
     loc = matplotlib.dates.AutoDateLocator()
     xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
     xax.set_major_locator(loc)
+    pylab.gca().set_yticklabels(())
     pylab.grid(True)
 
     # Plot model predictions vs. observations
