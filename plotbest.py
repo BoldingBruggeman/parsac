@@ -4,7 +4,7 @@ import sys,math,optparse,shutil,datetime,os.path
 
 # Import third-party modules
 import numpy
-import matplotlib.pylab,matplotlib.cm
+import pylab,matplotlib.cm
 
 import client.run,client.gotmcontroller
 
@@ -98,21 +98,9 @@ likelihood,model_values = job.evaluateFitness(parameters,return_model_values=Tru
 #     fout.close()
 #     print ' done'
 
-# # Shortcuts to coordinates
-# tim_cent,z_cent,z1_cent = res['time_center'],res['z_center'],res['z1_center']
-# tim_stag,z_stag,z1_stag = res['time_staggered'],res['z_staggered'],res['z1_staggered']
-
-# # Find the depth index from where we start
-# ifirstz = 0
-# viewdepth = -z_stag[0]
-viewdepth = None
-if options.depth is not None:
-#     ifirstz = z_cent.searchsorted(-options.depth)
-    viewdepth = options.depth
-
-hres = matplotlib.pylab.figure(figsize=(10,9))
-herr = matplotlib.pylab.figure()
-hcor = matplotlib.pylab.figure(figsize=(2.5,9))
+hres = pylab.figure(figsize=(10,9))
+herr = pylab.figure()
+hcor = pylab.figure(figsize=(2.5,9))
 nrow = int(round(math.sqrt(len(obsinfo))))
 ncol = int(math.ceil(len(obsinfo)/float(nrow)))
 for i,(oi,(t_interfaces,z_interfaces,all_model_data,model_data)) in enumerate(zip(obsinfo,model_values)):
@@ -136,80 +124,81 @@ for i,(oi,(t_interfaces,z_interfaces,all_model_data,model_data)) in enumerate(zi
         model_data *= oi['fixed_scale_factor']
         all_model_data *= oi['fixed_scale_factor']
 
-    #v = zs>-viewdepth
-    varrange = (min(all_model_data.min(),observed_values.min()),max(all_model_data.max(),observed_values.max()))
+    zmin,zmax = z_interfaces[:,0].min(),z_interfaces[:,-1].max()
+    z_centres = (z_interfaces[:-1,:-1] + z_interfaces[1:,:-1] + z_interfaces[:-1,1:] + z_interfaces[1:,1:])/4
+    if options.depth is not None: zmin= -options.depth
+
+    valid_obs = zs>zmin
+    valid_mod = z_centres>zmin
+    varrange = (min(all_model_data[valid_mod].min(),observed_values[valid_obs].min()),max(all_model_data[valid_mod].max(),observed_values[valid_obs].max()))
 
     # Create figure for model-data comparison
-    matplotlib.pylab.figure(hres.number)
+    pylab.figure(hres.number)
 
     # Plot model result
-    t_interfaces = matplotlib.pylab.date2num(t_interfaces)
-    matplotlib.pylab.subplot(len(obsinfo),2,i*2+1)
-    pc = matplotlib.pylab.pcolormesh(t_interfaces,z_interfaces,all_model_data)
-    matplotlib.pylab.clim(varrange)
-    #matplotlib.pylab.ylim(-viewdepth,0)
-    matplotlib.pylab.colorbar(pc)
-    matplotlib.pylab.xlim(t_interfaces[0,0],t_interfaces[-1,0])
-    xax = matplotlib.pylab.gca().xaxis
+    t_interfaces = pylab.date2num(t_interfaces)
+    pylab.subplot(len(obsinfo),2,i*2+1)
+    pc = pylab.pcolormesh(t_interfaces,z_interfaces,all_model_data)
+    pylab.clim(varrange)
+    pylab.ylim(zmin,zmax)
+    pylab.colorbar(pc)
+    pylab.xlim(t_interfaces[0,0],t_interfaces[-1,0])
+    xax = pylab.gca().xaxis
     loc = matplotlib.dates.AutoDateLocator()
     xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
     xax.set_major_locator(loc)
-    matplotlib.pylab.grid(True)
+    pylab.grid(True)
 
     # Plot observations
-    matplotlib.pylab.subplot(len(obsinfo),2,i*2+2)
+    pylab.subplot(len(obsinfo),2,i*2+2)
+    numtimes = pylab.date2num(times)
     if options.grid:
-        dt,dz,eps = 30,20,1e-6
-        tgrid = numpy.arange(min(obsdata[:,0])-eps,max(obsdata[:,0]+eps),dt)
-        zgrid = numpy.arange(min(obsdata[:,1])-eps,max(obsdata[:,1]+eps),dz)
-        griddedobs = numpy.zeros((len(zgrid),len(tgrid)),dtype=numpy.float)
-        counts = numpy.zeros((len(zgrid),len(tgrid)),dtype=numpy.int)
-        for numtime,z,value in zip(oi['numtimes'],zs,observed_values):
-            it = tgrid.searchsorted(numtime)-1
-            iz = zgrid.searchsorted(z)-1
-            griddedobs[iz,it] += value
-            counts[iz,it] += 1
-        matplotlib.pylab.pcolormesh(tgrid,zgrid,numpy.ma.array(griddedobs/counts,mask=(counts==0)))
+        import matplotlib.mlab
+        gridded_observed_values = matplotlib.mlab.griddata(numtimes,zs,observed_values,t_interfaces,z_interfaces,'linear')
+        pylab.pcolormesh(t_interfaces,z_interfaces,gridded_observed_values)
     else:
-        matplotlib.pylab.scatter(matplotlib.pylab.date2num(times),zs,s=10,c=observed_values,cmap=matplotlib.cm.jet,vmin=varrange[0],vmax=varrange[1],edgecolors='none')
-    #matplotlib.pylab.ylim(-viewdepth,0)
-    matplotlib.pylab.xlim(t_interfaces[0,0],t_interfaces[-1,0])
-    matplotlib.pylab.clim(varrange)
-    xax = matplotlib.pylab.gca().xaxis
+        pylab.scatter(numtimes,zs,s=10,c=observed_values,cmap=matplotlib.cm.jet,vmin=varrange[0],vmax=varrange[1],edgecolors='none')
+    pylab.ylim(zmin,zmax)
+    pylab.xlim(t_interfaces[0,0],t_interfaces[-1,0])
+    pylab.clim(varrange)
+    xax = pylab.gca().xaxis
     loc = matplotlib.dates.AutoDateLocator()
     xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
     xax.set_major_locator(loc)
-    matplotlib.pylab.grid(True)
+    pylab.grid(True)
 
     # Plot model predictions vs. observations
-    matplotlib.pylab.figure(hcor.number)
-    #matplotlib.pylab.subplot(nrow,ncol,i+1)
-    matplotlib.pylab.subplot(len(obsinfo),1,i+1)
-    matplotlib.pylab.plot(observed_values,model_data,'.')
-    matplotlib.pylab.grid(True)
+    pylab.figure(hcor.number)
+    #pylab.subplot(nrow,ncol,i+1)
+    pylab.subplot(len(obsinfo),1,i+1)
+    pylab.plot(observed_values,model_data,'.')
+    pylab.grid(True)
     mi,ma = min(observed_values.min(),model_data.min()),max(observed_values.max(),model_data.max())
-    matplotlib.pylab.xlim(mi,ma)
-    matplotlib.pylab.ylim(mi,ma)
-    matplotlib.pylab.hold(True)
-    matplotlib.pylab.plot((mi,ma),(mi,ma),'-k')
+    pylab.xlim(mi,ma)
+    pylab.ylim(mi,ma)
+    pylab.hold(True)
+    pylab.plot((mi,ma),(mi,ma),'-k')
+    pylab.xlabel('observation')
+    pylab.ylabel('model')
 
     # Plot histogram with errors.
-    matplotlib.pylab.figure(herr.number)
-    matplotlib.pylab.subplot(len(obsinfo),1,i+1)
+    pylab.figure(herr.number)
+    pylab.subplot(len(obsinfo),1,i+1)
     diff = model_data-observed_values
     var_obs = ((observed_values-observed_values.mean())**2).mean()
     var_mod = ((model_data-model_data.mean())**2).mean()
     cov = ((observed_values-observed_values.mean())*(model_data-model_data.mean())).mean()
     cor = cov/numpy.sqrt(var_obs*var_mod)
-    #matplotlib.pylab.plot(diff,obs[:,1],'o')
-    #matplotlib.pylab.figure()
-    n, bins, patches = matplotlib.pylab.hist(diff, 100, normed=1)
+    #pylab.plot(diff,obs[:,1],'o')
+    #pylab.figure()
+    n, bins, patches = pylab.hist(diff, 100, normed=1)
+    pylab.xlabel('model - observation')
     print '%s: mean absolute error = %.4g, rmse = %.4g., cor = %.4g, s.d. mod = %.4g, s.d. obs = %.4g' % (oi['outputvariable'],numpy.mean(numpy.abs(diff)),numpy.sqrt(numpy.mean(diff**2)),cor,numpy.sqrt(var_mod),numpy.sqrt(var_obs))
-    #y = matplotlib.pylab.normpdf(bins, 0., numpy.sqrt(ssq/len(diff)))
-    #l = matplotlib.pylab.plot(bins, y, 'r--', linewidth=2)
+    #y = pylab.normpdf(bins, 0., numpy.sqrt(ssq/len(diff)))
+    #l = pylab.plot(bins, y, 'r--', linewidth=2)
 
 if len(extravars)>0:
-    matplotlib.pylab.figure()
+    pylab.figure()
     varcount = float(len(extravars))
     rowcount = int(math.ceil(math.sqrt(varcount)))
     colcount = int(math.ceil(varcount/rowcount))
@@ -222,14 +211,14 @@ if len(extravars)>0:
             logscale = vardata[1]
         modeldata = res[varname]
         if logscale: modeldata = numpy.log10(modeldata)
-        matplotlib.pylab.subplot(rowcount,colcount,i+1)
-        matplotlib.pylab.pcolormesh(tim_stag,z_stag,modeldata.transpose())
-        matplotlib.pylab.ylim(-viewdepth,0)
-        matplotlib.pylab.colorbar()
-        xax = matplotlib.pylab.gca().xaxis
+        pylab.subplot(rowcount,colcount,i+1)
+        pylab.pcolormesh(tim_stag,z_stag,modeldata.transpose())
+        pylab.ylim(-viewdepth,0)
+        pylab.colorbar()
+        xax = pylab.gca().xaxis
         loc = matplotlib.dates.AutoDateLocator()
         xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
         xax.set_major_locator(loc)
-        matplotlib.pylab.grid(True)
+        pylab.grid(True)
 
-matplotlib.pylab.show()
+pylab.show()
