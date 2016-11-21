@@ -1,5 +1,5 @@
 # Import from standard Python library (>= 2.4)
-import sys,os.path,re,datetime,math,time,cPickle,hashlib,threading
+import sys, os.path, re, datetime, math, time, cPickle, hashlib, threading
 
 # Import third-party modules
 import numpy
@@ -7,42 +7,42 @@ import netCDF4
 
 # Import personal custom stuff
 import optimize
-import gotmcontroller,transport
+import gotmcontroller, transport
 
 # Regular expression for GOTM datetimes
-datetimere = re.compile('(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
+datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
 
 class RunTimeTransform(gotmcontroller.ParameterTransform):
-    def __init__(self,ins,outs):
+    def __init__(self, ins, outs):
         self.expressions = []
         self.outvars = []
-        for infile,namelist,variable,value in outs:
-            self.outvars.append((infile,namelist,variable))
+        for infile, namelist, variable, value in outs:
+            self.outvars.append((infile, namelist, variable))
             self.expressions.append(value)
         self.outvars = tuple(self.outvars)
-        
+
         self.innames = []
-        bounds,logscale = {},{}
-        for name,minval,maxval,haslogscale in ins:
+        bounds, logscale = {}, {}
+        for name, minval, maxval, haslogscale in ins:
             self.innames.append(name)
-            bounds[name] = minval,maxval
+            bounds[name] = minval, maxval
             logscale[name] = haslogscale
         self.innames = tuple(self.innames)
-            
-        gotmcontroller.ParameterTransform.__init__(self,bounds,logscale)
-        
+
+        gotmcontroller.ParameterTransform.__init__(self, bounds, logscale)
+
     def getOriginalParameters(self):
         return self.outvars
 
     def getExternalParameters(self):
         return self.innames
 
-    def undoTransform(self,values):
-        workspace = dict(zip(self.innames,values))
-        return tuple([eval(expr,workspace) for expr in self.expressions])
+    def undoTransform(self, values):
+        workspace = dict(zip(self.innames, values))
+        return tuple([eval(expr, workspace) for expr in self.expressions])
 
 class attributes():
-    def __init__(self,element,description):
+    def __init__(self, element, description):
         self.att = dict(element.attrib)
         self.description = description
 
