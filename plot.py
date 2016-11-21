@@ -102,7 +102,7 @@ def update(fig=None):
             print 'Skipping row %i because length of parameter string (%i) is less than expected (%i).' % (rowid,len(strpars),strlength)
             continue
 
-        if lnlikelihood is None:
+        if lnlikelihood in ('NULL',None):
             badcount += 1
         else:
             valid = True
