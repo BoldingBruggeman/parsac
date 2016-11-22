@@ -45,7 +45,7 @@ else:
 c = db.cursor()
 query = "SELECT `parameters`,`lnlikelihood` FROM `runs`,`results` WHERE `runs`.`id`=`results`.`run` AND `runs`.`job`='%s'" % jobid
 c.execute(query)
-res = [(strpars,lnlikelihood) for strpars,lnlikelihood in c if lnlikelihood is not None]
+res = [(strpars,lnlikelihood) for strpars,lnlikelihood in c if lnlikelihood not in ('NULL',None)]
 
 # Initialize the GOTM controller.
 job = client.run.getJob(args[0],simulationdir=options.simulationdir)
@@ -148,7 +148,8 @@ for i,(oi,(t_interfaces,z_interfaces,all_model_data,model_data)) in enumerate(zi
     xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
     xax.set_major_locator(loc)
     pylab.grid(True)
-    pylab.colorbar(pc,cax=pylab.subplot(gs[i,-1]))
+    cb = pylab.colorbar(pc,cax=pylab.subplot(gs[i,-1]))
+    cb.set_label(oi['outputvariable'])
 
     # Plot observations
     pylab.subplot(gs[i,5:-1])
