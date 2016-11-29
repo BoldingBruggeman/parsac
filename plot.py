@@ -134,7 +134,7 @@ def update(fig=None):
         values = res[:, ipar]
         if logscale:
             values = numpy.log10(values)
-        step = int(round(res.shape[0]/options.bincount))
+        step = int(round(2*res.shape[0]/options.bincount))
         order = values.argsort()
         values, lnls = values[order], res[order, -1]
         xs, ys, i = [values[0]], [lnls[0]], 1
