@@ -77,7 +77,7 @@ else:
     sys.path += ['.\\Microsoft.VC80.CRT']
 
     # Add files of MS Visual C runtime
-    datafiles.append(('',('C:\WINDOWS\system32\MSVCP71.dll','.\Microsoft.VC80.CRT\MSVCR80.dll','.\Microsoft.VC80.CRT\Microsoft.VC80.CRT.manifest')))
+    datafiles.append(('',(r'C:\WINDOWS\system32\MSVCP71.dll', r'.\Microsoft.VC80.CRT\MSVCR80.dll', r'.\Microsoft.VC80.CRT\Microsoft.VC80.CRT.manifest')))
 
     setup(console=['run.py'],
           data_files=datafiles,

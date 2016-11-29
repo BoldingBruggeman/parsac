@@ -23,7 +23,7 @@ class OptimizationProblem:
         pass
 
     def evaluateFitness(self,parameters):
-        raise NotImplementedErrror,'Classes deriving from OptimizationProblem must implement evaluateFitness.'
+        raise NotImplementedErrror('Classes deriving from OptimizationProblem must implement evaluateFitness.')
 
 class TransformedProblem:
     """Filter that log-transforms one or more parameters."""

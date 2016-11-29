@@ -11,8 +11,6 @@ import shutil
 import subprocess
 import cPickle
 import hashlib
-import threading
-import xml.etree.ElementTree
 
 # Import third-party modules
 import numpy
@@ -20,88 +18,13 @@ import netCDF4
 
 # Import custom packages
 import namelist
-import optimize
-import transport
+import shared
 
 # Regular expression for GOTM datetimes
 datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
-gotmdatere = re.compile(r'\.{4}(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)')
 
 # Determine if we are running on Windows
 windows = sys.platform == 'win32'
-
-class ParameterTransform:
-    def __init__(self, bounds=None, logscale=None):
-        if bounds is None: bounds = {}
-        if logscale is None: logscale = {}
-        self.bounds = bounds
-        self.logscale = logscale
-
-    def getOriginalParameters(self):
-        assert False, 'getOriginalParameters must be implemented by class deriving from ParameterTransform'
-        return ()   # Tuple of tuples with each three elements: namelist file, namelist name, parameter name
-
-    def getExternalParameters(self):
-        assert False, 'getExternalParameters must be implemented by class deriving from ParameterTransform'
-        return ()   # List of parameter names
-
-    def getExternalParameterBounds(self, name):
-        assert name in self.bounds,'Boundaries for %s have not been set.' % name
-        return self.bounds[name]
-
-    def hasLogScale(self, name):
-        return self.logscale.get(name, False)
-
-    def undoTransform(self,values):
-        assert False, 'undoTransform must be implemented by class deriving from ParameterTransform'
-        return ()   # Untransformed values
-
-class SimpleTransform(ParameterTransform):
-    def __init__(self, inpars, outpars, func, bounds=None):
-        ParameterTransform.__init__(self, bounds)
-        for i in inpars:
-            assert len(i) == 3, 'Input parameter must be specified as tuple with namelist filename, namelist name and parameter name. Current value: %s.' % i
-        self.inpars = inpars
-        self.outpars = outpars
-        self.func = func
-
-    def getOriginalParameters(self):
-        return self.inpars
-
-    def getExternalParameters(self):
-        return self.outpars
-
-    def undoTransform(self, values):
-        return self.func(*values)
-
-class RunTimeTransform(ParameterTransform):
-    def __init__(self, ins, outs):
-        self.expressions = []
-        self.outvars = []
-        for infile, namelist, variable, value in outs:
-            self.outvars.append((infile, namelist, variable))
-            self.expressions.append(value)
-        self.outvars = tuple(self.outvars)
-
-        self.innames = []
-        bounds, logscale = {}, {}
-        for name, minval, maxval, haslogscale in ins:
-            self.innames.append(name)
-            bounds[name] = minval, maxval
-            logscale[name] = haslogscale
-        self.innames = tuple(self.innames)
-
-        ParameterTransform.__init__(self, bounds, logscale)
-
-    def getOriginalParameters(self):
-        return self.outvars
-
-    def getExternalParameters(self):
-        return self.innames
-
-    def undoTransform(self, values):
-        workspace = dict(zip(self.innames, values))
-        return tuple([eval(expr, workspace) for expr in self.expressions])
 
 def writeNamelistFile(path, nmls, nmlorder):
     with open(path, 'w') as f:
@@ -126,181 +49,21 @@ def parseNamelistFile(path):
         nmlorder.append(nml.name)
     return nmls, tuple(nmlorder)
 
-class attributes():
-    def __init__(self, element, description):
-        self.att = dict(element.attrib)
-        self.description = description
-        self.unused = set(self.att.keys())
-
-    def get(self, name, type, default=None, required=None, minimum=None, maximum=None):
-        value = self.att.get(name, None)
-        if value is None:
-            # No value specified - use default or report error.
-            if required is None: required = default is None
-            if required:
-                raise Exception('Attribute "%s" of %s is required.' % (name, self.description))
-            value = default
-        elif type is bool:
-            # Boolean variable
-            if value not in ('True', 'False'):
-                raise Exception('Attribute "%s" of %s must have value "True" or "False".' % (name, self.description))
-            value = value == 'True'
-        elif type in (float, int):
-            # Numeric variable
-            value = type(eval(value))
-            if minimum is not None and value < minimum:
-                raise Exception('The value of "%s" of %s must exceed %s.' % (name, self.description, minimum))
-            if maximum is not None and value > maximum:
-                raise Exception('The value of "%s" of %s must lie below %s.' % (name, self.description, maximum))
-        else:
-            # String
-            value = type(value)
-        self.unused.discard(name)
-        return value
-
-    def testEmpty(self):
-        if self.unused:
-            print 'WARNING: the following attributes of %s are ignored: %s' % (self.description, ', '.join(['"%s"' % k for k in self.unused]))
-
-class Parameter(object):
-    def __init__(self, att, default_minimum=None, default_maximum=None):
-        att.description = 'parameter %s' % self.name
-        self.minimum = att.get('minimum', float, default_minimum)
-        self.maximum = att.get('maximum', float, default_maximum)
-        self.logscale = att.get('logscale', bool, default=False)
-        if self.logscale and self.minimum <= 0:
-            raise Exception('Minimum for "%s" = %.6g, but that value cannot be used as this parameter is set to move on a log-scale.' % (self.name, self.minimum))
-        if self.maximum < self.minimum:
-            raise Exception('Maximum value (%.6g) for "%s" < minimum value (%.6g).' % (self.maximum, self.name, self.minimum))
-
-class DummyParameter(Parameter):
-    def __init__(self, att):
-        Parameter.__init__(self, att, 0.0, 1.0)
-
-    @property
-    def name(self):
-        return 'dummy'
-
-class NamelistParameter(Parameter):
+class NamelistParameter(shared.Parameter):
     def __init__(self, att):
         self.file = att.get('file', unicode)
         self.namelist = att.get('namelist', unicode)
         self.variable = att.get('variable', unicode)
-        Parameter.__init__(self, att)
+        shared.Parameter.__init__(self, '%s/%s/%s' % (self.file, self.namelist, self.variable), att)
 
-    @property
-    def name(self):
-        return '%s/%s/%s' % (self.file, self.namelist, self.variable)
-
-class Job(optimize.OptimizationProblem):
-    @staticmethod
-    def fromConfigurationFile(path, **kwargs):
-        if not os.path.isfile(path):
-            print 'Configuration file "%s" not found.' % path
-            return None
-
-        xml_tree = xml.etree.ElementTree.parse(path)
-
-        job_id = os.path.splitext(os.path.basename(path))[0]
-
-        element = xml_tree.find('model')
-        if element is not None:
-            att = attributes(element, 'the model element')
-            model_type = att.get('type', unicode)
-            att.testEmpty()
-        else:
-            model_type = 'gotm'
-
-        if model_type == 'gotm':
-            job_class = GOTMJob
-        elif model_type == 'executable':
-            job_class = ExternalJob
-        elif model_type == 'idealized':
-            job_class = IdealizedJob
-
-        return job_class(job_id, xml_tree, os.path.dirname(path))
-
-    def __init__(self, job_id, xml_tree, root):
-        self.initialized = False
-        self.id = job_id
-
-        self.parameters = []
-        for ipar, element in enumerate(xml_tree.findall('parameters/parameter')):
-            att = attributes(element, 'parameter %i' % (ipar+1))
-            self.parameters.append(self.getParameter(att))
-            att.testEmpty()
-
-        # Parse transforms
-        for ipar, element in enumerate(xml_tree.findall('parameters/transform')):
-            att = attributes(element, 'transform %i' % (ipar+1,))
-            att.testEmpty()
-            ins, outs = [], []
-            for iin, inelement in enumerate(element.findall('in')):
-                att = attributes(inelement, 'transform %i, input %i' % (ipar+1, iin+1))
-                name = att.get('name', unicode)
-                att.description = 'transform %i, input %s' % (ipar+1, name)
-                ins.append((name, att.get('minimum', float), att.get('maximum', float), att.get('logscale', bool, default=False)))
-                att.testEmpty()
-            for iout, outelement in enumerate(element.findall('out')):
-                att = attributes(outelement, 'transform %i, output %i' % (ipar+1, iout+1))
-                infile = att.get('file', unicode)
-                namelist = att.get('namelist', unicode)
-                variable = att.get('variable', unicode)
-                att.description = 'transform %i, output %s/%s/%s' % (ipar+1, infile, namelist, variable)
-                outs.append((infile, namelist, variable, att.get('value', unicode)))
-                att.testEmpty()
-            tf = RunTimeTransform(ins, outs)
-            self.controller.addParameterTransform(tf)
-
-    def getParameter(self, att):
-        if att.get('dummy', bool, default=False):
-            return DummyParameter(att)
-        return Parameter(att)
-
-    def getParameterNames(self):
-        return tuple([parameter.name for parameter in self.parameters])
-
-    def getParameterBounds(self):
-        return numpy.array([parameter.minimum for parameter in self.parameters], dtype=float), numpy.array([parameter.maximum for parameter in self.parameters], dtype=float)
-
-    def getParameterLogScale(self):
-        return tuple([parameter.logscale for parameter in self.parameters])
-
-    def createParameterSet(self):
-        return numpy.array([0.5*(parameter.minimum+parameter.maximum) for parameter in self.parameters], dtype=float)
-
-class IdealizedJob(Job):
-    def __init__(self, job_id, xml_tree, root):
-        Job.__init__(self, job_id, xml_tree, root)
-
-        element = xml_tree.find('fitness')
-        if element is None:
-            raise Exception('The root node must contain a single "fitness" element.')
-        att = attributes(element, 'the fitness element')
-        self.expression = att.get('expression', unicode)
-
-        self.basedict = {}
-        for name in dir(numpy):
-            obj = getattr(numpy,name)
-            if isinstance(obj, numpy.ufunc):
-                self.basedict[name] = obj
-
-    def initialize(self, job_id, xml_tree, root):
-        IdealizedJob.__init__(self, job_id, xml_tree, root)
-
-    def evaluateFitness(self, p):
-        for name,value in zip(self.parameter_names, p):
-            self.basedict[name] = value
-        return eval(self.expression, {}, self.basedict)
-
-class ExternalJob(Job):
+class Job(shared.Job):
     verbose = True
 
     def __init__(self, job_id, xml_tree, root, copyexe=False, tempdir=None, simulationdir=None):
         # Allow overwrite of setup directory (default: directory with xml configuration file)
         element = xml_tree.find('setup')
         if element is not None:
-            att = attributes(element, 'the setup element')
+            att = shared.XMLAttributes(element, 'the setup element')
             self.scenariodir = os.path.join(root, att.get('path', unicode))
             att.testEmpty()
         else:
@@ -310,7 +73,7 @@ class ExternalJob(Job):
         element = xml_tree.find('executable')
         if element is None:
             raise Exception('The root node must contain a single "executable" element.')
-        att = attributes(element, 'the executable element')
+        att = shared.XMLAttributes(element, 'the executable element')
         self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
         att.testEmpty()
 
@@ -327,7 +90,7 @@ class ExternalJob(Job):
         #self.controller = gotmcontroller.Controller(scenariodir, path_exe, copyexe=not hasattr(sys, 'frozen'), tempdir=tempdir, simulationdir=simulationdir)
 
         # Initialize base class
-        Job.__init__(self, job_id, xml_tree, root)
+        shared.Job.__init__(self, job_id, xml_tree, root)
 
         # Array to hold observation datasets
         self.observations = []
@@ -339,7 +102,7 @@ class ExternalJob(Job):
         # Parse observations section
         n = 0
         for iobs, element in enumerate(xml_tree.findall('observations/variable')):
-            att = attributes(element, 'observed variable %i' % (iobs+1))
+            att = shared.XMLAttributes(element, 'observed variable %i' % (iobs+1))
             source = att.get('source', unicode)
             att.description = 'observation set %s' % source
             sourcepath = os.path.normpath(os.path.join(root, source))
@@ -347,24 +110,24 @@ class ExternalJob(Job):
             modelvariable = att.get('modelvariable', unicode)
             modelpath = att.get('modelpath', unicode)
             n += self.addObservation(sourcepath, modelvariable, modelpath,
-                                    maxdepth          =att.get('maxdepth',           float, required=False, minimum=0.),
-                                    mindepth          =att.get('mindepth',           float, required=False, minimum=0.),
-                                    spinupyears       =att.get('spinupyears',        int, default=0, minimum=0),
-                                    logscale          =att.get('logscale',           bool, default=False),
-                                    relativefit       =att.get('relativefit',        bool, default=False),
-                                    min_scale_factor  =att.get('minscalefactor',     float, required=False),
-                                    max_scale_factor  =att.get('maxscalefactor',     float, required=False),
-                                    fixed_scale_factor=att.get('constantscalefactor',float, required=False),
-                                    minimum           =att.get('minimum',            float, default=0.1),
-                                    sd                =att.get('sd',                 float, required=False, minimum=0.),
-                                    cache=True)
+                                     maxdepth          =att.get('maxdepth',           float, required=False, minimum=0.),
+                                     mindepth          =att.get('mindepth',           float, required=False, minimum=0.),
+                                     spinupyears       =att.get('spinupyears',        int, default=0, minimum=0),
+                                     logscale          =att.get('logscale',           bool, default=False),
+                                     relativefit       =att.get('relativefit',        bool, default=False),
+                                     min_scale_factor  =att.get('minscalefactor',     float, required=False),
+                                     max_scale_factor  =att.get('maxscalefactor',     float, required=False),
+                                     fixed_scale_factor=att.get('constantscalefactor',float, required=False),
+                                     minimum           =att.get('minimum',            float, default=0.1),
+                                     sd                =att.get('sd',                 float, required=False, minimum=0.),
+                                     cache=True)
             att.testEmpty()
         if n == 0:
            raise Exception('No valid observations found within specified depth and timee range.')
 
     def getParameter(self, att):
         if att.get('dummy', bool, default=False):
-            return DummyParameter(att)
+            return shared.DummyParameter(att)
         return NamelistParameter(att)
 
     def getSimulationStart(self):
@@ -840,256 +603,3 @@ class ExternalJob(Job):
         if proc.returncode != 0:
             print 'WARNING: model run stopped prematurely - an error must have occured.'
         return proc.returncode
-
-class GOTMJob(ExternalJob):
-    verbose = True
-
-    def __init__(self, job_id, xml_tree, root, copyexe=False, tempdir=None, simulationdir=None):
-        self.start = None
-        ExternalJob.__init__(self, job_id, xml_tree, root, copyexe, tempdir, simulationdir)
-
-    def getInfo(self):
-        return {'parameters': self.externalparameters}
-
-    def processTransforms(self):
-        self.externalparameters = list(self.parameters)
-        self.namelistparameters = [(pi['namelistfile'], pi['namelistname'], pi['name']) for pi in self.parameters]
-        for transform in self.parametertransforms:
-            self.namelistparameters += transform.getOriginalParameters()
-            for extpar in transform.getExternalParameters():
-                minval, maxval = transform.getExternalParameterBounds(extpar)
-                haslogscale = transform.hasLogScale(extpar)
-                self.externalparameters.append({'namelistfile':'none',
-                             'namelistname':'none',
-                             'name':extpar,
-                             'minimum':minval,
-                             'maximum':maxval,
-                             'logscale':haslogscale})
-
-    def getSimulationStart(self):
-        if self.start is None:
-            # Check for existence of scenario directory
-            # (we need it now already to find start/stop of simulation)
-            if not os.path.isdir(self.scenariodir):
-                raise Exception('GOTM scenario directory "%s" does not exist.' % self.scenariodir)
-
-            # Parse file with namelists describing the main scenario settings.
-            path = os.path.join(self.scenariodir, 'gotmrun.nml')
-            nmls, order = parseNamelistFile(path)
-            assert 'time' in nmls, 'Cannot find namelist named "time" in "%s".' % path
-
-            # Find start and stop of simulation.
-            # These will be used to prune the observation table.
-            datematch = datetimere.match(nmls['time']['start'][1:-1])
-            assert datematch is not None, 'Unable to parse start datetime in "%s".' % nmls['time']['start'][1:-1]
-            self.start = datetime.datetime(*map(int, datematch.group(1, 2, 3, 4, 5, 6)))
-            datematch = datetimere.match(nmls['time']['stop'][1:-1])
-            assert datematch is not None, 'Unable to parse stop datetime in "%s".' % nmls['time']['stop'][1:-1]
-            self.stop = datetime.datetime(*map(int, datematch.group(1, 2, 3, 4, 5, 6)))
-
-        return self.start
-
-class Reporter:
-    @staticmethod
-    def fromConfigurationFile(path, description, allowedtransports=None, interactive=True):
-        import xml.etree.ElementTree
-        tree = xml.etree.ElementTree.parse(path)
-
-        jobid = os.path.splitext(os.path.basename(path))[0]
-
-        # Parse transports section
-        transports = []
-        for itransport,element in enumerate(tree.findall('transports/transport')):
-            att = attributes(element,'transport %i' % (itransport+1))
-            type = att.get('type',unicode)
-            if allowedtransports is not None and type not in allowedtransports: continue
-            if type == 'mysql':
-                defaultfile = att.get('defaultfile', unicode, required=False)
-                curtransport = transport.MySQL(server=att.get('server', unicode, required=(defaultfile is None)),
-                                               user=att.get('user', unicode, required=(defaultfile is None)),
-                                               password=att.get('password', unicode, required=(defaultfile is None)),
-                                               database=att.get('database', unicode, required=(defaultfile is None)),
-                                               defaultfile = defaultfile)
-            elif type=='http':
-                curtransport = transport.HTTP(server=att.get('server',  unicode),
-                                              path=att.get('path',    unicode))
-            elif type=='sqlite':
-                curtransport = transport.SQLite(path=att.get('path', unicode, '%s.db' % jobid))
-            else:
-                raise Exception('Unknown transport type "%s".' % type)
-            att.testEmpty()
-            transports.append(curtransport)
-
-        return Reporter(jobid, description, transports, interactive=interactive)
-
-    def __init__(self, jobid, description, transports=None, interactive=True, separate_thread=True):
-
-        self.jobid = jobid
-        self.description = description
-        self.separate_thread = separate_thread
-
-        # Check transports
-        assert transports is not None,'One or more transports must be specified.'
-        validtp = []
-        for transport in transports:
-            if transport.available():
-                validtp.append(transport)
-            else:
-                print 'Transport %s is not available.' % str(transport)
-        if not validtp:
-            print 'No transport available; exiting...'
-            sys.exit(1)
-        self.transports = tuple(validtp)
-
-        # Last working transport (to be set at run time)
-        self.lasttransport = None
-
-        # Identifier for current run
-        self.runid = None
-
-        # Queue with results yet to be reported.
-        self.resultqueue = []
-        self.allowedreportfailcount = None
-        self.allowedreportfailperiod = 3600   # in seconds
-        self.timebetweenreports = 60 # in seconds
-        self.reportfailcount = 0
-        self.lastreporttime = time.time()
-        self.reportedcount = 0
-        self.nexttransportreset = 30
-        self.queuelock = None
-
-        # Whether to allow for interaction with user (via e.g. raw_input)
-        self.interactive = interactive
-
-    def reportRunStart(self):
-        runid = None
-        for transport in self.transports:
-            if not transport.available(): continue
-            try:
-                runid = transport.initialize(self.jobid, self.description)
-            except Exception, e:
-                print 'Failed to initialize run over %s.\nReason: %s' % (str(transport), str(e))
-                runid = None
-            if runid is not None:
-                print 'Successfully initialized run over %s.\nRun identifier = %i' % (str(transport), runid)
-                self.lasttransport = transport
-                break
-
-        if runid is None:
-            print 'Unable to initialize run. Exiting...'
-            sys.exit(1)
-
-        self.runid = runid
-
-    def createReportingThread(self):
-        self.queuelock = threading.Lock()
-        if self.separate_thread:
-            self.reportingthread = ReportingThread(self)
-            self.reportingthread.start()
-
-    def reportResult(self, values, lnlikelihood, error=None):
-        if self.queuelock is None:
-            self.createReportingThread()
-
-        if not numpy.isfinite(lnlikelihood):
-            lnlikelihood = None
-
-        # Append result to queue
-        self.queuelock.acquire()
-        self.resultqueue.append((values, lnlikelihood))
-        self.queuelock.release()
-
-        if not self.separate_thread:
-            self.flushResultQueue()
-
-    def flushResultQueue(self,maxbatchsize=100):
-        # Report the start of the run, if that was not done before.
-        if self.runid is None:
-            self.reportRunStart()
-
-        while 1:
-            # Take current results from the queue.
-            self.queuelock.acquire()
-            batch = self.resultqueue[:maxbatchsize]
-            del self.resultqueue[:maxbatchsize]
-            self.queuelock.release()
-
-            # If there are no results to report, do nothing.
-            if len(batch) == 0: return
-
-            # Reorder transports, prioritizing last working transport
-            # Once in a while we retry the different transports starting from the top.
-            curtransports = []
-            if self.reportedcount < self.nexttransportreset:
-                if self.lasttransport is not None: curtransports.append(self.lasttransport)
-            else:
-                self.nexttransportreset += 30
-                self.lasttransport = None
-            for transport in self.transports:
-                if self.lasttransport is None or transport is not self.lasttransport: curtransports.append(transport)
-
-            # Try to report the results
-            for transport in curtransports:
-                success = True
-                try:
-                    transport.reportResults(self.runid, batch, timeout=5)
-                except Exception,e:
-                    print 'Unable to report result(s) over %s. Reason:\n%s' % (str(transport), str(e))
-                    success = False
-                if success:
-                    print 'Successfully delivered %i result(s) over %s.' % (len(batch), str(transport))
-                    self.lasttransport = transport
-                    break
-
-            if success:
-                # Register success and continue to report any remaining results.
-                self.reportedcount += len(batch)
-                self.reportfailcount = 0
-                self.lastreporttime = time.time()
-                continue
-
-            # If we arrived here, reporting failed.
-            self.reportfailcount += 1
-            print 'Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch),time.time()-self.lastreporttime)
-
-            # Put unreported results back in queue
-            self.queuelock.acquire()
-            batch += self.resultqueue
-            self.resultqueue = batch
-            self.queuelock.release()
-
-            # If interaction with user is not allowed, leave the result in the queue and return.
-            if not self.interactive: return
-
-            # Check if the report failure tolerances (count and period) have been exceeded.
-            exceeded = False
-            if self.allowedreportfailcount is not None and self.reportfailcount > self.allowedreportfailcount:
-                print 'Maximum number of reporting failures (%i) exceeded.' % self.allowedreportfailcount
-                exceeded = True
-            elif self.allowedreportfailperiod is not None and time.time() > (self.lastreporttime+self.allowedreportfailperiod):
-                print 'Maximum period of reporting failure (%i s) exceeded.' % self.allowedreportfailperiod
-                exceeded = True
-
-            # If the report failure tolerance has been exceeded, ask the user whether to continue.
-            if exceeded:
-                resp = None
-                while resp not in ('y','n'):
-                    resp = raw_input('To report results, connectivity to the server should be restored. Continue for now (y/n)? ')
-                if resp=='n': sys.exit(1)
-                self.reportfailcount = 0
-                self.lastreporttime = time.time()
-
-            # We will tolerate this failure (the server-side script may be unavailable temporarily)
-            print 'Queuing current result for later reporting.'
-            return
-
-class ReportingThread(threading.Thread):
-    def __init__(self,job):
-        threading.Thread.__init__(self)
-        self.job = job
-
-    def run(self):
-        while 1:
-            self.job.flushResultQueue()
-            time.sleep(self.job.timebetweenreports)
-

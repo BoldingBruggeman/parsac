@@ -1,0 +1,30 @@
+import os.path
+import xml.etree.ElementTree
+
+import shared
+import program
+import gotm
+import idealized
+
+name2class = {'gotm': gotm.Job, 'program': program.Job, 'idealized': idealized.Job}
+
+def fromConfigurationFile(path, **kwargs):
+    if not os.path.isfile(path):
+        print 'Configuration file "%s" not found.' % path
+        return None
+
+    xml_tree = xml.etree.ElementTree.parse(path)
+
+    job_id = os.path.splitext(os.path.basename(path))[0]
+
+    element = xml_tree.find('model')
+    if element is not None:
+        att = shared.XMLAttributes(element, 'the model element')
+        model_type = att.get('type', unicode)
+        att.testEmpty()
+    else:
+        model_type = 'gotm'
+
+    assert model_type in name2class, 'Unknown job type "%s" specified.' % model_type
+
+    return name2class[model_type](job_id, xml_tree, os.path.dirname(path), **kwargs)

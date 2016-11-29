@@ -10,18 +10,8 @@ import numpy
 
 # Import personal custom stuff
 import optimize
-import optimizer
-
-def getJob(configpath, returnreporter=False, allowedtransports=None, tempdir=None, simulationdir=None):
-    print 'Reading configuration from %s...' % configpath
-    job = optimizer.Job.fromConfigurationFile(configpath, tempdir=tempdir, simulationdir=simulationdir)
-
-    if returnreporter:
-        with open(configpath) as f:
-            xml = f.read()
-        reporter = optimizer.Reporter.fromConfigurationFile(configpath, xml, allowedtransports=allowedtransports)
-        return job, reporter
-    return job
+import job
+import report
 
 def main():
     parser = optparse.OptionParser()
@@ -46,25 +36,30 @@ def main():
     if options.ppservers is not None:
         ppservers = tuple(options.ppservers.split(','))
 
-    job, reporter = getJob(args[0], returnreporter=True, allowedtransports=allowedtransports, tempdir=options.tempdir)
+    print 'Reading configuration from %s...' % args[0]
+    current_job = job.fromConfigurationFile(args[0], tempdir=options.tempdir)
+
+    with open(args[0]) as f:
+        xml = f.read()
+    reporter = report.fromConfigurationFile(args[0], xml, allowedtransports=allowedtransports)
 
     # Configure result reporter
     reporter.interactive = options.interactive
     if options.reportfrequency is not None:
         reporter.timebetweenreports = options.reportfrequency
 
-    opt = optimize.Optimizer(job, reportfunction=reporter.reportResult)
+    opt = optimize.Optimizer(current_job, reportfunction=reporter.reportResult)
 
     repeat = True
     while repeat:
         repeat = options.method != 'fmin'   # repeating is only useful for stochastic algorithms - not for deterministic ones
 
-        logtransform = job.getParameterLogScale()
+        logtransform = current_job.getParameterLogScale()
         if options.method == 'fmin':
-            job.initialize()
-            vals = opt.run(method=optimize.SIMPLEX, par_ini=job.createParameterSet(), logtransform=logtransform)
+            current_job.initialize()
+            vals = opt.run(method=optimize.SIMPLEX, par_ini=current_job.createParameterSet(), logtransform=logtransform)
         elif options.method == 'DE':
-            minpar, maxpar = job.getParameterBounds()
+            minpar, maxpar = current_job.getParameterBounds()
 
             popsize = 10*len(minpar)
             maxgen = 4000
@@ -82,7 +77,7 @@ def main():
             #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
 
         print 'Best parameter set:'
-        for parinfo, val in zip(job.parameters, vals):
+        for parinfo, val in zip(current_job.parameters, vals):
             print '  %s = %.6g' % (parinfo['name'], val)
 
 if __name__ == '__main__':
