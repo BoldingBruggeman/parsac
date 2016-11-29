@@ -85,7 +85,7 @@ def update(fig=None):
         else:
             parbinbounds[ipar, :] = numpy.linspace(minimum, maximum, options.bincount+1)
 
-    group2maxlnl = dict([(s,curres[:, -1].max(axis=0)) for s, curres in source2history.items()])
+    group2maxlnl = dict([(s,curres[:, -1].max()) for s, curres in source2history.items()])
 
     # Order sources (runs or clients) according to counts or ln likelihood.
     if options.groupby is not None:
