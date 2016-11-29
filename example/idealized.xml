@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../client/config.xsd">
+  <model type="idealized"/>
+  <transports>
+    <transport type="sqlite"/>
+  </transports>
+  <fitness expression="exp(-0.5*(x1**2+x2**2))"/>
+  <parameters>
+    <parameter name="x1" minimum="-2." maximum="2."/>
+    <parameter name="x2" minimum="-2." maximum="2."/>
+  </parameters>
+</config>
