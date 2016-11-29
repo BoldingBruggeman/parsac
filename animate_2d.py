@@ -10,7 +10,7 @@ import pylab
 
 # Import custom modules
 import client.result
-import client.optimizer
+import client.job.idealized
 
 parser = optparse.OptionParser()
 parser.add_option('--database', type='string', help='Path to database (SQLite only)')
@@ -22,9 +22,9 @@ parser.add_option('--maxcount', type='int', help='Maximum number of series to pl
 parser.add_option('--constraint', type='string', action='append',nargs=3,help='Constraint on parameter (parameter name, minimum, maximum)',dest='constraints')
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
 parser.add_option('--run', type='int', help='Run number')
-parser.add_option('-u', '--update', action='store_true', help='Keep running and updating the figure with new results until the user quits with Ctrl-C')
 parser.add_option('-n', type='int', help='Number of points in active parameter set.')
-parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, database=None, scenarios=None, update=False, n=20)
+parser.add_option('-s', '--scatter', action='store_true', help='Use scatter plot in 2d, with points according to likelihood value.')
+parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, database=None, scenarios=None, scatter=False, n=20)
 (options, args) = parser.parse_args()
 
 if len(args) < 1:
@@ -32,7 +32,6 @@ if len(args) < 1:
     sys.exit(2)
 
 marginal = True
-scatter = True
 
 parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in options.constraints])
 
@@ -76,12 +75,12 @@ def update(fig=None):
     ys_c = 0.5*(ys[:-1]+ys[1:])
 
     marg1_func, marg2_func = None, None 
-    if isinstance(result.job, client.optimizer.IdealizedJob):
+    if isinstance(result.job, client.job.idealized.Job) and not options.scatter:
         zs = result.job.evaluateFitness((xs_c[:, numpy.newaxis], ys_c[numpy.newaxis, :]))
         marg1_func = lambda x: numpy.exp(-0.5*(x**2))
         marg2_func = lambda x: numpy.exp(-0.5*(x**2))
         pc = pylab.contourf(xs_c, ys_c, zs, 100)
-    if scatter:
+    if options.scatter:
         vmin, vmax = res[:, -1].min(), res[:, -1].max()
         series_old = pylab.scatter(res[:, ix], res[:, iy], c=res[:, -1], vmin=vmin, vmax=vmax)
         series_new = pylab.scatter(res[:, ix], res[:, iy], c=res[:, -1], vmin=vmin, vmax=vmax)
@@ -123,7 +122,7 @@ def update(fig=None):
             pylab.plot(xs_c, marg1_func(xs_c)-maxlnl, '-k')
     for i in range(res.shape[0]):
         n = max(0, i-options.n)
-        if scatter:
+        if options.scatter:
             series_old.remove()
             series_new.remove()
             series_old = ax_main.scatter(res[:n, ix], res[:n, iy], c=res[:n, -1], vmin=vmin, vmax=vmax, edgecolors='face')
