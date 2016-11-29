@@ -13,21 +13,6 @@ class Job(program.Job):
     def getInfo(self):
         return {'parameters': self.externalparameters}
 
-    def processTransforms(self):
-        self.externalparameters = list(self.parameters)
-        self.namelistparameters = [(pi['namelistfile'], pi['namelistname'], pi['name']) for pi in self.parameters]
-        for transform in self.parametertransforms:
-            self.namelistparameters += transform.getOriginalParameters()
-            for extpar in transform.getExternalParameters():
-                minval, maxval = transform.getExternalParameterBounds(extpar)
-                haslogscale = transform.hasLogScale(extpar)
-                self.externalparameters.append({'namelistfile':'none',
-                             'namelistname':'none',
-                             'name':extpar,
-                             'minimum':minval,
-                             'maximum':maxval,
-                             'logscale':haslogscale})
-
     def getSimulationStart(self):
         if self.start is None:
             # Check for existence of scenario directory
