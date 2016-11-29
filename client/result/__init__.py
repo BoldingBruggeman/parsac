@@ -22,9 +22,7 @@ class Result(object):
                 raise Exception('SQLite database %s does not exist.' % database)
             self.db = sqlite3.connect(database)
 
-    def get(self, limit=-1, constraints={}, run_id=None, groupby=None):
-        assert groupby in ('source', 'run', None)
-
+    def get_sources(self):
         # Build map from run identifier to source machine
         cursor = self.db.cursor()
         query = "SELECT `id`,`source`,`description` FROM `runs` WHERE `job`='%s'" % self.job.id
@@ -49,6 +47,11 @@ class Result(object):
             # Link run identifier to source machine
             run2source[run] = source
         cursor.close()
+
+        return run2source
+
+    def get(self, limit=-1, constraints={}, run_id=None, groupby=None):
+        assert groupby in ('source', 'run', None)
 
         parconstraints = []
         parnames = self.job.getParameterNames()
@@ -102,13 +105,12 @@ class Result(object):
         print 'Found %i results, of which %i were invalid.' % (len(history)+badcount, badcount)
 
         # Convert results into numpy arrays
-        res = numpy.array(history)
+        all_results = numpy.array(history)
 
         if groupby is None:
-            return res
+            return all_results
 
-        source2history = dict([(s, numpy.array(h)) for s, h in source2history.items()])
-        return res, source2history, run2source
+        return all_results, dict([(s, numpy.array(h)) for s, h in source2history.items()])
 
     def get_best(self, rank=1):
         res = self.get()

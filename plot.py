@@ -47,7 +47,8 @@ parlog = result.job.getParameterLogScale()
 npar = len(parnames)
 
 def update(fig=None):
-    res, source2history, run2source = result.get(groupby=options.groupby, constraints=parbounds, run_id=options.run, limit=options.limit)
+    res, source2history = result.get(groupby=options.groupby, constraints=parbounds, run_id=options.run, limit=options.limit)
+    run2source = result.get_sources()
 
     # Sort by likelihood
     indices = res[:, -1].argsort()
