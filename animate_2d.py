@@ -24,9 +24,10 @@ parser.add_option('-l', '--limit', type='int', help='Maximum number of results t
 parser.add_option('--run', type='int', help='Run number')
 parser.add_option('--start', type='int', help='Index of first frame to generate')
 parser.add_option('--stop', type='int', help='Index of last frame to generate')
+parser.add_option('--stride', type='int', help='Stride in number of frames')
 parser.add_option('-n', type='int', help='Number of points in active parameter set.')
 parser.add_option('-s', '--scatter', action='store_true', help='Use scatter plot in 2d, with points according to likelihood value.')
-parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, database=None, scenarios=None, scatter=False, n=20, start=0, stop=-1)
+parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, database=None, scenarios=None, scatter=False, n=20, start=0, stop=-1, stride=1)
 (options, args) = parser.parse_args()
 
 if len(args) < 1:
@@ -122,7 +123,7 @@ def update(fig=None):
         series_marg1, = pylab.plot(res[:, ix], res[:, -1], 'ok')
         if marg1_func is not None:
             pylab.plot(xs_c, marg1_func(xs_c)-maxlnl, '-k')
-    for i in range(options.start%res.shape[0], (options.stop%res.shape[0])+1):
+    for i in range(options.start%res.shape[0], (options.stop%res.shape[0])+1, options.stride):
         n = max(0, i-options.n)
         if options.scatter:
             series_old.remove()
