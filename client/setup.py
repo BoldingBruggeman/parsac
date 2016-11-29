@@ -12,7 +12,7 @@ import run
 # Shared settings
 excludes = ['pylab','Tkconstants','Tkinter','tcl']
 datafiles = [('scenario',tuple(glob.glob('%s/*' % run.job.controller.scenariodir))),
-             ('',(run.job.controller.gotmexe,)),
+             ('',(run.job.controller.exe,)),
              ('obs',tuple(run.job.getObservationPaths()))]
 targetdir = 'dist'
 

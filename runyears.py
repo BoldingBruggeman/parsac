@@ -20,7 +20,7 @@ for year in range(2000,2006):
 
     job = client.optimizer.Job(jobid,
                         scenpath,
-                        gotmexe=client.run.gotmexe,
+                        gotmexe=client.run.exe,
                         transports=(client.transport.Dummy(),),
                         copyexe=True)
 

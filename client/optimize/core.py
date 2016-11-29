@@ -119,15 +119,16 @@ class Optimizer:
             if popsize is None: popsize = nfreepar*10
 
             class Reporter:
-                def __init__(self,reportfunction):
+                def __init__(self,reportfunction,transform):
+                    self.transform = transform
                     self.reportfunction = reportfunction
                 def reportResult(self,pars,fitness):
-                    if self.reportfunction is not None: self.reportfunction(pars,fitness)
+                    if self.reportfunction is not None: self.reportfunction(self.transform(pars),fitness)
             
             solver = desolver.DESolver(problem,popsize,maxgen,
                                        par_min,par_max,F=F,CR=CR,initialpopulation=initialpopulation,
                                        ncpus=ncpus,ppservers=ppservers,
-                                       reporter=Reporter(self.reportfunction),modules=modules+('optimize',),verbose=verbose,
+                                       reporter=Reporter(self.reportfunction,problem.untransform),modules=modules+('optimize',),verbose=verbose,
                                        reltol=reltol,abstol=abstol)
             p_final = solver.Solve()
             
