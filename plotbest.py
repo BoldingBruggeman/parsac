@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 
-import sys,math,optparse,shutil,datetime,os.path
+import sys
+import optparse
+import shutil
+import datetime
+import os.path
 
 # Import third-party modules
 import numpy
@@ -85,8 +89,8 @@ print 'Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likel
 hres = pylab.figure(figsize=(10, 9))
 herr = pylab.figure()
 hcor = pylab.figure(figsize=(2.5, 9))
-nrow = int(round(math.sqrt(len(obsinfo))))
-ncol = int(math.ceil(len(obsinfo)/float(nrow)))
+nrow = int(round(numpy.sqrt(len(obsinfo))))
+ncol = int(numpy.ceil(len(obsinfo)/float(nrow)))
 gs = matplotlib.gridspec.GridSpec(len(obsinfo), 11)
 for i, (oi, (t_interfaces, z_interfaces, all_model_data, model_data)) in enumerate(zip(obsinfo, model_values)):
     times, observed_values, zs = oi['times'], oi['values'], oi['zs']
@@ -191,8 +195,8 @@ for i, (oi, (t_interfaces, z_interfaces, all_model_data, model_data)) in enumera
 if len(extravars) > 0:
     pylab.figure()
     varcount = float(len(extravars))
-    rowcount = int(math.ceil(math.sqrt(varcount)))
-    colcount = int(math.ceil(varcount/rowcount))
+    rowcount = int(numpy.ceil(numpy.sqrt(varcount)))
+    colcount = int(numpy.ceil(varcount/rowcount))
     for i, vardata in enumerate(extravars):
         if isinstance(vardata, basestring):
             varname = vardata

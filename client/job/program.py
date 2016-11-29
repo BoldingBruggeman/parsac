@@ -3,7 +3,6 @@ import sys
 import os.path
 import re
 import datetime
-import math
 import time
 import tempfile
 import atexit
@@ -537,7 +536,7 @@ class Job(shared.Job):
             sd = obsinfo['sd']
             if sd is None:
                 # No standard deviation specified: calculate the optimal s.d.
-                sd = math.sqrt(ssq/(n-1))
+                sd = numpy.sqrt(ssq/(n-1))
                 print 'Using optimal s.d. for %s = %.6g.' % (obsvar, sd)
 
             # Note: assuming normally distributed errors, and eliminating constant terms in the log likelihood = -n*ln(2*pi)/2
