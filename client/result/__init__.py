@@ -22,8 +22,8 @@ class Result(object):
                 raise Exception('SQLite database %s does not exist.' % database)
             self.db = sqlite3.connect(database)
 
-    def get(self, limit=-1, constraints={}, run_id=None, groupby='run'):
-        assert groupby in ('source', 'run')
+    def get(self, limit=-1, constraints={}, run_id=None, groupby=None):
+        assert groupby in ('source', 'run', None)
 
         # Build map from run identifier to source machine
         cursor = self.db.cursor()
@@ -64,7 +64,8 @@ class Result(object):
         runcrit = '`runs`.`id`'
         if run_id is not None:
             run_id = '%i' % run_id
-        query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,`%s` FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'" % (groupby, runcrit, self.job.id)
+        groupcol = 'NULL' if groupby is None else '`%s`' % groupby
+        query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,%s FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'" % (groupcol, runcrit, self.job.id)
         if limit != -1:
             query += ' LIMIT %i' % limit
         cursor.execute(query)
@@ -95,14 +96,18 @@ class Result(object):
                     dat[:-1] = parameters
                     dat[-1] = lnlikelihood
                     history.append(dat)
-                    source2history.setdefault(group, []).append(dat)
+                    if group is not None:
+                        source2history.setdefault(group, []).append(dat)
             i += 1
         print 'Found %i results, of which %i were invalid.' % (len(history)+badcount, badcount)
 
         # Convert results into numpy arrays
         res = numpy.array(history)
-        source2history = dict([(s, numpy.array(h)) for s, h in source2history.items()])
 
+        if groupby is None:
+            return res
+
+        source2history = dict([(s, numpy.array(h)) for s, h in source2history.items()])
         return res, source2history, run2source
 
     def get_best(self, rank=1):

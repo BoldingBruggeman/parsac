@@ -14,11 +14,6 @@ import client.job.idealized
 
 parser = optparse.OptionParser()
 parser.add_option('--database', type='string', help='Path to database (SQLite only)')
-parser.add_option('-r', '--range', type='float', help='Lower boundary for relative ln likelihood (always < 0)')
-parser.add_option('--bincount', type='int', help='Number of bins for ln likelihood marginals')
-parser.add_option('-g', '--groupby', type='choice', choices=('source','run'), help='What identifier to group the results by, i.e., "source" or "run".')
-parser.add_option('-o', '--orderby', type='choice', choices=('count','lnl'), help='What property to order the result groups by, i.e., "count" or "lnl".')
-parser.add_option('--maxcount', type='int', help='Maximum number of series to plot')
 parser.add_option('--constraint', type='string', action='append',nargs=3,help='Constraint on parameter (parameter name, minimum, maximum)',dest='constraints')
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
 parser.add_option('--run', type='int', help='Run number')
@@ -27,7 +22,7 @@ parser.add_option('--stop', type='int', help='Index of last frame to generate')
 parser.add_option('--stride', type='int', help='Stride in number of frames')
 parser.add_option('-n', type='int', help='Number of points in active parameter set.')
 parser.add_option('-s', '--scatter', action='store_true', help='Use scatter plot in 2d, with points according to likelihood value.')
-parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, database=None, scenarios=None, scatter=False, n=20, start=0, stop=-1, stride=1)
+parser.set_defaults(constraints=[], limit=-1, run=None, database=None, scenarios=None, scatter=False, n=20, start=0, stop=-1, stride=1)
 (options, args) = parser.parse_args()
 
 if len(args) < 1:
@@ -39,9 +34,6 @@ marginal = True
 parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in options.constraints])
 
 result = client.result.Result(args[0], database=options.database)
-
-if options.range is not None and options.range > 0:
-    options.range = -options.range
 
 parnames = result.job.getParameterNames()
 parmin, parmax = result.job.getParameterBounds()
@@ -58,7 +50,7 @@ print 'x axis: %s (parameter %i)' % (args[1], ix)
 print 'y axis: %s (parameter %i)' % (args[2], iy)
 
 def update(fig=None):
-    res, source2history, run2source = result.get(groupby=options.groupby, constraints=parbounds, run_id=options.run, limit=options.limit)
+    res = result.get(constraints=parbounds, run_id=options.run, limit=options.limit)
 
     maxlnl = res[:, -1].max()
     res[:, -1] -= maxlnl
