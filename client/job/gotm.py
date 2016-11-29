@@ -4,14 +4,11 @@ import datetime
 import program
 
 class Job(program.Job):
-    verbose = True
 
     def __init__(self, job_id, xml_tree, root, copyexe=False, tempdir=None, simulationdir=None):
         self.start = None
+        self.stop = None
         program.Job.__init__(self, job_id, xml_tree, root, copyexe, tempdir, simulationdir)
-
-    def getInfo(self):
-        return {'parameters': self.externalparameters}
 
     def getSimulationStart(self):
         if self.start is None:

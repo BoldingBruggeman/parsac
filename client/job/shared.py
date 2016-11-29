@@ -128,6 +128,9 @@ class Parameter(object):
         if self.maximum < self.minimum:
             raise Exception('Maximum value (%.6g) for "%s" < minimum value (%.6g).' % (self.maximum, self.name, self.minimum))
 
+    def getInfo(self):
+        return {'name': self.name, 'minimum': self.minimum, 'maximum': self.maximum, 'logscale': self.logscale}
+
 class DummyParameter(Parameter):
     def __init__(self, att):
         Parameter.__init__(self, 'dummy', att, default_minimum=0.0, default_maximum=1.0)

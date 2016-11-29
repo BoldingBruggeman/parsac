@@ -259,9 +259,8 @@ class Job(shared.Job):
             infocopy['depthrange'] = (-float(zs.max()), -float(zs.min()))
             infocopy['valuerange'] = (float(values.min()), float(values.max()))
             obs.append(infocopy)
-        #info = self.controller.getInfo()
-        info['observations'] = obs
-        return cPickle.dumps(info)
+        parameter_info = [parameter.getInfo() for parameter in self.parameters]
+        return cPickle.dumps({'parameters':parameter_info, 'observations':obs})
 
     def initialize(self):
         assert not self.initialized, 'Job has already been initialized.'
