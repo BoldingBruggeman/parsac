@@ -66,7 +66,7 @@ class Result(object):
         cursor = self.db.cursor()
         runcrit = '`runs`.`id`'
         if run_id is not None:
-            run_id = '%i' % run_id
+            runcrit = '%i' % run_id
         groupcol = 'NULL' if groupby is None else '`%s`' % groupby
         query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,%s FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'" % (groupcol, runcrit, self.job.id)
         if limit != -1:
