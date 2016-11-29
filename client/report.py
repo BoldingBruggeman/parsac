@@ -76,6 +76,7 @@ class Reporter:
         self.reportedcount = 0
         self.nexttransportreset = 30
         self.queuelock = None
+        self.reportingthread = None
 
         # Whether to allow for interaction with user (via e.g. raw_input)
         self.interactive = interactive
@@ -134,7 +135,8 @@ class Reporter:
             self.queuelock.release()
 
             # If there are no results to report, do nothing.
-            if len(batch) == 0: return
+            if len(batch) == 0:
+                return
 
             # Reorder transports, prioritizing last working transport
             # Once in a while we retry the different transports starting from the top.
@@ -145,14 +147,15 @@ class Reporter:
                 self.nexttransportreset += 30
                 self.lasttransport = None
             for transport in self.transports:
-                if self.lasttransport is None or transport is not self.lasttransport: curtransports.append(transport)
+                if self.lasttransport is None or transport is not self.lasttransport:
+                    curtransports.append(transport)
 
             # Try to report the results
             for transport in curtransports:
                 success = True
                 try:
                     transport.reportResults(self.runid, batch, timeout=5)
-                except Exception,e:
+                except Exception, e:
                     print 'Unable to report result(s) over %s. Reason:\n%s' % (str(transport), str(e))
                     success = False
                 if success:
@@ -169,7 +172,7 @@ class Reporter:
 
             # If we arrived here, reporting failed.
             self.reportfailcount += 1
-            print 'Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch),time.time()-self.lastreporttime)
+            print 'Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch), time.time()-self.lastreporttime)
 
             # Put unreported results back in queue
             self.queuelock.acquire()
@@ -178,7 +181,8 @@ class Reporter:
             self.queuelock.release()
 
             # If interaction with user is not allowed, leave the result in the queue and return.
-            if not self.interactive: return
+            if not self.interactive:
+                return
 
             # Check if the report failure tolerances (count and period) have been exceeded.
             exceeded = False
@@ -192,9 +196,10 @@ class Reporter:
             # If the report failure tolerance has been exceeded, ask the user whether to continue.
             if exceeded:
                 resp = None
-                while resp not in ('y','n'):
+                while resp not in ('y', 'n'):
                     resp = raw_input('To report results, connectivity to the server should be restored. Continue for now (y/n)? ')
-                if resp=='n': sys.exit(1)
+                if resp == 'n':
+                    sys.exit(1)
                 self.reportfailcount = 0
                 self.lastreporttime = time.time()
 
@@ -202,12 +207,18 @@ class Reporter:
             print 'Queuing current result for later reporting.'
             return
 
+    def finalize(self):
+        if self.reportingthread:
+            self.reportingthread.exit_event.set()
+
 class ReportingThread(threading.Thread):
-    def __init__(self,job):
+    def __init__(self, job):
         threading.Thread.__init__(self)
+        self.exit_event = threading.Event()
         self.job = job
 
     def run(self):
-        while 1:
+        done = False
+        while not done:
+            done = self.exit_event.wait(self.job.timebetweenreports)
             self.job.flushResultQueue()
-            time.sleep(self.job.timebetweenreports)

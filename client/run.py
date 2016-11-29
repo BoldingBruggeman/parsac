@@ -79,5 +79,7 @@ def main():
         for parameter, value in zip(current_job.parameters, vals):
             print '  %s = %.6g' % (parameter.name, value)
 
+    reporter.finalize()
+
 if __name__ == '__main__':
     main()
