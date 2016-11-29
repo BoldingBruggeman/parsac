@@ -56,7 +56,6 @@ def main():
 
         logtransform = current_job.getParameterLogScale()
         if options.method == 'fmin':
-            current_job.initialize()
             vals = opt.run(method=optimize.SIMPLEX, par_ini=current_job.createParameterSet(), logtransform=logtransform)
         elif options.method == 'DE':
             minpar, maxpar = current_job.getParameterBounds()
@@ -77,8 +76,8 @@ def main():
             #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
 
         print 'Best parameter set:'
-        for parinfo, val in zip(current_job.parameters, vals):
-            print '  %s = %.6g' % (parinfo['name'], val)
+        for parameter, value in zip(current_job.parameters, vals):
+            print '  %s = %.6g' % (parameter.name, value)
 
 if __name__ == '__main__':
     main()
