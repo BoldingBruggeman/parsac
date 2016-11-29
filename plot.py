@@ -17,7 +17,6 @@ except ImportError:
 import client.result
 
 parser = optparse.OptionParser()
-parser.add_option('--database', type='string', help='Path to database (SQLite only)')
 parser.add_option('-r', '--range', type='float', help='Lower boundary for relative ln likelihood (always < 0)')
 parser.add_option('--bincount', type='int', help='Target number of segments per ln likelihood marginal')
 parser.add_option('-g', '--groupby', type='choice', choices=('source', 'run'), help='What identifier to group the results by, i.e., "source" or "run".')
@@ -27,7 +26,7 @@ parser.add_option('--constraint', type='string', action='append', nargs=3, help=
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
 parser.add_option('--run', type='int', help='Run number')
 parser.add_option('-u', '--update', action='store_true', help='Keep running and updating the figure with new results until the user quits with Ctrl-C')
-parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, database=None, scenarios=None, update=False)
+parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, update=False)
 options, args = parser.parse_args()
 
 if len(args) < 1:
@@ -39,7 +38,7 @@ if options.range is not None and options.range > 0:
 
 parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in options.constraints])
 
-result = client.result.Result(args[0], database=options.database)
+result = client.result.Result(args[0])
 
 parnames = result.job.getParameterNames()
 parmin, parmax = result.job.getParameterBounds()

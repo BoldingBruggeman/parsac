@@ -13,7 +13,6 @@ import client.result
 import client.job.idealized
 
 parser = optparse.OptionParser()
-parser.add_option('--database', type='string', help='Path to database (SQLite only)')
 parser.add_option('--constraint', type='string', action='append',nargs=3,help='Constraint on parameter (parameter name, minimum, maximum)',dest='constraints')
 parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
 parser.add_option('--run', type='int', help='Run number')
@@ -22,7 +21,7 @@ parser.add_option('--stop', type='int', help='Index of last frame to generate')
 parser.add_option('--stride', type='int', help='Stride in number of frames')
 parser.add_option('-n', type='int', help='Number of points in active parameter set.')
 parser.add_option('-s', '--scatter', action='store_true', help='Use scatter plot in 2d, with points according to likelihood value.')
-parser.set_defaults(constraints=[], limit=-1, run=None, database=None, scenarios=None, scatter=False, n=20, start=0, stop=-1, stride=1)
+parser.set_defaults(constraints=[], limit=-1, run=None, scatter=False, n=20, start=0, stop=-1, stride=1)
 (options, args) = parser.parse_args()
 
 if len(args) < 1:
@@ -33,7 +32,7 @@ marginal = True
 
 parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in options.constraints])
 
-result = client.result.Result(args[0], database=options.database)
+result = client.result.Result(args[0])
 
 parnames = result.job.getParameterNames()
 parmin, parmax = result.job.getParameterBounds()

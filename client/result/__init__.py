@@ -8,19 +8,23 @@ import numpy
 
 # Import custom modules
 import client.job
+import client.report
+import client.transport
 
 class Result(object):
-    def __init__(self, xml_path, database=None, simulationdir=None):
+    def __init__(self, xml_path, simulationdir=None):
         self.job = client.job.fromConfigurationFile(xml_path, simulationdir=simulationdir)
 
-        if database is None:
-            import mysqlinfo
-            self.db = mysqlinfo.connect(mysqlinfo.select)
-        else:
-            import sqlite3
-            if not os.path.isfile(database):
-                raise Exception('SQLite database %s does not exist.' % database)
-            self.db = sqlite3.connect(database)
+        reporter = client.report.fromConfigurationFile(xml_path, '')
+        for transport in reporter.transports:
+            if isinstance(transport, client.transport.MySQL):
+                import mysqlinfo
+                self.db = mysqlinfo.connect(mysqlinfo.select)
+            elif isinstance(transport, client.transport.SQLite):
+                import sqlite3
+                if not os.path.isfile(transport.path):
+                    raise Exception('SQLite database %s does not exist.' % transport.path)
+                self.db = sqlite3.connect(transport.path)
 
     def get_sources(self):
         # Build map from run identifier to source machine

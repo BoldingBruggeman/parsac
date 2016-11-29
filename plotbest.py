@@ -15,13 +15,12 @@ import client.result
 import netCDF4
 
 parser = optparse.OptionParser()
-parser.add_option('--database',type='string',help='Path to database (SQLite only)')
 parser.add_option('-r', '--rank',  type='int',   help='Rank of the result to plot (default = 1, i.e., the very best result)')
 parser.add_option('-d', '--depth', type='float', help='Depth range to show (> 0)')
 parser.add_option('-g', '--grid',  action='store_true', help='Whether to grid the observations.')
 parser.add_option('--savenc',      type='string', help='Path to copy NetCDF output file to.')
 parser.add_option('--simulationdir',type='string', help='Directory to run simulation in.')
-parser.set_defaults(rank=1,depth=None,grid=False,savenc=None,simulationdir=None)
+parser.set_defaults(rank=1, depth=None, grid=False, savenc=None, simulationdir=None)
 (options, args) = parser.parse_args()
 
 if len(args) < 1:
@@ -38,7 +37,7 @@ extravars = ()
 #extravars = [('mean_1',False),('mean_2',False),('var_1_1',False),('var_2_2',False),('cor_2_1',False)]
 #extravars = (('phytosize_mean_om',False),('phytosize_var_om',False))
 
-result = client.result.Result(args[0], database=options.database, simulationdir=options.simulationdir)
+result = client.result.Result(args[0], simulationdir=options.simulationdir)
 
 parameters, lnl = result.get_best(options.rank)
 

@@ -35,7 +35,7 @@ class Reporter:
         self.separate_thread = separate_thread
 
         # Check transports
-        assert transports is not None,'One or more transports must be specified.'
+        assert transports is not None, 'One or more transports must be specified.'
         validtp = []
         for transport in transports:
             if transport.available():
