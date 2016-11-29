@@ -111,7 +111,7 @@ class Result(object):
         return res, source2history, run2source
 
     def get_best(self, rank=1):
-        res, source2history, run2source = self.get()
+        res = self.get()
         indices = res[:, -1].argsort()
         return res[indices[-rank], :-1], res[indices[-rank], -1]
 
