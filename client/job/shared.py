@@ -124,7 +124,7 @@ class Parameter(object):
         self.maximum = att.get('maximum', float, default_maximum)
         self.logscale = att.get('logscale', bool, default=False)
         if self.logscale and self.minimum <= 0:
-            raise Exception('Minimum for "%s" = %.6g, but that value cannot be used as this parameter is set to move on a log-scale.' % (self.name, self.minimum))
+            raise Exception('Minimum for "%s" = %.6g, but should be positive as this parameter is configured to vary on a log scale.' % (self.name, self.minimum))
         if self.maximum < self.minimum:
             raise Exception('Maximum value (%.6g) for "%s" < minimum value (%.6g).' % (self.maximum, self.name, self.minimum))
 
