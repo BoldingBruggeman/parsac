@@ -2,22 +2,31 @@ import os.path
 
 try:
     import MySQLdb
-except Exception, e:
+except ImportError:
     MySQLdb = None
 
 try:
     import sqlite3
-except Exception, e:
+except ImportError:
     sqlite3 = None
 
 try:
     import httplib
     import urllib
     import socket
-except Exception, e:
+except ImportError:
     httplib = None
 
+def getClass(transport_type):
+    if transport_type not in type2class:
+        raise Exception('Unknown transport type "%s"."' % transport_type)
+    return type2class[transport_type] 
+
 class Transport:
+    @classmethod
+    def fromXML(cls, att, **kwargs):
+        raise NotImplementedError()
+
     def __init__(self):
         pass
 
@@ -38,6 +47,15 @@ class Dummy(Transport):
         pass
 
 class MySQL(Transport):
+    @classmethod
+    def fromXML(cls, att, **kwargs):
+        defaultfile = att.get('defaultfile', unicode, required=False)
+        return cls(server=att.get('server', unicode, required=(defaultfile is None)),
+                   user=att.get('user', unicode, required=(defaultfile is None)),
+                   password=att.get('password', unicode, required=(defaultfile is None)),
+                   database=att.get('database', unicode, required=(defaultfile is None)),
+                   defaultfile = defaultfile)
+
     def __init__(self, server, user, password, database, timeout=30, defaultfile=None):
         Transport.__init__(self)
         self.server   = server
@@ -91,6 +109,9 @@ class MySQL(Transport):
         db.close()
 
 class HTTP(Transport):
+    @classmethod
+    def fromXML(cls, att, **kwargs):
+        return cls(server=att.get('server', unicode), path=att.get('path', unicode))
 
     def __init__(self, server, path):
         Transport.__init__(self)
@@ -152,6 +173,10 @@ class HTTP(Transport):
             socket.setdefaulttimeout(oldtimeout)
 
 class SQLite(Transport):
+    @classmethod
+    def fromXML(cls, att, job_id):
+        return cls(path=att.get('path', unicode, '%s.db' % job_id))
+
     def __init__(self, path):
         Transport.__init__(self)
         self.path = path
@@ -192,3 +217,5 @@ class SQLite(Transport):
         # Commit and close database connection.
         db.commit()
         db.close()
+
+type2class = {'mysql': MySQL, 'http': HTTP, 'sqlite': SQLite}

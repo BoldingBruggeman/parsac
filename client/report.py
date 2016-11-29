@@ -12,33 +12,20 @@ import transport
 def fromConfigurationFile(path, description, allowedtransports=None, interactive=True):
     tree = xml.etree.ElementTree.parse(path)
 
-    jobid = os.path.splitext(os.path.basename(path))[0]
+    job_id = os.path.splitext(os.path.basename(path))[0]
 
     # Parse transports section
     transports = []
     for itransport, element in enumerate(tree.findall('transports/transport')):
-        att = shared.XMLAttributes(element,'transport %i' % (itransport+1))
-        type = att.get('type', unicode)
-        if allowedtransports is not None and type not in allowedtransports:
+        att = shared.XMLAttributes(element, 'transport %i' % (itransport+1))
+        transport_type = att.get('type', unicode)
+        if allowedtransports is not None and transport_type not in allowedtransports:
             continue
-        if type == 'mysql':
-            defaultfile = att.get('defaultfile', unicode, required=False)
-            curtransport = transport.MySQL(server=att.get('server', unicode, required=(defaultfile is None)),
-                                           user=att.get('user', unicode, required=(defaultfile is None)),
-                                           password=att.get('password', unicode, required=(defaultfile is None)),
-                                           database=att.get('database', unicode, required=(defaultfile is None)),
-                                           defaultfile = defaultfile)
-        elif type=='http':
-            curtransport = transport.HTTP(server=att.get('server',  unicode),
-                                                    path=att.get('path',    unicode))
-        elif type=='sqlite':
-            curtransport = transport.SQLite(path=att.get('path', unicode, '%s.db' % jobid))
-        else:
-            raise Exception('Unknown transport type "%s".' % type)
+        curtransport = transport.getClass(transport_type).fromXML(att, job_id=job_id)
         att.testEmpty()
         transports.append(curtransport)
 
-    return Reporter(jobid, description, transports, interactive=interactive)
+    return Reporter(job_id, description, transports, interactive=interactive)
 
 class Reporter:
     def __init__(self, jobid, description, transports=None, interactive=True, separate_thread=True):
