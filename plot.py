@@ -19,7 +19,7 @@ import client.result
 parser = optparse.OptionParser()
 parser.add_option('--database', type='string', help='Path to database (SQLite only)')
 parser.add_option('-r', '--range', type='float', help='Lower boundary for relative ln likelihood (always < 0)')
-parser.add_option('--bincount', type='int', help='Minimum number of points per ln likelihood marginal')
+parser.add_option('--bincount', type='int', help='Target number of segments per ln likelihood marginal')
 parser.add_option('-g', '--groupby', type='choice', choices=('source', 'run'), help='What identifier to group the results by, i.e., "source" or "run".')
 parser.add_option('-o', '--orderby', type='choice', choices=('count', 'lnl'), help='What property to order the result groups by, i.e., "count" or "lnl".')
 parser.add_option('--maxcount', type='int', help='Maximum number of series to plot')
@@ -148,7 +148,8 @@ def update(fig=None):
             while i < len(values) and values[i] == xs[-1]:
                 i += 1
         xs, ys = numpy.array(xs), numpy.array(ys)-maxlnl
-        if logscale: xs = 10.**xs
+        if logscale:
+            xs = 10.**xs
         marginals.append((xs, ys))
 
     for source in sources:
