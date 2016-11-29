@@ -186,7 +186,7 @@ class Job(shared.Job):
                         curtime = datetime.datetime(*refvals)
                         data = line[datematch.end():].strip('\n').split()
                         if len(data) != 2:
-                            raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline,len(data)))
+                            raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline, len(data)))
                         z, value = map(float, data)
                         if -z < mindepth or -z > maxdepth: continue
                         times.append(curtime)
@@ -242,7 +242,7 @@ class Job(shared.Job):
         return len(values)
 
     def getObservationPaths(self):
-        return [obsinfo['sourcepath'] for obsinfo in self.observations if obsinfo['sourcepath'] != None]
+        return [obsinfo['sourcepath'] for obsinfo in self.observations if obsinfo['sourcepath'] is not None]
 
     def describe(self):
         obs = []
@@ -345,15 +345,15 @@ class Job(shared.Job):
         returncode = self.run(values, showoutput=show_output)
 
         if returncode != 0:
-              # Run failed
-              print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
-              #self.reportResult(values, None, error='Run stopped prematurely')
-              return -numpy.Inf
+            # Run failed
+            print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+            #self.reportResult(values, None, error='Run stopped prematurely')
+            return -numpy.Inf
 
         resultroot = self.scenariodir
 
         # Check if this is the first model run/evaluation of the likelihood.
-        if not hasattr(self,'file2variables'):
+        if not hasattr(self, 'file2variables'):
             # This is the first time that we evaluate the likelihood.
             # Find a list of all NetCDF variables that we need.
             # Also find the coordinates in the result arrays and the weights that should be
@@ -364,7 +364,7 @@ class Job(shared.Job):
             for obsinfo in self.observations:
                 obsvar, outputpath = obsinfo['outputvariable'], obsinfo['outputpath']
 
-                with netCDF4.Dataset(os.path.join(resultroot,outputpath)) as nc:
+                with netCDF4.Dataset(os.path.join(resultroot, outputpath)) as nc:
                    if outputpath not in file2re:
                        file2re[outputpath] = re.compile(r'(?<!\w)('+'|'.join(nc.variables.keys())+r')(?!\w)')  # variable name that is not preceded and followed by a "word" character
                    if outputpath not in self.file2variables:
