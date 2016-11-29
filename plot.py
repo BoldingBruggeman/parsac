@@ -128,6 +128,29 @@ def update(fig=None):
         pylab.subplot(nrow, ncol, ipar+1)
         pylab.hold(True)
 
+    # Approximate marginal by estimsting upper contour of cloud.
+    marginals = []
+    for ipar, (minimum, maximum, logscale) in enumerate(zip(parmin, parmax, parlog)):
+        values = res[:, ipar]
+        if logscale:
+            values = numpy.log10(values)
+        step = int(round(res.shape[0]/options.bincount))
+        order = values.argsort()
+        values, lnls = values[order], res[order, -1]
+        xs, ys, i = [values[0]], [lnls[0]], 1
+        while i < len(values):
+            ilast = i + step
+            slope = (lnls[i:ilast]-ys[-1])/(values[i:ilast]-xs[-1])
+            i += slope.argmax()
+            xs.append(values[i])
+            ys.append(lnls[i])
+            i += 1
+            while i < len(values) and values[i] == xs[-1]:
+                i += 1
+        xs, ys = numpy.array(xs), numpy.array(ys)-maxlnl
+        if logscale: xs = 10.**xs
+        marginals.append((xs, ys))
+
     for source in sources:
         # Combine results for current source (run or client) into single array.
         curres = source2history[source]
@@ -149,7 +172,7 @@ def update(fig=None):
                 parbins[ipar, ibin] = max(parbins[ipar, ibin], curres[i, -1])
 
     # Put finishing touches on subplots
-    for ipar, (name, minimum, maximum, logscale, lbound, rbound) in enumerate(zip(parnames, parmin, parmax, parlog, lbounds, rbounds)):
+    for ipar, (name, minimum, maximum, logscale, lbound, rbound, marginal) in enumerate(zip(parnames, parmin, parmax, parlog, lbounds, rbounds, marginals)):
         ax = pylab.subplot(nrow, ncol, ipar+1)
         #pylab.legend(sources,numpoints=1)
 
@@ -158,9 +181,10 @@ def update(fig=None):
 
         # Plot marginal
         pylab.hold(True)
-        x = numpy.concatenate((parbinbounds[ipar, 0:1], numpy.repeat(parbinbounds[ipar, 1:-1], 2), parbinbounds[ipar, -1:]), 0)
-        y = numpy.repeat(parbins[ipar, :], 2)
-        pylab.plot(x, y, '-k', label='_nolegend_')
+        #x = numpy.concatenate((parbinbounds[ipar, 0:1], numpy.repeat(parbinbounds[ipar, 1:-1], 2), parbinbounds[ipar, -1:]), 0)
+        #y = numpy.repeat(parbins[ipar, :], 2)
+        #pylab.plot(x, y, '-k', label='_nolegend_')
+        pylab.plot(marginal[0], marginal[1], '-k', label='_nolegend_')
 
         #pylab.plot(res[:,0],res[:,1],'o')
 
