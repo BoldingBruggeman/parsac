@@ -2,7 +2,7 @@
 
 # Import from standard Python library
 import sys
-import optparse
+import argparse
 
 # Import third-party modules
 import numpy
@@ -16,29 +16,26 @@ except ImportError:
 # Import custom modules
 import client.result
 
-parser = optparse.OptionParser()
-parser.add_option('-r', '--range', type='float', help='Lower boundary for relative ln likelihood (always < 0)')
-parser.add_option('--bincount', type='int', help='Target number of segments per ln likelihood marginal')
-parser.add_option('-g', '--groupby', type='choice', choices=('source', 'run'), help='What identifier to group the results by, i.e., "source" or "run".')
-parser.add_option('-o', '--orderby', type='choice', choices=('count', 'lnl'), help='What property to order the result groups by, i.e., "count" or "lnl".')
-parser.add_option('--maxcount', type='int', help='Maximum number of series to plot')
-parser.add_option('--constraint', type='string', action='append', nargs=3, help='Constraint on parameter (parameter name, minimum, maximum)', dest='constraints')
-parser.add_option('-l', '--limit', type='int', help='Maximum number of results to read')
-parser.add_option('--run', type='int', help='Run number')
-parser.add_option('-u', '--update', action='store_true', help='Keep running and updating the figure with new results until the user quits with Ctrl-C')
+parser = argparse.ArgumentParser()
+parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
+parser.add_argument('-r', '--range', type=float, help='Lower boundary for relative ln likelihood (always < 0)')
+parser.add_argument('--bincount', type=int, help='Target number of segments per ln likelihood marginal')
+parser.add_argument('-g', '--groupby', type=str, choices=('source', 'run'), help='What identifier to group the results by, i.e., "source" or "run".')
+parser.add_argument('-o', '--orderby', type=str, choices=('count', 'lnl'), help='What property to order the result groups by, i.e., "count" or "lnl".')
+parser.add_argument('--maxcount', type=int, help='Maximum number of series to plot')
+parser.add_argument('--constraint', type=str, action='append', nargs=3, help='Constraint on parameter (parameter name, minimum, maximum)', dest='constraints')
+parser.add_argument('-l', '--limit', type=int, help='Maximum number of results to read')
+parser.add_argument('--run', type=int, help='Run number')
+parser.add_argument('-u', '--update', action='store_true', help='Keep running and updating the figure with new results until the user quits with Ctrl-C')
 parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, update=False)
-options, args = parser.parse_args()
+args = parser.parse_args()
 
-if len(args) < 1:
-    print 'This script takes one required argument: path to job configuration file (xml).'
-    sys.exit(2)
+if args.range is not None and args.range > 0:
+    args.range = -args.range
 
-if options.range is not None and options.range > 0:
-    options.range = -options.range
+parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in args.constraints])
 
-parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in options.constraints])
-
-result = client.result.Result(args[0])
+result = client.result.Result(args.xmlfile)
 
 parnames = result.job.getParameterNames()
 parmin, parmax = result.job.getParameterBounds()
@@ -46,11 +43,12 @@ parlog = result.job.getParameterLogScale()
 npar = len(parnames)
 
 def update(fig=None):
-    res, source2history = result.get(groupby=options.groupby, constraints=parbounds, run_id=options.run, limit=options.limit)
+    res, source2history = result.get(groupby=args.groupby, constraints=parbounds, run_id=args.run, limit=args.limit)
     run2source = result.get_sources()
 
     # Sort by likelihood
     indices = res[:, -1].argsort()
+    print indices
     res = res[indices, :]
 
     # Show best parameter set
@@ -75,31 +73,31 @@ def update(fig=None):
         print '  %s = %.6g (%.6g - %.6g)' % (parname, best[ipar], lbounds[ipar], rbounds[ipar])
 
     # Create parameter bins for histogram
-    parbinbounds = numpy.empty((npar, options.bincount+1))
-    parbins = numpy.empty((npar, options.bincount))
+    parbinbounds = numpy.empty((npar, args.bincount+1))
+    parbins = numpy.empty((npar, args.bincount))
     parbins[:, :] = 1.1*(minlnl-maxlnl)
     for ipar, (minimum, maximum, logscale) in enumerate(zip(parmin, parmax, parlog)):
         if logscale:
-            parbinbounds[ipar, :] = numpy.logspace(numpy.log10(minimum), numpy.log10(maximum), options.bincount+1)
+            parbinbounds[ipar, :] = numpy.logspace(numpy.log10(minimum), numpy.log10(maximum), args.bincount+1)
         else:
-            parbinbounds[ipar, :] = numpy.linspace(minimum, maximum, options.bincount+1)
+            parbinbounds[ipar, :] = numpy.linspace(minimum, maximum, args.bincount+1)
 
     group2maxlnl = dict([(s,curres[:, -1].max()) for s, curres in source2history.items()])
 
     # Order sources (runs or clients) according to counts or ln likelihood.
-    if options.groupby is not None:
-        print 'Points per %s:' % options.groupby
+    if args.groupby is not None:
+        print 'Points per %s:' % args.groupby
         sources = source2history.keys()
-        if options.orderby == 'count':
+        if args.orderby == 'count':
             sources = sorted(sources, cmp=lambda x, y: cmp(len(source2history[y]), len(source2history[x])))
         else:
             sources = sorted(sources, cmp=lambda x, y: cmp(group2maxlnl[y], group2maxlnl[x]))
-        if options.maxcount is not None and len(sources) > options.maxcount:
-            sources[options.maxcount:] = []
+        if args.maxcount is not None and len(sources) > args.maxcount:
+            sources[args.maxcount:] = []
         for source in sources:
             dat = source2history[source]
             label = source
-            if options.groupby == 'run':
+            if args.groupby == 'run':
                 label = '%s (%s)' % (source, run2source[source])
             print '  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source])
 
@@ -119,7 +117,7 @@ def update(fig=None):
     else:
         fig = pylab.figure(figsize=(12, 8))
         pylab.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=.3)
-        if options.update:
+        if args.update:
             fig.canvas.mpl_connect('close_event', lambda evt: sys.exit(0))
 
     # Create subplots
@@ -133,7 +131,7 @@ def update(fig=None):
         values = res[:, ipar]
         if logscale:
             values = numpy.log10(values)
-        step = max(int(round(2*res.shape[0]/options.bincount)), 1)
+        step = max(int(round(2*res.shape[0]/args.bincount)), 1)
         order = values.argsort()
         values, lnls = values[order], res[order, -1]
         xs, ys, i = [values[0]], [lnls[0]], 1
@@ -158,7 +156,7 @@ def update(fig=None):
 
         # Determine label for current source.
         label = source
-        if options.groupby == 'run':
+        if args.groupby == 'run':
             label = '%s (%s)' % (source, run2source[source])
 
         for ipar in range(npar):
@@ -191,8 +189,8 @@ def update(fig=None):
         # Set axes boundaries
         pylab.xlim(minimum, maximum)
         ymin = minlnl-maxlnl
-        if options.range is not None:
-            ymin = options.range
+        if args.range is not None:
+            ymin = args.range
         pylab.ylim(ymin, 0)
 
         # Show confidence interval
@@ -203,7 +201,7 @@ def update(fig=None):
             ax.set_xscale('log')
 
     #pylab.legend(numpoints=1)
-    if not options.update:
+    if not args.update:
         pylab.savefig('estimates.png', dpi=300)
 
     # Show figure and wait until the user closes it.
@@ -211,7 +209,7 @@ def update(fig=None):
 
     return fig
 
-if options.update:
+if args.update:
     if pylab is None:
         print 'MatPlotLib not found - cannot run in continuous update mode (-u/--update).'
         sys.exit(1)

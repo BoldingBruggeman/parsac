@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-import optparse
+import argparse
 import shutil
 import datetime
 import os.path
@@ -14,22 +14,20 @@ import client.result
 
 import netCDF4
 
-parser = optparse.OptionParser()
-parser.add_option('-r', '--rank',  type='int',   help='Rank of the result to plot (default = 1, i.e., the very best result)')
-parser.add_option('-d', '--depth', type='float', help='Depth range to show (> 0)')
-parser.add_option('-g', '--grid',  action='store_true', help='Whether to grid the observations.')
-parser.add_option('--savenc',      type='string', help='Path to copy NetCDF output file to.')
-parser.add_option('--simulationdir',type='string', help='Directory to run simulation in.')
+parser = argparse.ArgumentParser()
+parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
+parser.add_argument('-r', '--rank',  type=int,   help='Rank of the result to plot (default = 1, i.e., the very best result)')
+parser.add_argument('-d', '--depth', type=float, help='Depth range to show (> 0)')
+parser.add_argument('-g', '--grid',  action='store_true', help='Whether to grid the observations.')
+parser.add_argument('--savenc',      type=str, help='Path to copy NetCDF output file to.')
+parser.add_argument('--simulationdir',type=str, help='Directory to run simulation in.')
 parser.set_defaults(rank=1, depth=None, grid=False, savenc=None, simulationdir=None)
-(options, args) = parser.parse_args()
+args = parser.parse_args()
 
-if len(args) < 1:
-    print 'This script takes one required argument: path to job configuration file (xml).'
-    sys.exit(2)
-jobid = os.path.splitext(os.path.basename(args[0]))[0]
+jobid = os.path.splitext(os.path.basename(args.xmlfile))[0]
 
-if options.depth is not None and options.depth < 0:
-    print 'Depth argument must be positive, but is %.6g.' % options.depth
+if args.depth is not None and args.depth < 0:
+    print 'Depth argument must be positive, but is %.6g.' % args.depth
     sys.exit(2)
 
 extravars = ()
@@ -37,12 +35,12 @@ extravars = ()
 #extravars = [('mean_1',False),('mean_2',False),('var_1_1',False),('var_2_2',False),('cor_2_1',False)]
 #extravars = (('phytosize_mean_om',False),('phytosize_var_om',False))
 
-result = client.result.Result(args[0], simulationdir=options.simulationdir)
+result = client.result.Result(args.xmlfile, simulationdir=args.simulationdir)
 
-parameters, lnl = result.get_best(options.rank)
+parameters, lnl = result.get_best(args.rank)
 
 # Show best parameter set
-print '%ith best parameter set:' % options.rank
+print '%ith best parameter set:' % args.rank
 for name, value in zip(result.job.getParameterNames(), parameters):
     print '  %s = %.6g' % (name, value)
 print 'Original ln likelihood = %.8g' % lnl
@@ -71,11 +69,11 @@ likelihood, model_values = result.job.evaluateFitness(parameters, return_model_v
 print 'Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood,lnl)
 
 # # Copy NetCDF file
-# if options.savenc is not None:
-#     print 'Saving NetCDF output to %s...' % options.savenc,
-#     shutil.copyfile(ncpath,options.savenc)
-#     fout = open('%s.info' % options.savenc,'w')
-#     fout.write('job %i, %ith best parameter set\n' % (result.job.id,options.rank))
+# if args.savenc is not None:
+#     print 'Saving NetCDF output to %s...' % args.savenc,
+#     shutil.copyfile(ncpath,args.savenc)
+#     fout = open('%s.info' % args.savenc,'w')
+#     fout.write('job %i, %ith best parameter set\n' % (result.job.id,args.rank))
 #     fout.write('%s\n' % datetime.datetime.today().isoformat())
 #     fout.write('parameter values:\n')
 #     for i,val in enumerate(parameters_utf):
@@ -114,8 +112,8 @@ for i, (oi, (t_interfaces, z_interfaces, all_model_data, model_data)) in enumera
 
     zmin, zmax = z_interfaces[:,0].min(), z_interfaces[:,-1].max()
     z_centres = (z_interfaces[:-1, :-1] + z_interfaces[1:, :-1] + z_interfaces[:-1, 1:] + z_interfaces[1:, 1:])/4
-    if options.depth is not None:
-        zmin = -options.depth
+    if args.depth is not None:
+        zmin = -args.depth
 
     valid_obs = zs > zmin
     valid_mod = z_centres > zmin
@@ -142,7 +140,7 @@ for i, (oi, (t_interfaces, z_interfaces, all_model_data, model_data)) in enumera
     # Plot observations
     pylab.subplot(gs[i, 5:-1])
     numtimes = pylab.date2num(times)
-    if options.grid:
+    if args.grid:
         import matplotlib.mlab
         gridded_observed_values = matplotlib.mlab.griddata(numtimes, zs, observed_values, t_interfaces, z_interfaces, 'linear')
         pylab.pcolormesh(t_interfaces, z_interfaces, gridded_observed_values)
