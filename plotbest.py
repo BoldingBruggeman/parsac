@@ -8,7 +8,10 @@ import os.path
 
 # Import third-party modules
 import numpy
-import pylab,matplotlib.cm,matplotlib.gridspec,matplotlib.colorbar
+import pylab
+import matplotlib.cm
+import matplotlib.gridspec
+import matplotlib.colorbar
 
 import client.result
 
@@ -141,8 +144,8 @@ def main(args):
         pylab.subplot(gs[i, 5:-1])
         numtimes = pylab.date2num(times)
         if args.grid:
-            import matplotlib.mlab
-            gridded_observed_values = matplotlib.mlab.griddata(numtimes, zs, observed_values, t_interfaces, z_interfaces, 'linear')
+            from matplotlib.mlab import griddata
+            gridded_observed_values = griddata(numtimes, zs, observed_values, t_interfaces, z_interfaces, 'linear')
             pylab.pcolormesh(t_interfaces, z_interfaces, gridded_observed_values)
         else:
             pylab.scatter(numtimes, zs, s=10, c=observed_values, cmap=matplotlib.cm.jet, vmin=varrange[0], vmax=varrange[1], edgecolors='none')
