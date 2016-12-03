@@ -13,11 +13,10 @@ import optimize
 import job
 import report
 
-def main():
-    parser = argparse.ArgumentParser()
+def configure_argument_parser(parser):
 #KB    parser.add_argument('xmlfile',                 type=file, help='XML formatted configuration file')
     parser.add_argument('xmlfile',                 type=str, help='XML formatted configuration file')
-    parser.add_argument('-m', '--method',          type=str, choices=('DE', 'fmin', 'galileo'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex, galileo = galileo genetic algorithm')
+    parser.add_argument('-m', '--method',          type=str, choices=('DE', 'fmin'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex')
     parser.add_argument('-t', '--transport',       type=str, choices=('http', 'mysql'), help='Transport to use for server communication: http or mysql')
     parser.add_argument('-r', '--reportfrequency', type=int,    help='Time between result reports (seconds).')
     parser.add_argument('-i', '--interactive',     action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
@@ -25,8 +24,8 @@ def main():
     parser.add_argument('--tempdir',               type=str, help='Temporary directory for GOTM setups.')
     parser.add_argument('--ppservers',             type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on (only for Differential Evolution genetic algorithm).')
     parser.set_defaults(method='DE', transport=None, interactive=False, ncpus=None, ppservers=None, reportfrequency=None, tempdir=None, scenarios='.')
-    args = parser.parse_args()
 
+def main(args):
     allowedtransports = None
     if args.transport is not None:
         allowedtransports = (args.transport,)
@@ -81,4 +80,7 @@ def main():
     reporter.finalize()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    configure_argument_parser(parser)
+    args = parser.parse_args()
+    main(args)
