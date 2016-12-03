@@ -19,12 +19,12 @@ class pyac_cmds(object):
         parser_run.set_defaults(func=client.run.main)
 
         parser_plot = subparsers.add_parser('plot', help='Plot maximum likelihood for the various parameters being estimated')
-        client.run.configure_argument_parser(parser_plot)
-        parser_run.set_defaults(func=plot.main)
+        plot.configure_argument_parser(parser_plot)
+        parser_plot.set_defaults(func=plot.main)
 
         parser_plotbest = subparsers.add_parser('plotbest', help='Plot statistical results - default for the best parameter set')
-        client.run.configure_argument_parser(parser_plotbest)
-        parser_run.set_defaults(func=plotbest.main)
+        plotbest.configure_argument_parser(parser_plotbest)
+        parser_plotbest.set_defaults(func=plotbest.main)
 
         args = parser.parse_args()
         args.func(args)
