@@ -229,7 +229,7 @@ def main(args):
     else:
         update()
 
-if __name__=='__main__':
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     configure_argument_parser(parser)
     args = parser.parse_args()

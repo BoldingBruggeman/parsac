@@ -2,8 +2,6 @@
 
 import sys
 import argparse
-import shutil
-import datetime
 import os.path
 
 # Import third-party modules
@@ -15,8 +13,6 @@ import matplotlib.colorbar
 
 import client.result
 
-import netCDF4
-
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
     parser.add_argument('-r', '--rank',  type=int,   help='Rank of the result to plot (default = 1, i.e., the very best result)')
@@ -27,8 +23,6 @@ def configure_argument_parser(parser):
     parser.set_defaults(rank=1, depth=None, grid=False, savenc=None, simulationdir=None)
 
 def main(args):
-    jobid = os.path.splitext(os.path.basename(args.xmlfile))[0]
-
     if args.depth is not None and args.depth < 0:
         print 'Depth argument must be positive, but is %.6g.' % args.depth
         sys.exit(2)
@@ -69,7 +63,7 @@ def main(args):
     #res = result.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
     #nc.close()
     likelihood, model_values = result.job.evaluateFitness(parameters, return_model_values=True, show_output=True)
-    print 'Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood,lnl)
+    print 'Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood, lnl)
 
     # # Copy NetCDF file
     # if args.savenc is not None:
@@ -165,7 +159,7 @@ def main(args):
         pylab.subplot(len(obsinfo), 1, i+1)
         pylab.plot(observed_values, model_data, '.')
         pylab.grid(True)
-        mi,ma = min(observed_values.min(), model_data.min()), max(observed_values.max(), model_data.max())
+        mi, ma = min(observed_values.min(), model_data.min()), max(observed_values.max(), model_data.max())
         pylab.xlim(mi, ma)
         pylab.ylim(mi, ma)
         pylab.hold(True)
@@ -205,7 +199,8 @@ def main(args):
                 varname = vardata[0]
                 logscale = vardata[1]
             modeldata = res[varname]
-            if logscale: modeldata = numpy.log10(modeldata)
+            if logscale:
+                modeldata = numpy.log10(modeldata)
             pylab.subplot(rowcount, colcount, i+1)
             pylab.pcolormesh(tim_stag, z_stag, modeldata.T)
             pylab.ylim(-viewdepth, 0)
@@ -218,7 +213,7 @@ def main(args):
 
     pylab.show()
 
-if __name__=='__main__':
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     configure_argument_parser(parser)
     args = parser.parse_args()
