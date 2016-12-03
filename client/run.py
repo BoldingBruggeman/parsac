@@ -2,7 +2,6 @@
 
 # Import from standard Python library
 import os.path
-import sys
 import argparse
 
 # Import third party libraries
