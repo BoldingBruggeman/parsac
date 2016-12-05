@@ -13,6 +13,7 @@ def fromConfigurationFile(path, description, allowedtransports=None, interactive
     tree = xml.etree.ElementTree.parse(path)
 
     job_id = os.path.splitext(os.path.basename(path))[0]
+    root_dir = os.path.dirname(path)
 
     # Parse transports section
     transports = []
@@ -21,7 +22,7 @@ def fromConfigurationFile(path, description, allowedtransports=None, interactive
         transport_type = att.get('type', unicode)
         if allowedtransports is not None and transport_type not in allowedtransports:
             continue
-        curtransport = transport.getClass(transport_type).fromXML(att, job_id=job_id)
+        curtransport = transport.getClass(transport_type).fromXML(att, job_id=job_id, root_dir=root_dir)
         att.testEmpty()
         transports.append(curtransport)
 
