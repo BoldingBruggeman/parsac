@@ -183,8 +183,8 @@ class Job(optimize.OptimizationProblem):
 
     def getParameter(self, att):
         if att.get('dummy', bool, default=False):
-            return DummyParameter(att)
-        return Parameter(att.get('name', unicode), att)
+            return DummyParameter(self, att)
+        return Parameter(self, att)
 
     def getParameterNames(self):
         return tuple([parameter.name for parameter in self.parameters])
