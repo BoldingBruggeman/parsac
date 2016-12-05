@@ -86,8 +86,15 @@ def main(args):
     nrow = int(round(numpy.sqrt(len(obsinfo))))
     ncol = int(numpy.ceil(len(obsinfo)/float(nrow)))
     gs = matplotlib.gridspec.GridSpec(len(obsinfo), 11)
-    for i, (oi, (t_interfaces, z_interfaces, all_model_data, model_data)) in enumerate(zip(obsinfo, model_values)):
+    for i, (oi, moddat) in enumerate(zip(obsinfo, model_values)):
         times, observed_values, zs = oi['times'], oi['values'], oi['zs']
+
+        if zs is None:
+            # Time series of scalar (dimensions: time)
+            t_centers, all_model_data, model_data = moddat
+        else:
+            # Time series of vertically structured variable (dimensions: time, z)
+            t_interfaces, z_interfaces, all_model_data, model_data = moddat
 
         modelmin = oi.get('modelminimum', None)
         if modelmin is not None:
@@ -107,51 +114,59 @@ def main(args):
             model_data *= oi['fixed_scale_factor']
             all_model_data *= oi['fixed_scale_factor']
 
-        zmin, zmax = z_interfaces[:,0].min(), z_interfaces[:,-1].max()
-        z_centres = (z_interfaces[:-1, :-1] + z_interfaces[1:, :-1] + z_interfaces[:-1, 1:] + z_interfaces[1:, 1:])/4
-        if args.depth is not None:
-            zmin = -args.depth
-
-        valid_obs = zs > zmin
-        valid_mod = z_centres > zmin
-        varrange = (min(all_model_data[valid_mod].min(), observed_values[valid_obs].min()), max(all_model_data[valid_mod].max(), observed_values[valid_obs].max()))
-
         # Create figure for model-data comparison
         pylab.figure(hres.number)
 
         # Plot model result
-        t_interfaces = pylab.date2num(t_interfaces)
-        pylab.subplot(gs[i, 0:5])
-        pc = pylab.pcolormesh(t_interfaces, z_interfaces, all_model_data)
-        pylab.clim(varrange)
-        pylab.ylim(zmin, zmax)
-        pylab.xlim(t_interfaces[0, 0], t_interfaces[-1, 0])
-        xax = pylab.gca().xaxis
-        loc = matplotlib.dates.AutoDateLocator()
-        xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
-        xax.set_major_locator(loc)
-        pylab.grid(True)
-        cb = pylab.colorbar(pc, cax=pylab.subplot(gs[i, -1]))
-        cb.set_label(oi['outputvariable'])
+        if zs is not None:
+            zmin, zmax = z_interfaces[:, 0].min(), z_interfaces[:, -1].max()
+            z_centers = (z_interfaces[:-1, :-1] + z_interfaces[1:, :-1] + z_interfaces[:-1, 1:] + z_interfaces[1:, 1:])/4
+            if args.depth is not None:
+                zmin = -args.depth
 
-        # Plot observations
-        pylab.subplot(gs[i, 5:-1])
-        numtimes = pylab.date2num(times)
-        if args.grid:
-            from matplotlib.mlab import griddata
-            gridded_observed_values = griddata(numtimes, zs, observed_values, t_interfaces, z_interfaces, 'linear')
-            pylab.pcolormesh(t_interfaces, z_interfaces, gridded_observed_values)
+            valid_obs = zs > zmin
+            valid_mod = z_centers > zmin
+            varrange = (min(all_model_data[valid_mod].min(), observed_values[valid_obs].min()), max(all_model_data[valid_mod].max(), observed_values[valid_obs].max()))
+
+            t_interfaces = pylab.date2num(t_interfaces)
+            ax = pylab.subplot(gs[i, 0:5])
+            pc = pylab.pcolormesh(t_interfaces, z_interfaces, all_model_data)
+            pylab.clim(varrange)
+            pylab.ylim(zmin, zmax)
+            pylab.xlim(t_interfaces[0, 0], t_interfaces[-1, 0])
+            loc = matplotlib.dates.AutoDateLocator()
+            ax.xaxis.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
+            ax.xaxis.set_major_locator(loc)
+            pylab.grid(True)
+            cb = pylab.colorbar(pc, cax=pylab.subplot(gs[i, -1]))
+            cb.set_label(oi['outputvariable'])
+
+            # Plot observations
+            ax = pylab.subplot(gs[i, 5:-1])
+            numtimes = pylab.date2num(times)
+            if args.grid:
+                from matplotlib.mlab import griddata
+                gridded_observed_values = griddata(numtimes, zs, observed_values, t_interfaces, z_interfaces, 'linear')
+                pylab.pcolormesh(t_interfaces, z_interfaces, gridded_observed_values)
+            else:
+                pylab.scatter(numtimes, zs, s=10, c=observed_values, cmap=matplotlib.cm.jet, vmin=varrange[0], vmax=varrange[1], edgecolors='none')
+            pylab.ylim(zmin, zmax)
+            pylab.xlim(t_interfaces[0, 0], t_interfaces[-1, 0])
+            pylab.clim(varrange)
+            loc = matplotlib.dates.AutoDateLocator()
+            ax.xaxis.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
+            ax.xaxis.set_major_locator(loc)
+            pylab.gca().set_yticklabels(())
+            pylab.grid(True)
         else:
-            pylab.scatter(numtimes, zs, s=10, c=observed_values, cmap=matplotlib.cm.jet, vmin=varrange[0], vmax=varrange[1], edgecolors='none')
-        pylab.ylim(zmin, zmax)
-        pylab.xlim(t_interfaces[0, 0], t_interfaces[-1, 0])
-        pylab.clim(varrange)
-        xax = pylab.gca().xaxis
-        loc = matplotlib.dates.AutoDateLocator()
-        xax.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
-        xax.set_major_locator(loc)
-        pylab.gca().set_yticklabels(())
-        pylab.grid(True)
+            ax = pylab.subplot(gs[i, :])
+            pylab.plot(pylab.date2num(t_centers), all_model_data, '-')
+            pylab.plot(pylab.date2num(times), observed_values, '.')
+            loc = matplotlib.dates.AutoDateLocator()
+            ax.xaxis.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
+            ax.xaxis.set_major_locator(loc)
+            pylab.ylabel(oi['outputvariable'])
+            pylab.grid(True)
 
         # Plot model predictions vs. observations
         pylab.figure(hcor.number)

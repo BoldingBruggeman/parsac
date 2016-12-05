@@ -48,7 +48,6 @@ def main(args):
 
         # Sort by likelihood
         indices = res[:, -1].argsort()
-        print indices
         res = res[indices, :]
 
         # Show best parameter set
@@ -106,7 +105,7 @@ def main(args):
             return
 
         nrow = int(numpy.ceil(numpy.sqrt(0.5*npar)))
-        ncol = int(numpy.ceil(npar/nrow))
+        ncol = int(numpy.ceil(float(npar)/nrow))
 
         # Create the figure
         if fig is not None:

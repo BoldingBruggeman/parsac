@@ -117,9 +117,13 @@ class XMLAttributes():
             print 'WARNING: the following attributes of %s are ignored: %s' % (self.description, ', '.join(['"%s"' % k for k in self.unused]))
 
 class Parameter(object):
-    def __init__(self, name, att, default_minimum=None, default_maximum=None):
+    def __init__(self, job, att, name=None, default_minimum=None, default_maximum=None):
+        self.job = job
         att.description = 'parameter %s' % name
-        self.name = name
+        if name is None:
+            self.name = att.get('name', unicode)
+        else:
+            self.name = name
         self.minimum = att.get('minimum', float, default_minimum)
         self.maximum = att.get('maximum', float, default_maximum)
         self.logscale = att.get('logscale', bool, default=False)
@@ -128,12 +132,21 @@ class Parameter(object):
         if self.maximum < self.minimum:
             raise Exception('Maximum value (%.6g) for "%s" < minimum value (%.6g).' % (self.maximum, self.name, self.minimum))
 
+    def initialize(self):
+        pass
+
+    def setValue(self, value):
+        pass
+
+    def store(self):
+        pass
+
     def getInfo(self):
         return {'name': self.name, 'minimum': self.minimum, 'maximum': self.maximum, 'logscale': self.logscale}
 
 class DummyParameter(Parameter):
-    def __init__(self, att):
-        Parameter.__init__(self, 'dummy', att, default_minimum=0.0, default_maximum=1.0)
+    def __init__(self, job, att):
+        Parameter.__init__(self, job, att, name='dummy', default_minimum=0.0, default_maximum=1.0)
 
 class Job(optimize.OptimizationProblem):
     def __init__(self, job_id, xml_tree, root, **kwargs):
