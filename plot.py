@@ -3,6 +3,7 @@
 # Import from standard Python library
 import sys
 import argparse
+import warnings
 
 # Import third-party modules
 import numpy
@@ -219,7 +220,9 @@ def main(args):
             fig = update(fig)
             print 'Waiting for new results...',
             while 1:
-                pylab.pause(5.)
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore')
+                    pylab.pause(5.)
                 newcount = result.count()
                 if newcount != count:
                     print '%i found.' % (newcount-count)
