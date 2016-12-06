@@ -29,6 +29,8 @@ datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
 
 # Determine if we are running on Windows
 windows = sys.platform == 'win32'
+if windows:
+    import win32con
 
 def writeNamelistFile(path, nmls, nmlorder):
     with open(path, 'w') as f:
@@ -668,7 +670,7 @@ class Job(shared.Job):
             # We start the process with low priority
             if self.exe.endswith('.py'):
                 args = [sys.executable] + args
-            proc = subprocess.Popen(['start', '/B', '/WAIT', '/LOW']+args, shell=True, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=win32con.IDLE_PRIORITY_CLASS)
         else:
             proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
@@ -683,6 +685,7 @@ class Job(shared.Job):
         # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
         elapsed = time.time() - time_start
         print 'Model run took %.1f s.' % elapsed
+        print 'Return code: %s' % proc.returncode
         if proc.returncode != 0:
             print 'WARNING: model run stopped prematurely - an error must have occured.'
         return proc.returncode
