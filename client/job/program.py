@@ -242,76 +242,73 @@ class Job(shared.Job):
         if maxdepth < 0: print 'WARNING: maxdepth=%s, but typically should be positive (downward distance from surface in meter).' % maxdepth
         assert maxdepth > mindepth, 'ERROR: maxdepth=%s should be greater than mindepth=%s' % (maxdepth, mindepth)
 
-        if isinstance(observeddata, basestring):
+        assert isinstance(observeddata, basestring), 'Currently observations must be supplied as path to an 3-column ASCII file.'
 
-            # Observations are specified as path to ASCII file.
-            sourcepath = observeddata
-            md5 = getMD5(sourcepath)
+        # Observations are specified as path to ASCII file.
+        sourcepath = observeddata
+        md5 = getMD5(sourcepath)
 
-            observeddata = None
-            if cache and os.path.isfile(sourcepath+'.cache'):
-                # Retrieve cached copy of the observations
-                with open(sourcepath+'.cache', 'rb') as f:
-                    oldmd5 = cPickle.load(f)
-                    if oldmd5 != md5:
-                        print 'Cached copy of %s is out of date - file will be reparsed.' % sourcepath
-                    else:
-                        print 'Getting cached copy of %s...' % sourcepath
-                        observeddata = cPickle.load(f)
-
-            if not isinstance(observeddata, tuple):
-                # Parse ASCII file and store observations as matrix.
-                if self.verbose:
-                    print 'Reading observations for variable "%s" from "%s".' % (outputvariable, sourcepath)
-                if not os.path.isfile(sourcepath):
-                    raise Exception('"%s" is not a file.' % sourcepath)
-                times, zs, values = [], [], []
-                with open(sourcepath, 'rU') as f:
-                    for iline, line in enumerate(f):
-                        if self.verbose and (iline+1)%20000 == 0:
-                            print 'Read "%s" upto line %i.' % (sourcepath, iline)
-                        if line[0] == '#': continue
-                        datematch = datetimere.match(line)
-                        if datematch is None:
-                            raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline+1, line))
-                        refvals = map(int, datematch.group(1, 2, 3, 4, 5, 6)) # Convert matched strings into integers
-                        curtime = datetime.datetime(*refvals)
-                        data = line[datematch.end():].strip('\n').split()
-                        if file_format == 0:
-                            if len(data) != 2:
-                                raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline, len(data)))
-                            z = float(data[0])
-                            if -z < mindepth or -z > maxdepth: continue
-                            zs.append(z)
-                        else:
-                            if len(data) != 1:
-                                raise Exception('Line %i does not contain one values (observation) after the date + time, but %i values.' % (iline, len(data)))
-                        times.append(curtime)
-                        values.append(float(data[-1]))
-                if file_format == 0:
-                    zs = numpy.array(zs)
+        observeddata = None
+        if cache and os.path.isfile(sourcepath+'.cache'):
+            # Retrieve cached copy of the observations
+            with open(sourcepath+'.cache', 'rb') as f:
+                oldmd5 = cPickle.load(f)
+                if oldmd5 != md5:
+                    print 'Cached copy of %s is out of date - file will be reparsed.' % sourcepath
                 else:
-                    zs = None
-                values = numpy.array(values)
+                    print 'Loading cached copy of %s...' % sourcepath
+                    observeddata = cPickle.load(f)
 
-                # Ensure all observations are valid numbers.
-                valid = numpy.isfinite(values)
-                if not valid.all():
-                    bad = ['time=%s, z=%s, %s=%s' % (t, z, outputvariable, v) for i, (t, z, v) in enumerate(zip(times, zs, values)) if not valid[i]]
-                    raise Exception('%s contains invalid values:\n  %s' % (sourcepath, '\n  '.join(bad)))
-
-                # Try to store cached copy of observations
-                if cache:
-                    try:
-                        with open(sourcepath+'.cache', 'wb') as f:
-                            cPickle.dump(md5, f, cPickle.HIGHEST_PROTOCOL)
-                            cPickle.dump((times, zs, values), f, cPickle.HIGHEST_PROTOCOL)
-                    except Exception, e:
-                        print 'Unable to store cached copy of observation file. Reason: %s' % e
+        if not isinstance(observeddata, tuple):
+            # Parse ASCII file and store observations as matrix.
+            if self.verbose:
+                print 'Reading observations for variable "%s" from "%s".' % (outputvariable, sourcepath)
+            if not os.path.isfile(sourcepath):
+                raise Exception('"%s" is not a file.' % sourcepath)
+            times, zs, values = [], [], []
+            with open(sourcepath, 'rU') as f:
+                for iline, line in enumerate(f):
+                    if self.verbose and (iline+1)%20000 == 0:
+                        print 'Read "%s" upto line %i.' % (sourcepath, iline)
+                    if line.startswith('#'): continue
+                    datematch = datetimere.match(line)
+                    if datematch is None:
+                        raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline+1, line))
+                    refvals = map(int, datematch.group(1, 2, 3, 4, 5, 6)) # Convert matched strings into integers
+                    curtime = datetime.datetime(*refvals)
+                    data = line[datematch.end():].rstrip('\n').split()
+                    if file_format == 0:
+                        if len(data) != 2:
+                            raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline+1, len(data)))
+                        z = float(data[0])
+                        if not numpy.isfinite(z):
+                            raise Exception('Depth on line %i is not a valid number: %s.' % (iline+1, data[0]))
+                        if -z < mindepth or -z > maxdepth: continue
+                        zs.append(z)
+                    else:
+                        if len(data) != 1:
+                            raise Exception('Line %i does not contain one value (observation) after the date + time, but %i values.' % (iline+1, len(data)))
+                    times.append(curtime)
+                    value = float(data[-1])
+                    if not numpy.isfinite(value):
+                        raise Exception('Observed value on line %i is not a valid number: %s.' % (iline+1, data[-1]))
+                    values.append(value)
+            if file_format == 0:
+                zs = numpy.array(zs)
             else:
-                times, zs, values = observeddata
+                zs = None
+            values = numpy.array(values)
+
+            # Try to store cached copy of observations
+            if cache:
+                try:
+                    with open(sourcepath+'.cache', 'wb') as f:
+                        cPickle.dump(md5, f, cPickle.HIGHEST_PROTOCOL)
+                        cPickle.dump((times, zs, values), f, cPickle.HIGHEST_PROTOCOL)
+                except Exception, e:
+                    print 'Unable to store cached copy of observation file. Reason: %s' % e
         else:
-            assert False, 'Currently observations must be supplied as path to an 3-column ASCII file.'
+            times, zs, values = observeddata
 
         if logscale and minimum is None:
             raise Exception('For log scale fitting, the (relevant) minimum value must be specified.')
@@ -510,10 +507,10 @@ class Job(shared.Job):
                             valid[i] = True
                             itimes_left.append(iright-1)
                             iweights_left.append((numtime-time_vals[iright-1])/(time_vals[iright]-time_vals[iright-1]))
-                        obsinfo['times'] = [t for t,v in zip(obsinfo['times'],valid) if v]
+                        obsinfo['times'] = [t for t, v in zip(obsinfo['times'], valid) if v]
                         obsinfo['numtimes'] = numtimes[valid]
-                        obsinfo['itimes'] = numpy.array(itimes_left,dtype=int)
-                        obsinfo['time_weights'] = numpy.array(iweights_left,dtype=float)
+                        obsinfo['itimes'] = numpy.array(itimes_left, dtype=int)
+                        obsinfo['time_weights'] = numpy.array(iweights_left, dtype=float)
                         obsinfo['values'] = obsinfo['values'][valid]
                         if obsinfo['zs'] is not None:
                             obsinfo['zs'] = obsinfo['zs'][valid]
@@ -552,14 +549,14 @@ class Job(shared.Job):
                 # Interpolate in depth (extrapolates if required)
                 modelvals = numpy.empty_like(obsvals)
                 previous_numtime = None
-                for i,(numtime, ileft, weight, z) in enumerate(zip(obsinfo['numtimes'], obsinfo['itimes'], obsinfo['time_weights'], obsinfo['zs'])):
+                for i, (numtime, ileft, weight, z) in enumerate(zip(obsinfo['numtimes'], obsinfo['itimes'], obsinfo['time_weights'], obsinfo['zs'])):
                     if previous_numtime != numtime:
                         zprof     = weight*zs_model        [ileft, :] + (1-weight)*zs_model[ileft+1, :]
                         valueprof = weight*all_values_model[ileft, :] + (1-weight)*all_values_model[ileft+1, :]
                         previous_numtime = numtime
                     jright = min(max(1, zprof.searchsorted(z)), len(zprof)-1)
                     z_weight = (z - zprof[jright-1]) / (zprof[jright] - zprof[jright-1])
-                    modelvals[i] = z_weight*valueprof[jright-1] + (1-z_weight)*valueprof[jright]
+                    modelvals[i] = (1-z_weight)*valueprof[jright-1] + z_weight*valueprof[jright]
             else:
                 modelvals = obsinfo['time_weights']*all_values_model[obsinfo['itimes']] + (1-obsinfo['time_weights'])*all_values_model[obsinfo['itimes']+1]
 
@@ -685,7 +682,6 @@ class Job(shared.Job):
         # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
         elapsed = time.time() - time_start
         print 'Model run took %.1f s.' % elapsed
-        print 'Return code: %s' % proc.returncode
         if proc.returncode != 0:
-            print 'WARNING: model run stopped prematurely - an error must have occured.'
+            print 'WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode 
         return proc.returncode
