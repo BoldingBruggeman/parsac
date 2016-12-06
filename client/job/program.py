@@ -491,10 +491,9 @@ class Job(shared.Job):
                         else:
                             assert curdimnames == dimnames, 'Dimensions of %s %s do not match dimensions of %s %s. Cannot combine both in one expression.' % (varname, curdimnames, firstvar, dimnames)
 
-                    print 'Calculating coordinates for linear interpolation to "%s" observations...' % obsvar,
-
                     # Get time indices (for left side of bracket for linear interpolation)
                     # This also eliminates points outside the simulated period.
+                    print 'Calculating weights for linear interpolation to "%s" observations...' % obsvar,
                     nctime = nc.variables['time']
                     time_vals = nctime[:]
                     if 'itimes' not in obsinfo:
