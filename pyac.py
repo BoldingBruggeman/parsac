@@ -5,6 +5,7 @@ import argparse
 import client.run
 import plot
 import plotbest
+import animate_2d
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PYthon AutoCalibration - pyac')
@@ -21,6 +22,10 @@ if __name__ == '__main__':
     parser_plotbest = subparsers.add_parser('plotbest', help='Plot statistical results - default for the best parameter set')
     plotbest.configure_argument_parser(parser_plotbest)
     parser_plotbest.set_defaults(func=plotbest.main)
+
+    parser_animate_2d = subparsers.add_parser('animate_2d', help='Generate sequence of X-Y plots showing parameter variations - as .pngs')
+    animate_2d.configure_argument_parser(parser_animate_2d)
+    parser_animate_2d.set_defaults(func=animate_2d.main)
 
     args = parser.parse_args()
     args.func(args)
