@@ -24,13 +24,13 @@ except ImportError:
 import namelist
 import shared
 
+IDLE_PRIORITY_CLASS = 0x00000040
+
 # Regular expression for GOTM datetimes
 datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
 
 # Determine if we are running on Windows
 windows = sys.platform == 'win32'
-if windows:
-    import win32con
 
 def writeNamelistFile(path, nmls, nmlorder):
     with open(path, 'w') as f:
@@ -666,7 +666,7 @@ class Job(shared.Job):
             # We start the process with low priority
             if self.exe.endswith('.py'):
                 args = [sys.executable] + args
-            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=win32con.IDLE_PRIORITY_CLASS)
+            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS)
         else:
             proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
