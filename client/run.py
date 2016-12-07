@@ -3,6 +3,7 @@
 # Import from standard Python library
 import os.path
 import argparse
+import tempfile
 
 # Import third party libraries
 import numpy
@@ -15,12 +16,12 @@ import report
 def configure_argument_parser(parser):
 #KB    parser.add_argument('xmlfile',                 type=file, help='XML formatted configuration file')
     parser.add_argument('xmlfile',                 type=str, help='XML formatted configuration file')
-    parser.add_argument('-m', '--method',          type=str, choices=('DE', 'fmin'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex')
+    parser.add_argument('-m', '--method',          type=str, choices=('DE', 'fmin'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex (default: DE)')
     parser.add_argument('-t', '--transport',       type=str, choices=('http', 'mysql'), help='Transport to use for server communication: http or mysql')
-    parser.add_argument('-r', '--reportfrequency', type=int,    help='Time between result reports (seconds).')
+    parser.add_argument('-r', '--reportinterval', type=int, help='Time between result reports (seconds).')
     parser.add_argument('-i', '--interactive',     action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
-    parser.add_argument('-n', '--ncpus',           type=int,    help='Number of CPUs to use (only for Differential Evolution genetic algorithm).')
-    parser.add_argument('--tempdir',               type=str, help='Temporary directory for GOTM setups.')
+    parser.add_argument('-n', '--ncpus',           type=int, help='Number of cores to use (only for Differential Evolution genetic algorithm).')
+    parser.add_argument('--tempdir',               type=str, help='Temporary directory to use for setups when using a parallelized optimization method (default: %s).' % tempfile.gettempdir())
     parser.add_argument('--ppservers',             type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on (only for Differential Evolution genetic algorithm).')
     parser.set_defaults(method='DE', transport=None, interactive=False, ncpus=None, ppservers=None, reportfrequency=None, tempdir=None, scenarios='.')
 
@@ -42,8 +43,8 @@ def main(args):
 
     # Configure result reporter
     reporter.interactive = args.interactive
-    if args.reportfrequency is not None:
-        reporter.timebetweenreports = args.reportfrequency
+    if args.reportinterval is not None:
+        reporter.timebetweenreports = args.reportinterval
 
     opt = optimize.Optimizer(current_job, reportfunction=reporter.reportResult)
 
