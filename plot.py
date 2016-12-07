@@ -10,9 +10,11 @@ import numpy
 
 # Try importing MatPlotLib
 try:
-    import pylab
+    import matplotlib
+    matplotlib.use('TkAgg')
+    from matplotlib import pyplot
 except ImportError:
-    pylab = None
+    pyplot = None
 
 # Import custom modules
 import client.result
@@ -101,7 +103,7 @@ def main(args):
                     label = '%s (%s)' % (source, run2source[source])
                 print '  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source])
 
-        if pylab is None:
+        if pyplot is None:
             print 'MatPlotLib not found - skipping plotting.'
             return
 
@@ -110,20 +112,19 @@ def main(args):
 
         # Create the figure
         if fig is not None:
-            pylab.figure(fig.number)
             for ipar in range(npar):
-                pylab.subplot(nrow, ncol, ipar+1)
-                pylab.cla()
+                ax = fig.add_subplot(nrow, ncol, ipar+1)
+                ax.cla()
         else:
-            fig = pylab.figure(figsize=(12, 8))
-            pylab.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=.3)
+            fig = pyplot.figure(figsize=(12, 8))
+            fig.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=.3)
             if args.update:
                 fig.canvas.mpl_connect('close_event', lambda evt: sys.exit(0))
 
         # Create subplots
         for ipar in range(npar):
-            pylab.subplot(nrow, ncol, ipar+1)
-            pylab.hold(True)
+            ax = fig.add_subplot(nrow, ncol, ipar+1)
+            ax.hold(True)
 
         # Approximate marginal by estimsting upper contour of cloud.
         marginals = []
@@ -161,8 +162,8 @@ def main(args):
 
             for ipar in range(npar):
                 # Plot results for current source.
-                pylab.subplot(nrow, ncol, ipar+1)
-                pylab.plot(curres[:, ipar], curres[:, -1], '.', label=label)
+                ax = fig.add_subplot(nrow, ncol, ipar+1)
+                ax.plot(curres[:, ipar], curres[:, -1], '.', label=label)
 
                 # Update histogram based on current source results.
                 ind = parbinbounds[ipar, :].searchsorted(curres[:, ipar])-1
@@ -171,50 +172,50 @@ def main(args):
 
         # Put finishing touches on subplots
         for ipar, (name, minimum, maximum, logscale, lbound, rbound, marginal) in enumerate(zip(parnames, parmin, parmax, parlog, lbounds, rbounds, marginals)):
-            ax = pylab.subplot(nrow, ncol, ipar+1)
-            #pylab.legend(sources,numpoints=1)
+            ax = fig.add_subplot(nrow, ncol, ipar+1)
+            #ax.legend(sources,numpoints=1)
 
             # Add title
-            pylab.title(name)
+            ax.set_title(name)
 
             # Plot marginal
-            pylab.hold(True)
+            ax.hold(True)
             #x = numpy.concatenate((parbinbounds[ipar, 0:1], numpy.repeat(parbinbounds[ipar, 1:-1], 2), parbinbounds[ipar, -1:]), 0)
             #y = numpy.repeat(parbins[ipar, :], 2)
-            #pylab.plot(x, y, '-k', label='_nolegend_')
-            pylab.plot(marginal[0], marginal[1], '-k', label='_nolegend_')
+            #ax.plot(x, y, '-k', label='_nolegend_')
+            ax.plot(marginal[0], marginal[1], '-k', label='_nolegend_')
 
-            #pylab.plot(res[:,0],res[:,1],'o')
+            #ax.plot(res[:,0],res[:,1],'o')
 
             # Set axes boundaries
-            pylab.xlim(minimum, maximum)
+            ax.set_xlim(minimum, maximum)
             ymin = minlnl-maxlnl
             if args.range is not None:
                 ymin = args.range
-            pylab.ylim(ymin, 0)
+            ax.set_ylim(ymin, 0)
 
             # Show confidence interval
-            pylab.axvline(lbound, color='k', linestyle='--')
-            pylab.axvline(rbound, color='k', linestyle='--')
+            ax.axvline(lbound, color='k', linestyle='--')
+            ax.axvline(rbound, color='k', linestyle='--')
 
             if logscale:
                 ax.set_xscale('log')
 
-        #pylab.legend(numpoints=1)
+        #ax.legend(numpoints=1)
         if not args.update:
-            pylab.savefig('estimates.png', dpi=300)
+            fig.savefig('estimates.png', dpi=300)
 
         # Show figure and wait until the user closes it.
-        pylab.show()
+        pyplot.show()
 
         return fig
 
     if args.update:
-        if pylab is None:
+        if pyplot is None:
             print 'MatPlotLib not found - cannot run in continuous update mode (-u/--update).'
             sys.exit(1)
         fig = None
-        pylab.ion()
+        pyplot.ion()
         count = result.count()
         while 1:
             fig = update(fig)
@@ -222,7 +223,7 @@ def main(args):
             while 1:
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore')
-                    pylab.pause(5.)
+                    pyplot.pause(5.)
                 newcount = result.count()
                 if newcount != count:
                     print '%i found.' % (newcount-count)
