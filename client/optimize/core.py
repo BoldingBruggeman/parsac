@@ -123,7 +123,7 @@ class Optimizer:
             assert par_min is not None, 'Differential Evolution method requires lower parameter bounds.'
             assert par_max is not None, 'Differential Evolution method requires upper parameter bounds.'
             if not parallelize:
-                desolver.pp = None
+                ncpus = 1
 
             nfreepar = (numpy.asarray(par_min) != numpy.asarray(par_max)).sum()
             if popsize is None:

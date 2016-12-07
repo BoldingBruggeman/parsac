@@ -9,7 +9,6 @@ try:
     import pp # http://www.parallelpython.com - can be single CPU, multi-core SMP, or cluster parallelization
 except ImportError:
     pp = None
-#pp = None
 
 if pp is not None:
     ver = map(int, pp.version.split('.'))
@@ -72,9 +71,19 @@ class DESolver:
         # Parallel Python settings
         if ncpus is None:
             ncpus = 'autodetect'
+        else:
+            if ncpus == 1:
+                print 'Parallelization of Differential Evolution is disabled because number of cores is set to 1.'
+            else:
+                print 'Number of cores for Differential Evolution set to %i by user.' % ncpus
         self.ncpus = ncpus
         self.ppservers = ppservers
         self.socket_timeout = socket_timeout
+
+        if pp is None:
+            if self.ncpus != 1:
+                print 'Parallelization of Differential Evolution is disabled because Parallel Python is not available or the wrong version.'
+            self.ncpus = 1
 
         # Store initial population (if provided) and perform basic checks.
         self.initialpopulation = initialpopulation
@@ -101,7 +110,7 @@ class DESolver:
     def Solve(self):
 
         job_server = None
-        if pp is not None:
+        if self.ncpus != 1:
             # Create job server and give it time to conenct to nodes.
             if self.verbose:
                 print 'Starting Parallel Python server...'
