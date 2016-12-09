@@ -663,10 +663,11 @@ class Job(shared.Job):
         time_start = time.time()
         print 'Starting model run...'
         args = [self.exe]
+        if self.exe.endswith('.py'):
+            args = [sys.executable] + args
+            self.use_shell = False
         if windows:
             # We start the process with low priority
-            if self.exe.endswith('.py'):
-                args = [sys.executable] + args
             proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS, shell=self.use_shell)
         else:
             proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=self.use_shell)
