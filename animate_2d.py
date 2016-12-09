@@ -1,18 +1,5 @@
 #!/usr/bin/env python
 
-# Import from standard Python library
-import sys
-import argparse
-
-# Import third-party modules
-import numpy
-import pylab
-
-# Import custom modules
-import acpy.result
-import acpy.job.idealized
-
-parser = argparse.ArgumentParser()
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
     parser.add_argument('x',       type=str, help='Parameter on X-axis')
@@ -28,6 +15,17 @@ def configure_argument_parser(parser):
     parser.set_defaults(constraints=[], limit=-1, run=None, scatter=False, n=20, start=0, stop=-1, stride=1)
 
 def main(args):
+    # Import from standard Python library
+    import sys
+
+    # Import third-party modules
+    import numpy
+    import pylab
+
+    # Import custom modules
+    import acpy.result
+    import acpy.job.idealized
+
     marginal = True
 
     parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in args.constraints])
@@ -130,6 +128,7 @@ def main(args):
     update()
 
 if __name__ == '__main__':
+    import argparse
     parser = argparse.ArgumentParser()
     configure_argument_parser(parser)
     args = parser.parse_args()
