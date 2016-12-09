@@ -11,6 +11,10 @@ import acpy.job
 import acpy.report
 import acpy.transport
 
+import acpy.result.plot
+import acpy.result.plotbest
+import acpy.result.animate_2d
+
 class Result(object):
     def __init__(self, xml_path, simulationdir=None):
         self.job = acpy.job.fromConfigurationFile(xml_path, simulationdir=simulationdir)
