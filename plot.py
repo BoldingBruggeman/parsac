@@ -17,7 +17,7 @@ except ImportError:
     pyplot = None
 
 # Import custom modules
-import client.result
+import acpy.result
 
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
@@ -38,7 +38,7 @@ def main(args):
 
     parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in args.constraints])
 
-    result = client.result.Result(args.xmlfile)
+    result = acpy.result.Result(args.xmlfile)
 
     parnames = result.job.getParameterNames()
     parmin, parmax = result.job.getParameterBounds()

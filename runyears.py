@@ -3,25 +3,25 @@
 import re,os.path
 from Scientific.IO.NetCDF import NetCDFFile
 import matplotlib.pylab,numpy
-import client.gotmcontroller,client.run,client.optimizer
+import acpy.gotmcontroller,acpy.run,acpy.optimizer
 
 jobid = 25
-scenpath = os.path.join('client','./scenarios/%i' % jobid)
-obsdir = os.path.join('client',client.run.obsdir)
+scenpath = os.path.join('acpy','./scenarios/%i' % jobid)
+obsdir = os.path.join('acpy',acpy.run.obsdir)
 
 nmlfile = os.path.join(scenpath,'gotmrun.nml')
 
 for year in range(2000,2006):
     print 'Running year %04i' % year
-    nmls,nmlorder = client.gotmcontroller.parseNamelistFile(nmlfile)
+    nmls,nmlorder = acpy.gotmcontroller.parseNamelistFile(nmlfile)
     nmls['time']['start'] = '"%04i-01-01 00:00:00"' % year
     nmls['time']['stop'] = '"%04i-01-01 00:00:00"' % (year+1)
-    client.gotmcontroller.writeNamelistFile(nmlfile,nmls,nmlorder)
+    acpy.gotmcontroller.writeNamelistFile(nmlfile,nmls,nmlorder)
 
-    job = client.optimizer.Job(jobid,
+    job = acpy.optimizer.Job(jobid,
                         scenpath,
-                        gotmexe=client.run.exe,
-                        transports=(client.transport.Dummy(),),
+                        gotmexe=acpy.run.exe,
+                        transports=(acpy.transport.Dummy(),),
                         copyexe=True)
 
     job.verbose = False
@@ -40,7 +40,7 @@ for year in range(2000,2006):
         print 'GOTM run failed - exiting.'
         sys.exit(1)
     nc = NetCDFFile(ncpath,'r')
-    res = client.run.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
+    res = acpy.run.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
     nc.close()
 
     # Shortcuts to coordinates
@@ -61,7 +61,7 @@ for year in range(2000,2006):
         if modelmin!=None: modeldata[modeldata<modelmin] = modelmin
 
         # Calculate model predictions on observation coordinates.
-        pred = client.gotmcontroller.interp2(tim_cent,z_cent,modeldata,obsdata[:,0],obsdata[:,1])
+        pred = acpy.gotmcontroller.interp2(tim_cent,z_cent,modeldata,obsdata[:,0],obsdata[:,1])
 
         # If we do a relative fit, scale the model result to best match observations.
         if oi['relativefit']:

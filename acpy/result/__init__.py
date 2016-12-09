@@ -7,20 +7,20 @@ import os
 import numpy
 
 # Import custom modules
-import client.job
-import client.report
-import client.transport
+import acpy.job
+import acpy.report
+import acpy.transport
 
 class Result(object):
     def __init__(self, xml_path, simulationdir=None):
-        self.job = client.job.fromConfigurationFile(xml_path, simulationdir=simulationdir)
+        self.job = acpy.job.fromConfigurationFile(xml_path, simulationdir=simulationdir)
 
-        reporter = client.report.fromConfigurationFile(xml_path, '')
+        reporter = acpy.report.fromConfigurationFile(xml_path, '')
         for transport in reporter.transports:
-            if isinstance(transport, client.transport.MySQL):
+            if isinstance(transport, acpy.transport.MySQL):
                 import mysqlinfo
                 self.db = mysqlinfo.connect(mysqlinfo.select)
-            elif isinstance(transport, client.transport.SQLite):
+            elif isinstance(transport, acpy.transport.SQLite):
                 import sqlite3
                 if not os.path.isfile(transport.path):
                     raise Exception('SQLite database %s does not exist.' % transport.path)

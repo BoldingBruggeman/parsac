@@ -2,18 +2,18 @@
 
 import argparse
 
-import client.run
+import acpy.run
 import plot
 import plotbest
 import animate_2d
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PYthon AutoCalibration - pyac')
+    parser = argparse.ArgumentParser(description='AutoCalibration Python - acpy')
     subparsers = parser.add_subparsers()
 
     parser_run = subparsers.add_parser('run', help='Run the auto-calibration')
-    client.run.configure_argument_parser(parser_run)
-    parser_run.set_defaults(func=client.run.main)
+    acpy.run.configure_argument_parser(parser_run)
+    parser_run.set_defaults(func=acpy.run.main)
 
     parser_plot = subparsers.add_parser('plot', help='Plot maximum likelihood for the various parameters being estimated')
     plot.configure_argument_parser(parser_plot)

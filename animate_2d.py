@@ -9,8 +9,8 @@ import numpy
 import pylab
 
 # Import custom modules
-import client.result
-import client.job.idealized
+import acpy.result
+import acpy.job.idealized
 
 parser = argparse.ArgumentParser()
 def configure_argument_parser(parser):
@@ -32,7 +32,7 @@ def main(args):
 
     parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in args.constraints])
 
-    result = client.result.Result(args.xmlfile)
+    result = acpy.result.Result(args.xmlfile)
 
     parnames = result.job.getParameterNames()
     parmin, parmax = result.job.getParameterBounds()
@@ -65,7 +65,7 @@ def main(args):
         ys_c = 0.5*(ys[:-1]+ys[1:])
 
         marg1_func, marg2_func = None, None 
-        if isinstance(result.job, client.job.idealized.Job) and not args.scatter:
+        if isinstance(result.job, acpy.job.idealized.Job) and not args.scatter:
             zs = result.job.evaluateFitness((xs_c[:, numpy.newaxis], ys_c[numpy.newaxis, :]))
             marg1_func = lambda x: numpy.exp(-0.5*(x**2))
             marg2_func = lambda x: numpy.exp(-0.5*(x**2))

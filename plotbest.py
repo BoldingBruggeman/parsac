@@ -11,7 +11,7 @@ import matplotlib.cm
 import matplotlib.gridspec
 import matplotlib.colorbar
 
-import client.result
+import acpy.result
 
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
@@ -32,7 +32,7 @@ def main(args):
     #extravars = [('mean_1',False),('mean_2',False),('var_1_1',False),('var_2_2',False),('cor_2_1',False)]
     #extravars = (('phytosize_mean_om',False),('phytosize_var_om',False))
 
-    result = client.result.Result(args.xmlfile, simulationdir=args.simulationdir)
+    result = acpy.result.Result(args.xmlfile, simulationdir=args.simulationdir)
 
     parameters, lnl = result.get_best(args.rank)
 

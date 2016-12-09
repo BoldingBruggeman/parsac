@@ -2,8 +2,8 @@
 
 import sys,math,optparse
 
-import client.run
-import client.gotmcontroller
+import acpy.run
+import acpy.gotmcontroller
 import mysqlinfo
 
 parser = optparse.OptionParser()
@@ -30,7 +30,7 @@ if parameters==None:
     print 'No bad results found. Exiting...'
     sys.exit(0)
 
-job = client.run.getJob(jobid)
+job = acpy.run.getJob(jobid)
 
 # Show best parameter set
 print 'Testing bad parameter set number %i.' % options.index
