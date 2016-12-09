@@ -48,8 +48,9 @@ def main(args):
 
     opt = optimize.Optimizer(current_job, reportfunction=reporter.reportResult)
 
-    repeat = True
-    while repeat:
+    try:
+      repeat = True
+      while repeat:
         repeat = args.method != 'fmin'   # repeating is only useful for stochastic algorithms - not for deterministic ones
 
         logtransform = current_job.getParameterLogScale()
@@ -76,8 +77,8 @@ def main(args):
         print 'Best parameter set:'
         for parameter, value in zip(current_job.parameters, vals):
             print '  %s = %.6g' % (parameter.name, value)
-
-    reporter.finalize()
+    finally:
+      reporter.finalize()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
