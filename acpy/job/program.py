@@ -172,6 +172,7 @@ class Job(shared.Job):
             raise Exception('The root node must contain a single "executable" element.')
         att = shared.XMLAttributes(element, 'the executable element')
         self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
+        self.use_shell = att.get('shell', bool, False)
         att.testEmpty()
 
         self.simulationdir = simulationdir
@@ -666,9 +667,9 @@ class Job(shared.Job):
             # We start the process with low priority
             if self.exe.endswith('.py'):
                 args = [sys.executable] + args
-            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS)
+            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS, shell=self.use_shell)
         else:
-            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=self.use_shell)
 
         # Simulation is now running
         if show_output:
