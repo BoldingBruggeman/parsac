@@ -2,3 +2,4 @@
 *.png
 *.db
 *.pyc
+*.whl
