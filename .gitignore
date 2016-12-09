@@ -3,3 +3,4 @@
 *.db
 *.pyc
 *.whl
+acpy.egg-info/
