@@ -2,6 +2,8 @@
 
 Python-based auto-calibration tool. Expect configuration of model parameters through namelist or yaml files and model output in the form of NetCDF files.
 
+Pronounced - A-C-Py
+
 
 ## Howto wheel
 
