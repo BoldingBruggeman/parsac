@@ -1,18 +1,5 @@
 #!/usr/bin/env python
 
-import sys
-import argparse
-import os.path
-
-# Import third-party modules
-import numpy
-import pylab
-import matplotlib.cm
-import matplotlib.gridspec
-import matplotlib.colorbar
-
-import acpy.result
-
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
     parser.add_argument('-r', '--rank',  type=int,   help='Rank of the result to plot (default = 1, i.e., the very best result)')
@@ -23,6 +10,17 @@ def configure_argument_parser(parser):
     parser.set_defaults(rank=1, depth=None, grid=False, savenc=None, simulationdir=None)
 
 def main(args):
+    import sys
+    import os.path
+
+    import numpy
+    import pylab
+    import matplotlib.cm
+    import matplotlib.gridspec
+    import matplotlib.colorbar
+
+    import acpy.result
+
     if args.depth is not None and args.depth < 0:
         print 'Depth argument must be positive, but is %.6g.' % args.depth
         sys.exit(2)
@@ -229,6 +227,7 @@ def main(args):
     pylab.show()
 
 if __name__ == '__main__':
+    import argparse
     parser = argparse.ArgumentParser()
     configure_argument_parser(parser)
     args = parser.parse_args()

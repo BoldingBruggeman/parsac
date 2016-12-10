@@ -1,24 +1,5 @@
 #!/usr/bin/env python
 
-# Import from standard Python library
-import sys
-import argparse
-import warnings
-
-# Import third-party modules
-import numpy
-
-# Try importing MatPlotLib
-try:
-    import matplotlib
-    matplotlib.use('TkAgg')
-    from matplotlib import pyplot
-except ImportError:
-    pyplot = None
-
-# Import custom modules
-import acpy.result
-
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
     parser.add_argument('-r', '--range', type=float, help='Lower boundary for relative ln likelihood (always < 0)')
@@ -33,6 +14,23 @@ def configure_argument_parser(parser):
     parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, update=False)
 
 def main(args):
+    import sys
+    import warnings
+
+    # Import third-party modules
+    import numpy
+
+    # Try importing MatPlotLib
+    try:
+        import matplotlib
+        matplotlib.use('TkAgg')
+        from matplotlib import pyplot
+    except ImportError:
+        pyplot = None
+
+    # Import custom modules
+    import acpy.result
+
     if args.range is not None and args.range > 0:
         args.range = -args.range
 
@@ -233,6 +231,7 @@ def main(args):
         update()
 
 if __name__ == '__main__':
+    import argparse
     parser = argparse.ArgumentParser()
     configure_argument_parser(parser)
     args = parser.parse_args()
