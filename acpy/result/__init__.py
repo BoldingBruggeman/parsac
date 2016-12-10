@@ -1,5 +1,4 @@
 # Import from standard Python library
-import sys
 import socket
 import os
 

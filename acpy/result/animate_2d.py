@@ -15,9 +15,6 @@ def configure_argument_parser(parser):
     parser.set_defaults(constraints=[], limit=-1, run=None, scatter=False, n=20, start=0, stop=-1, stride=1)
 
 def main(args):
-    # Import from standard Python library
-    import sys
-
     # Import third-party modules
     import numpy
     import pylab
