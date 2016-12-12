@@ -173,6 +173,7 @@ class Job(shared.Job):
         att = shared.XMLAttributes(element, 'the executable element')
         self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
         self.use_shell = att.get('shell', bool, False)
+        self.max_runtime = att.get('max_runtime', int, required=False)
         att.testEmpty()
 
         self.simulationdir = simulationdir

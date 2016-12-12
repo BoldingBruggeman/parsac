@@ -30,10 +30,6 @@ def main(args):
     if args.transport is not None:
         allowedtransports = (args.transport,)
 
-    ppservers = ()
-    if args.ppservers is not None:
-        ppservers = tuple(args.ppservers.split(','))
-
     print 'Reading configuration from %s...' % args.xmlfile
     current_job = job.fromConfigurationFile(args.xmlfile, tempdir=args.tempdir)
 
@@ -70,7 +66,7 @@ def main(args):
                 startpop = numpy.load(startpoppath)
 
             # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-            vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=0.5, CR=0.9, initialpopulation=startpop, ncpus=args.ncpus, ppservers=ppservers, modules=('run',), logtransform=logtransform)
+            vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=0.5, CR=0.9, initialpopulation=startpop, ncpus=args.ncpus, ppservers=args.ppservers, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime'))
 
             #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
 
