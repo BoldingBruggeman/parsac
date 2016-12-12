@@ -48,7 +48,7 @@ class DESolver:
 
     def __init__(self, job, populationSize, maxGenerations, minInitialValue, maxInitialValue, F, CR,
                  initialpopulation = None, ncpus=None, ppservers=(), reporter = None, functions = (), modules =(),
-                 reltol=0.01, abstol=1e-8, minfitnesstoreach=None, verbose=True, strictbounds=True, socket_timeout=600):
+                 reltol=0.01, abstol=1e-8, minfitnesstoreach=None, verbose=True, strictbounds=True, socket_timeout=600, secret=None):
         # Store job (with fitness function) and reporter objects.
         self.job = job
         self.reporter = reporter
@@ -100,6 +100,7 @@ class DESolver:
                 print 'Local number of cores for Differential Evolution set to %i by user.' % ncpus
         self.ncpus = ncpus
         self.ppservers = ppservers
+        self.secret = secret
         self.socket_timeout = socket_timeout
 
         if pp is None:
@@ -137,7 +138,7 @@ class DESolver:
             # Create job server and give it time to conenct to nodes.
             if self.verbose:
                 print 'Starting Parallel Python server...'
-            job_server = pp.Server(ncpus=self.ncpus, ppservers=self.ppservers, socket_timeout=self.socket_timeout)
+            job_server = pp.Server(ncpus=self.ncpus, ppservers=self.ppservers, socket_timeout=self.socket_timeout, secret=self.secret)
             if self.ppservers:
                 if self.verbose:
                     print 'Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(self.ppservers))
