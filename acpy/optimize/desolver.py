@@ -182,6 +182,10 @@ class DESolver:
             self.job = os.path.abspath(jobpath)
             atexit.register(os.remove, self.job)
 
+        ppcallback = None
+        if self.reporter is not None:
+            ppcallback = lambda arg: self.reporter.reportResult(*arg)
+
         # try/finally block is to ensure remote worker processes are killed
         try:
 
@@ -193,7 +197,7 @@ class DESolver:
                 for itarget in range(self.population.shape[0]):
                     trial = self.generateNew(itarget, ibest, F=self.scale, CR=self.crossOverProbability, strictbounds=self.strictbounds)
                     if job_server is not None:
-                        trial = job_server.submit(processTrial, (jobid, self.job, trial), self.functions, self.modules, callback=lambda arg: self.reporter.reportResult(*arg))
+                        trial = job_server.submit(processTrial, (jobid, self.job, trial), self.functions, self.modules, callback=ppcallback)
                     trials.append(trial)
 
                 # Process the individual target,trial combinations.
@@ -201,12 +205,13 @@ class DESolver:
                     if job_server is None:
                         # No parallelization: "trial" is the parameter vector to be tested.
                         trial, trialfitness = processTrial(jobid, self.job, trial)
+                        if self.reporter is not None:
+                            self.reporter.reportResult(trial, trialfitness)
                     else:
                         # Parallelization: "trial" is the Parallel Python job processing the new parameter vector.
                         # This job returns the tested parameter vector, together with its fitness.
+                        # Reporting of the result is already done by the callback routine provided to submit.
                         trial, trialfitness = trial()
-                        if self.reporter is not None:
-                            self.reporter.reportResult(trial, trialfitness)
 
                     # Determine whether trial vector is better than target vector.
                     # If so, replace target with trial.
