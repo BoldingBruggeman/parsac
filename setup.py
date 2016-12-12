@@ -21,6 +21,6 @@ setup(name='acpy',
       ],
       scripts=['bin/run_acpy.py'],
 #      packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
-      packages=find_packages(),
+      packages=find_packages(exclude=['need_updates']),
       include_package_data=True,
       zip_safe=False)
