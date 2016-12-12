@@ -94,10 +94,10 @@ class Optimizer:
         self.problem = problem
         self.reportfunction = reportfunction
 
-    def run(self, method=SIMPLEX, par_ini=None, par_min=None, par_max=None, logtransform=None, modules=(), maxiter=1000, maxfun=1000, verbose=True, reltol=0.01, abstol=1e-8, popsize=None, maxgen=500, F=0.5, CR=0.9, initialpopulation=None, parallelize=True, ppservers=(), ncpus=None):
+    def run(self, method=SIMPLEX, par_ini=None, par_min=None, par_max=None, logtransform=None, modules=(), maxiter=1000, maxfun=1000, verbose=True, reltol=0.01, abstol=1e-8, popsize=None, maxgen=500, F=0.5, CR=0.9, initialpopulation=None, parallelize=True, ppservers=(), ncpus=None, max_runtime=None):
         if isinstance(method, (list, tuple)):
             for curmethod in method:
-                par_ini = self.run(curmethod, par_ini, par_min, par_max, logtransform=logtransform, modules=modules, maxiter=maxiter, maxfun=maxfun, verbose=verbose, reltol=reltol, abstol=abstol, popsize=popsize, maxgen=maxgen, CR=CR, F=F, initialpopulation=initialpopulation, parallelize=parallelize, ppservers=ppservers, ncpus=ncpus)
+                par_ini = self.run(curmethod, par_ini, par_min, par_max, logtransform=logtransform, modules=modules, maxiter=maxiter, maxfun=maxfun, verbose=verbose, reltol=reltol, abstol=abstol, popsize=popsize, maxgen=maxgen, CR=CR, F=F, initialpopulation=initialpopulation, parallelize=parallelize, ppservers=ppservers, ncpus=ncpus, max_runtime=max_runtime)
             return par_ini
 
         problem = self.problem
@@ -140,8 +140,8 @@ class Optimizer:
             solver = desolver.DESolver(problem, popsize, maxgen,
                                        par_min, par_max, F=F, CR=CR, initialpopulation=initialpopulation,
                                        ncpus=ncpus, ppservers=ppservers,
-                                       reporter=Reporter(self.reportfunction, problem.untransform), modules=modules+('optimize',), verbose=verbose,
-                                       reltol=reltol, abstol=abstol)
+                                       reporter=Reporter(self.reportfunction, problem.untransform), verbose=verbose,
+                                       reltol=reltol, abstol=abstol, socket_timeout=max_runtime)
             p_final = solver.Solve()
 
         return problem.untransform(p_final)
