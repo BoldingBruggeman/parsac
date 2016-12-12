@@ -45,36 +45,36 @@ def main(args):
     opt = optimize.Optimizer(current_job, reportfunction=reporter.reportResult)
 
     try:
-      repeat = True
-      while repeat:
-        repeat = args.method != 'fmin'   # repeating is only useful for stochastic algorithms - not for deterministic ones
+        repeat = True
+        while repeat:
+            repeat = args.method != 'fmin'   # repeating is only useful for stochastic algorithms - not for deterministic ones
 
-        logtransform = current_job.getParameterLogScale()
-        if args.method == 'fmin':
-            vals = opt.run(method=optimize.SIMPLEX, par_ini=current_job.createParameterSet(), logtransform=logtransform)
-        elif args.method == 'DE':
-            minpar, maxpar = current_job.getParameterBounds()
+            logtransform = current_job.getParameterLogScale()
+            if args.method == 'fmin':
+                vals = opt.run(method=optimize.SIMPLEX, par_ini=current_job.createParameterSet(), logtransform=logtransform)
+            elif args.method == 'DE':
+                minpar, maxpar = current_job.getParameterBounds()
 
-            popsize = 10*len(minpar)
-            maxgen = 4000
-            startpoppath = 'startpop.dat'
+                popsize = 10*len(minpar)
+                maxgen = 4000
+                startpoppath = 'startpop.dat'
 
-            startpop = None
-            if os.path.isfile(startpoppath):
-                # Retrieve cached copy of the observations
-                print 'Reading initial population from file %s...' % startpoppath
-                startpop = numpy.load(startpoppath)
+                startpop = None
+                if os.path.isfile(startpoppath):
+                    # Retrieve cached copy of the observations
+                    print 'Reading initial population from file %s...' % startpoppath
+                    startpop = numpy.load(startpoppath)
 
-            # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-            vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=0.5, CR=0.9, initialpopulation=startpop, ncpus=args.ncpus, ppservers=args.ppservers, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime'))
+                # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
+                vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=0.5, CR=0.9, initialpopulation=startpop, ncpus=args.ncpus, ppservers=args.ppservers, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime'))
 
-            #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
+                #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
 
-        print 'Best parameter set:'
-        for parameter, value in zip(current_job.parameters, vals):
-            print '  %s = %.6g' % (parameter.name, value)
+            print 'Best parameter set:'
+            for parameter, value in zip(current_job.parameters, vals):
+                print '  %s = %.6g' % (parameter.name, value)
     finally:
-      reporter.finalize()
+        reporter.finalize()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
