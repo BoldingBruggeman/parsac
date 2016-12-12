@@ -1,6 +1,8 @@
 import os
 import time
 import numpy
+import atexit
+import re
 
 minppversion = '1.6.2'
 passsavedjob = True
@@ -69,21 +71,42 @@ class DESolver:
         self.strictbounds = strictbounds
 
         # Parallel Python settings
+        if isinstance(ppservers, basestring):
+            match = re.match(r'(.*)\[(.*)\](.*)', ppservers)
+            if match is not None:
+                # Hostnames in PBS/SLURM notation, e.g., node[01-06]
+                ppservers = []
+                left, middle, right = match.groups()
+                for item in middle.split(','):
+                    if '-' in item:
+                        start, stop = item.split('-')
+                        for i in range(int(start), int(stop)+1):
+                            ppservers.append('%s%s%s' % (left, str(i).zfill(len(start)), right))
+                    else:
+                        ppservers.append('%s%s%s' % (left, item, right))
+                ppservers = tuple(ppservers)
+            else:
+                # Comma-separated hostnames
+                ppservers = ppservers.split(',')
+        elif ppservers is None:
+            ppservers = ()
+
         if ncpus is None:
             ncpus = 'autodetect'
         else:
-            if ncpus == 1:
+            if ncpus == 1 and not ppservers:
                 print 'Parallelization of Differential Evolution is disabled because number of cores is set to 1.'
             else:
-                print 'Number of cores for Differential Evolution set to %i by user.' % ncpus
+                print 'Local number of cores for Differential Evolution set to %i by user.' % ncpus
         self.ncpus = ncpus
         self.ppservers = ppservers
         self.socket_timeout = socket_timeout
 
         if pp is None:
-            if self.ncpus != 1:
+            if self.ncpus != 1 or ppservers:
                 print 'Parallelization of Differential Evolution is disabled because Parallel Python is not available or the wrong version.'
             self.ncpus = 1
+            self.ppservers = ()
 
         # Store initial population (if provided) and perform basic checks.
         self.initialpopulation = initialpopulation
@@ -110,14 +133,14 @@ class DESolver:
     def Solve(self):
 
         job_server = None
-        if self.ncpus != 1:
+        if self.ncpus != 1 or self.ppservers:
             # Create job server and give it time to conenct to nodes.
             if self.verbose:
                 print 'Starting Parallel Python server...'
             job_server = pp.Server(ncpus=self.ncpus, ppservers=self.ppservers, socket_timeout=self.socket_timeout)
             if self.ppservers:
                 if self.verbose:
-                    print 'Giving Parallel Python 10 seconds to connect to nodes...'
+                    print 'Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(self.ppservers))
                 time.sleep(10)
                 if self.verbose:
                     print 'Running on:'
@@ -126,7 +149,11 @@ class DESolver:
 
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
-            jobsperworker = int(numpy.round(self.populationSize/float(nworkers)))
+            if self.verbose:
+                print 'Total number of cpus: %i' % nworkers
+            if nworkers == 0:
+                raise Exception('No cpus available; exiting.')
+            jobsperworker = int(round(self.populationSize/float(nworkers)))
             if self.populationSize != jobsperworker*nworkers:
                 if self.verbose:
                     print 'Setting population size to %i (was %i) to ensure it is a multiple of number of workers (%i).' % (jobsperworker*nworkers, self.populationSize, nworkers)
@@ -153,6 +180,7 @@ class DESolver:
             with open(jobpath, 'wb') as f:
                 cPickle.dump(self.job, f, cPickle.HIGHEST_PROTOCOL)
             self.job = os.path.abspath(jobpath)
+            atexit.register(os.remove, self.job)
 
         # try/finally block is to ensure remote worker processes are killed
         try:
@@ -165,7 +193,7 @@ class DESolver:
                 for itarget in range(self.population.shape[0]):
                     trial = self.generateNew(itarget, ibest, F=self.scale, CR=self.crossOverProbability, strictbounds=self.strictbounds)
                     if job_server is not None:
-                        trial = job_server.submit(processTrial, (jobid, self.job, trial), self.functions, self.modules)
+                        trial = job_server.submit(processTrial, (jobid, self.job, trial), self.functions, self.modules, callback=lambda arg: self.reporter.reportResult(*arg))
                     trials.append(trial)
 
                 # Process the individual target,trial combinations.
@@ -177,9 +205,8 @@ class DESolver:
                         # Parallelization: "trial" is the Parallel Python job processing the new parameter vector.
                         # This job returns the tested parameter vector, together with its fitness.
                         trial, trialfitness = trial()
-
-                    if self.reporter is not None:
-                        self.reporter.reportResult(trial, trialfitness)
+                        if self.reporter is not None:
+                            self.reporter.reportResult(trial, trialfitness)
 
                     # Determine whether trial vector is better than target vector.
                     # If so, replace target with trial.
