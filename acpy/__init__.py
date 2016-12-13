@@ -10,8 +10,8 @@ from . import result
 #    except CalledProcessError:
 #        ver = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd='.')
 def get_sha():
-    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd='.')
-    return sha[0:6]
+#    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd='.')
+    return '0.1'
 
 def main():
     parser = argparse.ArgumentParser(description='AutoCalibration Python - acpy')
