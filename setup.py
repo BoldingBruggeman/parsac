@@ -1,11 +1,16 @@
+import subprocess
 from setuptools import setup, find_packages
 
 def readme():
     with open('README.md') as f:
         return f.read()
 
+def get_sha():
+    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd='.')
+    return sha[0:6]
+
 setup(name='acpy',
-      version='0.1',
+      version=get_sha(),
       description='AutoCalibration tool in Python',
       long_description=readme(),
       url='http://github.com/BoldingBruggeman/acpy',
