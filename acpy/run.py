@@ -67,7 +67,7 @@ def main(args):
                     startpop = numpy.load(startpoppath)
 
                 # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-                vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=0.5, CR=0.9, initialpopulation=startpop, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime'))
+                vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=0.5, CR=0.9, initialpopulation=startpop, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime', None))
 
                 #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
 
