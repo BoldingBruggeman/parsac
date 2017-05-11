@@ -4,9 +4,10 @@
   <transports>
     <transport type="sqlite"/>
   </transports>
-  <fitness expression="exp(-0.5*(x1**2+x2**2))"/>
+  <!--fitness expression="exp(-0.5*(x1**2+x2**2))"--/>
+  <fitness expression="5*(sqrt(x1**2 + x2**2) + sin(x1**2 + x2**2))"/>
   <parameters>
-    <parameter name="x1" minimum="-2." maximum="2."/>
-    <parameter name="x2" minimum="-2." maximum="2."/>
+    <parameter name="x1" minimum="-5." maximum="5."/>
+    <parameter name="x2" minimum="-5." maximum="5."/>
   </parameters>
 </config>
