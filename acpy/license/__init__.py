@@ -1,3 +1,0 @@
-import license
-
-license.read()
