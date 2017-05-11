@@ -23,11 +23,11 @@ setup(name='acpy',
       ],
       entry_points={
           'console_scripts': [
-                'acpy_run=acpy.acpy_run:main',
+                'acpy=acpy.acpy_run:main',
                 'acpy_license=acpy.acpy_license:main',
           ]
       },
       packages=find_packages(exclude=['need_updates']),
-      package_data={'acpy': ['examples/configs/*', 'examples/webserver/*', 'license/license.txt']},
+      package_data={'acpy': ['examples/*', 'license.txt']},
       include_package_data=True,
       zip_safe=False)

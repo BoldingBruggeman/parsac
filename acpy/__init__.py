@@ -1,7 +1,7 @@
 import subprocess
 import argparse
 
-#KBfrom . import license
+from . import license
 from . import run
 from . import result
 
@@ -34,6 +34,11 @@ def main():
     parser_animate_2d = subparsers.add_parser('animate_2d', help='Generate sequence of X-Y plots showing parameter variations - as .pngs')
     result.animate_2d.configure_argument_parser(parser_animate_2d)
     parser_animate_2d.set_defaults(func=result.animate_2d.main)
+
+    parser_license = subparsers.add_parser('license', help='Print license information')
+#    license.configure_argument_parser(parser_license)
+    parser_license.set_defaults(func=license.main)
+
 
     args = parser.parse_args()
     args.func(args)
