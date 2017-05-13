@@ -7,7 +7,6 @@ import os.path
 #KBsys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import acpy
-#from acpy.license.license import user,key, parallel
 
 def main():
     acpy.main()

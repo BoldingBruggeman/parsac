@@ -4,6 +4,8 @@ import numpy
 import atexit
 import re
 
+import acpy.license
+
 minppversion = '1.6.2'
 passsavedjob = True
 
@@ -21,6 +23,9 @@ if pp is not None:
             print 'Old Parallel Python version %s. Minimum required = %s.' % (pp.version, minppversion)
             print 'Parallel Python support for Differential Evolution is disabled.'
             pp = None
+
+if acpy.license.parallel == None:
+    pp = None
 
 passsavedjob = passsavedjob and (pp is not None)
 

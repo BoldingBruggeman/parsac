@@ -2,21 +2,13 @@ import subprocess
 import argparse
 
 from . import license
+license.read()
 from . import run
 from . import result
 
-#    try:
-#        ver = subprocess.check_output(['git', 'describe', '--tags'])
-#        break
-#    except CalledProcessError:
-#        ver = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd='.')
-def get_sha():
-#    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd='.')
-    return '0.1'
-
 def main():
     parser = argparse.ArgumentParser(description='AutoCalibration Python - acpy')
-    parser.add_argument('--version', '-v', action='version', version='git sha: %s' % get_sha())
+    parser.add_argument('--version', '-v', action='version')
     subparsers = parser.add_subparsers()
 
     parser_run = subparsers.add_parser('run', help='Run the auto-calibration')

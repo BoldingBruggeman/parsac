@@ -4,10 +4,11 @@ import os
 import argparse
 import ConfigParser
 
-have_license = False
 user = None
+email = None
 key = None
 parallel = None
+have_license = False
 
 path = os.path.dirname(os.path.realpath(__file__))
 license_file  = os.path.join(path, 'license.txt')
@@ -15,14 +16,16 @@ license_file  = os.path.join(path, 'license.txt')
 config = ConfigParser.SafeConfigParser()
 
 def read():
-    global have_license
     global user
+    global email
     global key
     global parallel
+    global have_license
     if os.path.isfile(license_file):
         try:
             config.read(license_file)
             user = config.get('User','user')
+            email = config.get('User','email')
             key = config.get('Key','key')
             parallel = config.get('Features','parallel')
             have_license = True
@@ -34,6 +37,8 @@ def read():
 
 def print_c():
     if have_license:
+        print('Reading license from:')
+        print('   '+license_file)
         for section_name in config.sections():
             print 'Section:', section_name
             for name, value in config.items(section_name):
@@ -46,13 +51,5 @@ def main(args):
     print_c()
 
 if __name__ == "__main__":
-    if have_license:
-        print('Reading license from:')
-        print('   '+license_file)
-        print
     args = None
     main(args)
-
-
-
-
