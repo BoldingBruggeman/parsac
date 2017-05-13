@@ -28,6 +28,6 @@ setup(name='acpy',
           ]
       },
       packages=find_packages(exclude=['need_updates']),
-      package_data={'acpy': ['examples/*', 'license.txt']},
+      package_data={'acpy': ['examples/*']},
       include_package_data=True,
       zip_safe=False)
