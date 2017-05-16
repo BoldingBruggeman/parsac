@@ -4,3 +4,4 @@
 *.pyc
 *.whl
 acpy.egg-info/
+Licenses/
