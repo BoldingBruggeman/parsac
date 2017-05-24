@@ -14,6 +14,7 @@ setup(name='acpy',
       author='Jorn Bruggeman',
       author_email='jorn@bolding-bruggeman.com',
       license='GPL',
+      install_requires=['netCDF4'],
       classifiers=[
           'Development Status :: 3 - Alpha',
           'Intended Audience :: Developers',
@@ -24,7 +25,6 @@ setup(name='acpy',
       entry_points={
           'console_scripts': [
                 'acpy=acpy.acpy_run:main',
-                'acpy_license=acpy.acpy_license:main',
           ]
       },
       packages=find_packages(exclude=['need_updates']),
