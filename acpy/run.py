@@ -70,9 +70,9 @@ def main(args):
                     startpop = numpy.load(startpoppath)
 
                 # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
-                extra_args = {}
+                extra_args = {'parallelize': False}
                 if license.parallel is not None:
-                    extra_args.update(ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
+                    extra_args.update(parallelize=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
                 if args.ftol is not None:
                     extra_args.update(ftol=args.ftol, abstol=numpy.inf)
                 vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=args.F, CR=args.CR, initialpopulation=startpop, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime', None), **extra_args)
