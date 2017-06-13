@@ -3,19 +3,14 @@
   <transports>
     <transport type="sqlite"/>
   </transports>
-  <executable path="../../gotm-lake/build/Release/gotm.exe"/>
-  <setup path="../../glm2gotm/test"/>
+  <executable path="../../../gotm-lake/build/Release/gotm.exe"/>
+  <setup path="../../../glm2gotm/test"/>
   <parameters>
     <parameter file="airsea.nml" namelist="airsea" variable="wind_factor" minimum="0." maximum="3."/>
     <parameter file="gotmturb.nml" namelist="turb_param" variable="k_min" minimum="1e-7" maximum="1e-5" logscale="True"/>
     <parameter dummy="True"                                               minimum="0." maximum="1"/>
   </parameters>
   <observations>
-    <variable source="../../glm2gotm/test/temp.obs" modelpath="output.nc" modelvariable="temp" spinupyears="2"/>
+    <variable source="../../../glm2gotm/test/temp.obs" modelpath="output.nc" modelvariable="temp" spinupyears="2"/>
   </observations>
 </config>
-
-Just committed support for parameters in yaml files (use file=”xxx.yaml” variable=”path/to/yaml/variable” in parameter xml entry) and for calibration against time series of scalars - no depth dimension (use format=”timeseries” in observation xml entry). Not unlikely I broke something… ;-)
-
-    <parameter file="fabm.yaml" variable="wind_factor" minimum="0." maximum="3."/>
-    <variable source="../../glm2gotm/test/temp.obs" modelpath="output.nc" format="timeseries" modelvariable="temp" spinupyears="2"/>
