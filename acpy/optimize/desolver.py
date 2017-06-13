@@ -4,10 +4,7 @@ import numpy
 import atexit
 import re
 
-import acpy.license
-
 minppversion = '1.6.2'
-passsavedjob = True
 
 try:
     import pp # http://www.parallelpython.com - can be single CPU, multi-core SMP, or cluster parallelization
@@ -23,11 +20,6 @@ if pp is not None:
             print 'Old Parallel Python version %s. Minimum required = %s.' % (pp.version, minppversion)
             print 'Parallel Python support for Differential Evolution is disabled.'
             pp = None
-
-if acpy.license.parallel == None:
-    pp = None
-
-passsavedjob = passsavedjob and (pp is not None)
 
 def processTrial(newjobid, newjob, trial):
     global jobid, job
@@ -53,7 +45,7 @@ class DESolver:
 
     def __init__(self, job, populationSize, maxGenerations, minInitialValue, maxInitialValue, F, CR,
                  initialpopulation = None, ncpus=None, ppservers=(), reporter = None, functions = (), modules =(),
-                 reltol=0.01, abstol=1e-8, minfitnesstoreach=None, verbose=True, strictbounds=True, socket_timeout=600, secret=None):
+                 reltol=0.01, abstol=1e-8, ftol=numpy.inf, verbose=True, strictbounds=True, socket_timeout=600, secret=None):
         # Store job (with fitness function) and reporter objects.
         self.job = job
         self.reporter = reporter
@@ -130,7 +122,7 @@ class DESolver:
         # Absolute and relative tolerances used to stop optimization
         self.reltol = reltol
         self.abstol = abstol
-        self.minfitnesstoreach = minfitnesstoreach
+        self.ftol = ftol
 
         self.verbose = verbose
 
@@ -180,7 +172,7 @@ class DESolver:
         # (this allows the worker to detect stale job objects)
         jobid = self.randomstate.rand()
 
-        if passsavedjob:
+        if job_server is not None:
             import cPickle
             jobpath = '%s.ppjob' % jobid
             with open(jobpath, 'wb') as f:
@@ -232,11 +224,13 @@ class DESolver:
                 currange = curmaxpar-curminpar
                 curcent = 0.5*(curmaxpar+curminpar)
                 tol = numpy.maximum(self.abstol, abs(curcent)*self.reltol)
+                frange = (fitness[ibest] - fitness).max()
                 if self.verbose:
                     print 'Finished generation %i' % igeneration
                     print '  Range:     %s' % ', '.join(['%.2e' % v for v in currange])
                     print '  Tolerance: %s' % ', '.join(['%.2e' % v for v in tol])
-                if (currange <= tol).all() or (self.minfitnesstoreach is not None and fitness[ibest] > self.minfitnesstoreach):
+                    print '  Fitness range: %s' % frange
+                if (currange <= tol).all() and frange <= self.ftol:
                     break
 
                 #dup = False
