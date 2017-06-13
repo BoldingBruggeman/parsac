@@ -78,6 +78,7 @@ def main(args):
                 vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=args.F, CR=args.CR, initialpopulation=startpop, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime', None), **extra_args)
 
                 #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
+                reporter.finalize()
 
             print 'Best parameter set:'
             for parameter, value in zip(current_job.parameters, vals):

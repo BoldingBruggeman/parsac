@@ -196,8 +196,15 @@ class Reporter:
             return
 
     def finalize(self):
-        if self.reportingthread:
+        if self.reportingthread and self.reportingthread.isAlive():
             self.reportingthread.exit_event.set()
+            print 'Waiting for reporting thread to shut down...'
+            self.reportingthread.join(self.timebetweenreports*2)
+            if self.reportingthread.isAlive():
+                print 'WARNING: failed to shut down reporting thread.'
+        self.reportingthread = None
+        self.runid = None
+        self.queuelock = None
 
 class ReportingThread(threading.Thread):
     def __init__(self, job):
