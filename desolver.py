@@ -5,7 +5,6 @@ import atexit
 import re
 
 minppversion = '1.6.2'
-passsavedjob = True
 
 try:
     import pp # http://www.parallelpython.com - can be single CPU, multi-core SMP, or cluster parallelization
@@ -21,8 +20,6 @@ if pp is not None:
             print 'Old Parallel Python version %s. Minimum required = %s.' % (pp.version, minppversion)
             print 'Parallel Python support for Differential Evolution is disabled.'
             pp = None
-
-passsavedjob = passsavedjob and (pp is not None)
 
 def processTrial(newjobid, newjob, trial):
     global jobid, job
@@ -175,7 +172,7 @@ class DESolver:
         # (this allows the worker to detect stale job objects)
         jobid = self.randomstate.rand()
 
-        if passsavedjob:
+        if job_server is not None:
             import cPickle
             jobpath = '%s.ppjob' % jobid
             with open(jobpath, 'wb') as f:
