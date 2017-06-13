@@ -4,7 +4,7 @@ import sys
 import os.path
 
 # Add parent directory to Python path to support importing acpy from source distribution.
-#KBsys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import acpy
 
