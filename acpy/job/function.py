@@ -10,9 +10,9 @@ class Job(shared.Job):
         if element is None:
             raise Exception('The root node must contain a single "function" element.')
         att = shared.XMLAttributes(element, 'the function element')
-        self.name = att.get('name', unicode)
-        self.module = att.get('module', unicode)
-        self.path = att.get('path', unicode, required=False)
+        self.module, self.name = att.get('name', unicode).rsplit('.', 1)
+        self.path = att.get('path', unicode, default=root)
+        att.testEmpty()
         self.parameter_names = self.getParameterNames()
         self.function = None
 
