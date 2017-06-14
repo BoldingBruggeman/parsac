@@ -86,11 +86,18 @@ class XMLAttributes():
         self.description = description
         self.unused = set(self.att.keys())
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.testEmpty()
+
     def get(self, name, type, default=None, required=None, minimum=None, maximum=None):
         value = self.att.get(name, None)
         if value is None:
             # No value specified - use default or report error.
-            if required is None: required = default is None
+            if required is None:
+                required = default is None
             if required:
                 raise Exception('Attribute "%s" of %s is required.' % (name, self.description))
             value = default
@@ -155,9 +162,8 @@ class Job(optimize.OptimizationProblem):
 
         self.parameters = []
         for ipar, element in enumerate(xml_tree.findall('parameters/parameter')):
-            att = XMLAttributes(element, 'parameter %i' % (ipar+1))
-            self.parameters.append(self.getParameter(att))
-            att.testEmpty()
+            with XMLAttributes(element, 'parameter %i' % (ipar+1)) as att:
+                self.parameters.append(self.getParameter(att))
 
         # Parse transforms
         for ipar, element in enumerate(xml_tree.findall('parameters/transform')):

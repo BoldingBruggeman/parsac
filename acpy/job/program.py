@@ -160,9 +160,8 @@ class Job(shared.Job):
         # Allow overwrite of setup directory (default: directory with xml configuration file)
         element = xml_tree.find('setup')
         if element is not None:
-            att = shared.XMLAttributes(element, 'the setup element')
-            self.scenariodir = os.path.join(root, att.get('path', unicode))
-            att.testEmpty()
+            with shared.XMLAttributes(element, 'the setup element') as att:
+                self.scenariodir = os.path.join(root, att.get('path', unicode))
         else:
             self.scenariodir = root
 
@@ -170,11 +169,10 @@ class Job(shared.Job):
         element = xml_tree.find('executable')
         if element is None:
             raise Exception('The root node must contain a single "executable" element.')
-        att = shared.XMLAttributes(element, 'the executable element')
-        self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
-        self.use_shell = att.get('shell', bool, False)
-        self.max_runtime = att.get('max_runtime', int, required=False)
-        att.testEmpty()
+        with shared.XMLAttributes(element, 'the executable element') as att:
+            self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
+            self.use_shell = att.get('shell', bool, False)
+            self.max_runtime = att.get('max_runtime', int, required=False)
 
         self.simulationdir = simulationdir
 

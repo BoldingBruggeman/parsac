@@ -20,9 +20,8 @@ def fromConfigurationFile(path, **kwargs):
 
     element = xml_tree.find('model')
     if element is not None:
-        att = shared.XMLAttributes(element, 'the model element')
-        model_type = att.get('type', unicode)
-        att.testEmpty()
+        with shared.XMLAttributes(element, 'the model element') as att:
+            model_type = att.get('type', unicode)
     else:
         model_type = 'gotm'
 

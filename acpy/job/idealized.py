@@ -9,8 +9,8 @@ class Job(shared.Job):
         element = xml_tree.find('fitness')
         if element is None:
             raise Exception('The root node must contain a single "fitness" element.')
-        att = shared.XMLAttributes(element, 'the fitness element')
-        self.expression = att.get('expression', unicode)
+        with shared.XMLAttributes(element, 'the fitness element') as att:
+            self.expression = att.get('expression', unicode)
 
         self.basedict = {}
         for name in dir(numpy):
