@@ -19,7 +19,7 @@ def configure_argument_parser(parser):
     parser.add_argument('-m', '--method',         type=str, choices=('DE', 'fmin'), help='Optimization method: DE = Differential Evolution genetic algorithm, fmin = Nelder-Mead simplex (default: DE)', default='DE')
     parser.add_argument('-t', '--transport',      type=str, choices=('http', 'mysql'), help='Transport to use for server communication: http or mysql')
     parser.add_argument('-r', '--reportinterval', type=int, help='Time between result reports (seconds).')
-    parser.add_argument('-i', '--interactive',    action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions', default=False)
+    parser.add_argument('-i', '--interactive',    action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
     parser.add_argument('--tempdir',              type=str, help='Temporary directory to use for setups when using a parallelized optimization method (default: %s).' % tempfile.gettempdir())
 
     de_options = parser.add_argument_group('Option specific to Differential Evolution (http://dx.doi.org/10.1023/A:1008202821328)')
@@ -30,7 +30,7 @@ def configure_argument_parser(parser):
     de_options.add_argument('--F',  type=float, help='Scale factor for mutation (default: 0.5).', default=0.5)
     de_options.add_argument('--CR', type=float, help='Crossover probability (default: 0.9).', default=0.9)
     de_options.add_argument('--ftol', type=float, help='Difference in log likelihood that is acceptable for convergence. If the range in log likelihood values within the parameter population drops below this threshold, the optimization is terminated.')
-    de_options.add_argument('--repeat', action='store_true', help='Start a new optimization whenever the last completes.', default=False)
+    de_options.add_argument('--repeat', action='store_true', help='Start a new optimization whenever the last completes.')
 
 def main(args):
     allowedtransports = None
@@ -69,7 +69,6 @@ def main(args):
                     print 'Reading initial population from file %s...' % startpoppath
                     startpop = numpy.load(startpoppath)
 
-                # parameterCount, populationSize, maxGenerations, minInitialValue, maxInitialValue, deStrategy, diffScale, crossoverProb, cutoffEnergy, useClassRandomNumberMethods, polishTheBestTrials
                 extra_args = {'parallelize': False}
                 if license.parallel is not None:
                     extra_args.update(parallelize=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
@@ -77,7 +76,6 @@ def main(args):
                     extra_args.update(ftol=args.ftol, abstol=numpy.inf)
                 vals = opt.run(method=optimize.DIFFERENTIALEVOLUTION, par_min=minpar, par_max=maxpar, popsize=popsize, maxgen=maxgen, F=args.F, CR=args.CR, initialpopulation=startpop, logtransform=logtransform, max_runtime=getattr(current_job, 'max_runtime', None), **extra_args)
 
-                #print 'Generation %i done. Current best fitness = %.6g.' % (itn,P.maxFitness)
                 reporter.finalize()
 
             print 'Best parameter set:'
