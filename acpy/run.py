@@ -21,13 +21,16 @@ def configure_argument_parser(parser):
     parser.add_argument('-r', '--reportinterval', type=int, help='Time between result reports (seconds).')
     parser.add_argument('-i', '--interactive',    action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions', default=False)
     parser.add_argument('--tempdir',              type=str, help='Temporary directory to use for setups when using a parallelized optimization method (default: %s).' % tempfile.gettempdir())
+
+    de_options = parser.add_argument_group('Option specific to Differential Evolution (http://dx.doi.org/10.1023/A:1008202821328)')
     if license.parallel is not None:
-        parser.add_argument('-n', '--ncpus', type=int, help='Number of cores to use (only for Differential Evolution genetic algorithm).')
-        parser.add_argument('--ppservers',   type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on (only for Differential Evolution genetic algorithm).')
-        parser.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only for Differential Evolution genetic algorithm in combination with ppservers argument).')
-    parser.add_argument('--F',  type=float, help='Scale factor for mutation (Differential Evolution only). See http://dx.doi.org/10.1023/A:1008202821328', default=0.5)
-    parser.add_argument('--CR', type=float, help='Crossover probability (Differential Evolution only). See http://dx.doi.org/10.1023/A:1008202821328', default=0.9)
-    parser.add_argument('--ftol', type=float, help='Crossover probability (Differential Evolution only). See http://dx.doi.org/10.1023/A:1008202821328', default=0.9)
+        de_options.add_argument('-n', '--ncpus', type=int, help='Number of cores to use (default: use all available on the local machine).')
+        de_options.add_argument('--ppservers',   type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on.')
+        de_options.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only used in combination with ppservers argument).')
+    de_options.add_argument('--F',  type=float, help='Scale factor for mutation (default: 0.5).', default=0.5)
+    de_options.add_argument('--CR', type=float, help='Crossover probability (default: 0.9).', default=0.9)
+    de_options.add_argument('--ftol', type=float, help='Difference in log likelihood that is acceptable for convergence. If the range in log likelihood values within the parameter population drops below this threshold, the optimization is terminated.')
+    de_options.add_argument('--repeat', action='store_true', help='Start a new optimization whenever the last completes.', default=False)
 
 def main(args):
     allowedtransports = None
@@ -49,10 +52,7 @@ def main(args):
     opt = optimize.Optimizer(current_job, reportfunction=reporter.reportResult)
 
     try:
-        repeat = True
-        while repeat:
-            repeat = args.method != 'fmin'   # repeating is only useful for stochastic algorithms - not for deterministic ones
-
+        while 1:
             logtransform = current_job.getParameterLogScale()
             if args.method == 'fmin':
                 vals = opt.run(method=optimize.SIMPLEX, par_ini=current_job.createParameterSet(), logtransform=logtransform)
@@ -83,6 +83,9 @@ def main(args):
             print 'Best parameter set:'
             for parameter, value in zip(current_job.parameters, vals):
                 print '  %s = %.6g' % (parameter.name, value)
+
+            if args.method == 'fmin' or not args.repeat:
+                break
     finally:
         reporter.finalize()
 
