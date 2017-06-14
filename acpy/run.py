@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # Import from standard Python library
+import sys
 import os.path
 import argparse
 import tempfile
@@ -21,6 +22,8 @@ def configure_argument_parser(parser):
     parser.add_argument('-r', '--reportinterval', type=int, help='Time between result reports (seconds).')
     parser.add_argument('-i', '--interactive',    action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
     parser.add_argument('--tempdir',              type=str, help='Temporary directory to use for setups when using a parallelized optimization method (default: %s).' % tempfile.gettempdir())
+    parser.add_argument('--maxfun',               type=int, help='Maximum number of function evaluations (or simulations) to perform (default: unlimited).')
+    parser.add_argument('--maxiter',              type=int, help='Maximum number of iterations (Nelder-Mead simplex) or generations (Differential Evolution) to perform (default: unlimited).', default=sys.maxint)
 
     de_options = parser.add_argument_group('Option specific to Differential Evolution (http://dx.doi.org/10.1023/A:1008202821328)')
     if license.parallel is not None:
@@ -60,7 +63,10 @@ def main(args):
                 minpar, maxpar = current_job.getParameterBounds()
 
                 popsize = 10*len(minpar)
-                maxgen = 4000
+                maxgen = args.maxiter
+                if args.maxfun is not None:
+                    maxgen = min(maxgen, int(numpy.ceil(args.maxfun/float(popsize))))
+                print 'Maximum number of generations for Differential Evolution (based on maxfun ands maxiter): %i' % maxgen
                 startpoppath = 'startpop.dat'
 
                 startpop = None
