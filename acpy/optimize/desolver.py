@@ -187,7 +187,7 @@ class DESolver:
         # try/finally block is to ensure remote worker processes are killed
         try:
 
-            for igeneration in range(self.maxGenerations):
+            for igeneration in xrange(self.maxGenerations):
 
                 # Generate list with target,trial vector combinations to try.
                 # If using Parallel Python, submit these trials to the workers.
