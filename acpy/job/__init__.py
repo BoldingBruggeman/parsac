@@ -5,8 +5,9 @@ import shared
 import program
 import gotm
 import idealized
+import function
 
-name2class = {'gotm': gotm.Job, 'program': program.Job, 'idealized': idealized.Job}
+name2class = {'gotm': gotm.Job, 'program': program.Job, 'idealized': idealized.Job, 'function': function.Job}
 
 def fromConfigurationFile(path, **kwargs):
     if not os.path.isfile(path):
