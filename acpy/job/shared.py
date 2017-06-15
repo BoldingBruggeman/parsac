@@ -90,7 +90,8 @@ class XMLAttributes():
         return self
 
     def __exit__(self, *exc):
-        self.testEmpty()
+        if self.unused:
+            print 'WARNING: the following attributes of %s are ignored: %s' % (self.description, ', '.join(['"%s"' % k for k in self.unused]))
 
     def get(self, name, type, default=None, required=None, minimum=None, maximum=None):
         value = self.att.get(name, None)
@@ -118,10 +119,6 @@ class XMLAttributes():
             value = type(value)
         self.unused.discard(name)
         return value
-
-    def testEmpty(self):
-        if self.unused:
-            print 'WARNING: the following attributes of %s are ignored: %s' % (self.description, ', '.join(['"%s"' % k for k in self.unused]))
 
 class Parameter(object):
     def __init__(self, job, att, name=None, default_minimum=None, default_maximum=None):
@@ -167,23 +164,21 @@ class Job(optimize.OptimizationProblem):
 
         # Parse transforms
         for ipar, element in enumerate(xml_tree.findall('parameters/transform')):
-            att = XMLAttributes(element, 'transform %i' % (ipar+1,))
-            att.testEmpty()
+            with XMLAttributes(element, 'transform %i' % (ipar+1,)) as att:
+                pass
             ins, outs = [], []
             for iin, inelement in enumerate(element.findall('in')):
-                att = XMLAttributes(inelement, 'transform %i, input %i' % (ipar+1, iin+1))
-                name = att.get('name', unicode)
-                att.description = 'transform %i, input %s' % (ipar+1, name)
-                ins.append((name, att.get('minimum', float), att.get('maximum', float), att.get('logscale', bool, default=False)))
-                att.testEmpty()
+                with XMLAttributes(inelement, 'transform %i, input %i' % (ipar+1, iin+1)) as att:
+                    name = att.get('name', unicode)
+                    att.description = 'transform %i, input %s' % (ipar+1, name)
+                    ins.append((name, att.get('minimum', float), att.get('maximum', float), att.get('logscale', bool, default=False)))
             for iout, outelement in enumerate(element.findall('out')):
-                att = XMLAttributes(outelement, 'transform %i, output %i' % (ipar+1, iout+1))
-                infile = att.get('file', unicode)
-                namelist = att.get('namelist', unicode)
-                variable = att.get('variable', unicode)
-                att.description = 'transform %i, output %s/%s/%s' % (ipar+1, infile, namelist, variable)
-                outs.append((infile, namelist, variable, att.get('value', unicode)))
-                att.testEmpty()
+                with XMLAttributes(outelement, 'transform %i, output %i' % (ipar+1, iout+1)) as att:
+                    infile = att.get('file', unicode)
+                    namelist = att.get('namelist', unicode)
+                    variable = att.get('variable', unicode)
+                    att.description = 'transform %i, output %s/%s/%s' % (ipar+1, infile, namelist, variable)
+                    outs.append((infile, namelist, variable, att.get('value', unicode)))
             tf = RunTimeTransform(ins, outs)
             self.controller.addParameterTransform(tf)
 

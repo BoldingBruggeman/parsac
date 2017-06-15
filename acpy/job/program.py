@@ -199,28 +199,27 @@ class Job(shared.Job):
         # Parse observations section
         n = 0
         for iobs, element in enumerate(xml_tree.findall('observations/variable')):
-            att = shared.XMLAttributes(element, 'observed variable %i' % (iobs+1))
-            source = att.get('source', unicode)
-            att.description = 'observation set %s' % source
-            sourcepath = os.path.normpath(os.path.join(root, source))
-            assert os.path.isfile(sourcepath), 'Observation source file "%s" does not exist.' % sourcepath
-            modelvariable = att.get('modelvariable', unicode)
-            modelpath = att.get('modelpath', unicode)
-            file_format = att.get('format', unicode, default='profiles')
-            n += self.addObservation(sourcepath, modelvariable, modelpath,
-                                     maxdepth          =att.get('maxdepth',           float, required=False, minimum=0.),
-                                     mindepth          =att.get('mindepth',           float, required=False, minimum=0.),
-                                     spinupyears       =att.get('spinupyears',        int, required=False, minimum=0),
-                                     logscale          =att.get('logscale',           bool, default=False),
-                                     relativefit       =att.get('relativefit',        bool, default=False),
-                                     min_scale_factor  =att.get('minscalefactor',     float, required=False),
-                                     max_scale_factor  =att.get('maxscalefactor',     float, required=False),
-                                     fixed_scale_factor=att.get('constantscalefactor',float, required=False),
-                                     minimum           =att.get('minimum',            float, default=0.1),
-                                     sd                =att.get('sd',                 float, required=False, minimum=0.),
-                                     file_format       ={'profiles':0, 'timeseries':1}[file_format],
-                                     cache=True)
-            att.testEmpty()
+            with shared.XMLAttributes(element, 'observed variable %i' % (iobs+1)) as att:
+                source = att.get('source', unicode)
+                att.description = 'observation set %s' % source
+                sourcepath = os.path.normpath(os.path.join(root, source))
+                assert os.path.isfile(sourcepath), 'Observation source file "%s" does not exist.' % sourcepath
+                modelvariable = att.get('modelvariable', unicode)
+                modelpath = att.get('modelpath', unicode)
+                file_format = att.get('format', unicode, default='profiles')
+                n += self.addObservation(sourcepath, modelvariable, modelpath,
+                    maxdepth          =att.get('maxdepth',           float, required=False, minimum=0.),
+                    mindepth          =att.get('mindepth',           float, required=False, minimum=0.),
+                    spinupyears       =att.get('spinupyears',        int, required=False, minimum=0),
+                    logscale          =att.get('logscale',           bool, default=False),
+                    relativefit       =att.get('relativefit',        bool, default=False),
+                    min_scale_factor  =att.get('minscalefactor',     float, required=False),
+                    max_scale_factor  =att.get('maxscalefactor',     float, required=False),
+                    fixed_scale_factor=att.get('constantscalefactor',float, required=False),
+                    minimum           =att.get('minimum',            float, default=0.1),
+                    sd                =att.get('sd',                 float, required=False, minimum=0.),
+                    file_format       ={'profiles':0, 'timeseries':1}[file_format],
+                    cache=True)
         if n == 0:
             raise Exception('No valid observations found within specified depth and time range.')
 

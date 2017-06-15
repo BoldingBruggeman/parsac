@@ -18,12 +18,11 @@ def fromConfigurationFile(path, description, allowedtransports=None, interactive
     # Parse transports section
     transports = []
     for itransport, element in enumerate(tree.findall('transports/transport')):
-        att = shared.XMLAttributes(element, 'transport %i' % (itransport+1))
-        transport_type = att.get('type', unicode)
-        if allowedtransports is not None and transport_type not in allowedtransports:
-            continue
-        curtransport = transport.getClass(transport_type).fromXML(att, job_id=job_id, root_dir=root_dir)
-        att.testEmpty()
+        with shared.XMLAttributes(element, 'transport %i' % (itransport+1)) as att:
+            transport_type = att.get('type', unicode)
+            if allowedtransports is not None and transport_type not in allowedtransports:
+                continue
+            curtransport = transport.getClass(transport_type).fromXML(att, job_id=job_id, root_dir=root_dir)
         transports.append(curtransport)
 
     return Reporter(job_id, description, transports, interactive=interactive)
