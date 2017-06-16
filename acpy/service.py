@@ -8,10 +8,10 @@ user = None
 email = None
 key = None
 parallel = None
-have_license = False
+have_service = False
 
 path = os.path.dirname(os.path.realpath(__file__))
-license_file  = os.path.join(path, 'license.txt')
+service_file  = os.path.join(path, 'service.txt')
 
 config = ConfigParser.SafeConfigParser()
 
@@ -20,15 +20,22 @@ def read():
     global email
     global key
     global parallel
-    global have_license
-    if os.path.isfile(license_file):
+    global have_service
+    if os.path.isfile(service_file):
         try:
-            config.read(license_file)
+            config.read(service_file)
             user = config.get('User','user')
-            email = config.get('User','email')
+            try:
+               email = config.get('User','email')
+            except:
+                email = 'none'
+            try:
+                expire = config.get('User','expire')
+            except:
+                expire = 'never'
             key = config.get('Key','key')
             parallel = config.get('Features','parallel')
-            have_license = True
+            have_service = True
         except ConfigParser.ParsingError, err:
             print 'Could not parse:', err
 
@@ -36,15 +43,15 @@ def read():
 #    print('Write cfg-file')
 
 def print_c():
-    if have_license:
-        print('Reading license from:')
-        print('   '+license_file)
+    if have_service:
+        print('Reading service from:')
+        print('   '+service_file)
         for section_name in config.sections():
             print 'Section:', section_name
             for name, value in config.items(section_name):
                 print '  %s = %s' % (name, value)
     else:
-        print("No license file found!")
+        print("No service file found!")
 
 def main(args):
     read()

@@ -10,7 +10,7 @@ import tempfile
 import numpy
 
 # Import personal custom stuff
-import license
+import service
 import optimize
 import job
 import report
@@ -26,7 +26,7 @@ def configure_argument_parser(parser):
     parser.add_argument('--maxiter',              type=int, help='Maximum number of iterations (Nelder-Mead simplex) or generations (Differential Evolution) to perform (default: unlimited).', default=sys.maxint)
 
     de_options = parser.add_argument_group('Option specific to Differential Evolution (http://dx.doi.org/10.1023/A:1008202821328)')
-    if license.parallel is not None:
+    if service.parallel is not None:
         de_options.add_argument('-n', '--ncpus', type=int, help='Number of cores to use (default: use all available on the local machine).')
         de_options.add_argument('--ppservers',   type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on.')
         de_options.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only used in combination with ppservers argument).')
@@ -76,7 +76,7 @@ def main(args):
                     startpop = numpy.load(startpoppath)
 
                 extra_args = {'parallelize': False}
-                if license.parallel is not None:
+                if service.parallel is not None:
                     extra_args.update(parallelize=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
                 if args.ftol is not None:
                     extra_args.update(ftol=args.ftol, abstol=numpy.inf)

@@ -7,7 +7,7 @@ def readme():
         return f.read()
 
 setup(name='acpy',
-      version='0.1',
+      version='0.2',
       description='AutoCalibration tool written in Python',
       long_description=readme(),
       url='http://github.com/BoldingBruggeman/acpy',
@@ -16,7 +16,7 @@ setup(name='acpy',
       license='GPL',
       install_requires=['netCDF4'],
       classifiers=[
-          'Development Status :: 3 - Alpha',
+          'Development Status :: 3 - Beta',
           'Intended Audience :: Developers',
           'Topic :: Numerical Models :: Calibration Tools',
           'License :: OSI Approved :: GPL License',
