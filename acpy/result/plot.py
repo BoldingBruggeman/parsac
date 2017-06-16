@@ -11,6 +11,7 @@ def configure_argument_parser(parser):
     parser.add_argument('-l', '--limit', type=int, help='Maximum number of results to read')
     parser.add_argument('--run', type=int, help='Run number')
     parser.add_argument('-u', '--update', action='store_true', help='Keep running and updating the figure with new results until the user quits with Ctrl-C')
+    parser.add_argument('-s', '--save', type=str, help='File to save best result to (one line per parameter, containing name, tab, value)')
     parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, update=False)
 
 def main(args):
@@ -70,7 +71,12 @@ def main(args):
                 rbounds[ipar] = outside[rvalid, ipar].min()
 
             # Report estimate and confidence interval
-            print '  %s = %.6g (%.6g - %.6g)' % (parname, best[ipar], lbounds[ipar], rbounds[ipar])
+            print '  %s: %.6g (%.6g - %.6g)' % (parname, best[ipar], lbounds[ipar], rbounds[ipar])
+        if args.save is not None:
+            print 'Writing best parameter set to %s...' % args.save
+            with open(args.save, 'w') as f:
+                for parname, value in zip(parnames, best):
+                    f.write('%s\t%s\n' % (parname, value))
 
         # Create parameter bins for histogram
         parbinbounds = numpy.empty((npar, args.bincount+1))
