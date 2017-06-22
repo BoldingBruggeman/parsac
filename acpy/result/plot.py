@@ -92,20 +92,20 @@ def main(args):
 
         # Order sources (runs or clients) according to counts or ln likelihood.
         if args.groupby is not None:
-            print 'Points per %s:' % args.groupby
+#KB            print 'Points per %s:' % args.groupby
             sources = source2history.keys()
-            if args.orderby == 'count':
-                sources = sorted(sources, cmp=lambda x, y: cmp(len(source2history[y]), len(source2history[x])))
-            else:
-                sources = sorted(sources, cmp=lambda x, y: cmp(group2maxlnl[y], group2maxlnl[x]))
-            if args.maxcount is not None and len(sources) > args.maxcount:
-                sources[args.maxcount:] = []
-            for source in sources:
-                dat = source2history[source]
-                label = source
-                if args.groupby == 'run':
-                    label = '%s (%s)' % (source, run2source[source])
-                print '  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source])
+#KB            if args.orderby == 'count':
+#KB                sources = sorted(sources, cmp=lambda x, y: cmp(len(source2history[y]), len(source2history[x])))
+#KB            else:
+#KB                sources = sorted(sources, cmp=lambda x, y: cmp(group2maxlnl[y], group2maxlnl[x]))
+#KB            if args.maxcount is not None and len(sources) > args.maxcount:
+#KB                sources[args.maxcount:] = []
+#KB            for source in sources:
+#KB                dat = source2history[source]
+#KB                label = source
+#KB                if args.groupby == 'run':
+#KB                    label = '%s (%s)' % (source, run2source[source])
+#KB                print '  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source])
 
         if pyplot is None:
             print 'MatPlotLib not found - skipping plotting.'

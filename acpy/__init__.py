@@ -27,6 +27,10 @@ def main():
     result.animate_2d.configure_argument_parser(parser_animate_2d)
     parser_animate_2d.set_defaults(func=result.animate_2d.main)
 
+    parser_summary = subparsers.add_parser('summary', help='Summary of calibration')
+    result.summary.configure_argument_parser(parser_summary)
+    parser_summary.set_defaults(func=result.summary.main)
+
     parser_service = subparsers.add_parser('service', help='Print service information')
 #    service.configure_argument_parser(parser_service)
     parser_service.set_defaults(func=service.main)

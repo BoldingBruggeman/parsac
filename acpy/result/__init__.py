@@ -13,6 +13,7 @@ import acpy.transport
 import acpy.result.plot
 import acpy.result.plotbest
 import acpy.result.animate_2d
+import acpy.result.summary
 
 class Result(object):
     def __init__(self, xml_path, simulationdir=None):
