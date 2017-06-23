@@ -58,7 +58,7 @@ class Result(object):
 
         return run2source
 
-    def get(self, limit=-1, constraints={}, run_id=None, groupby=None):
+    def get(self, limit=-1, constraints={}, run_id=None, groupby=None, lnlrange=None):
         assert groupby in ('source', 'run', None)
 
         parconstraints = []
@@ -69,14 +69,24 @@ class Result(object):
             parconstraints.append((i, minval, maxval))
         npar = len(parnames)
 
-        # Retrieve all results
-        print 'Retrieving results...'
         cursor = self.db.cursor()
         runcrit = '`runs`.`id`'
         if run_id is not None:
             runcrit = '%i' % run_id
+
+        lnl_condition = ''
+        if lnlrange is not None:
+            print 'Finding maximum of fitness function...',
+            query = "SELECT DISTINCT MAX(`lnlikelihood`) FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'" % (runcrit, self.job.id)
+            cursor.execute(query)
+            maxlnl, = cursor.fetchone()
+            print maxlnl
+            lnl_condition = ' AND `lnlikelihood`>%s' % (maxlnl+lnlrange)
+
+        # Retrieve all results
+        print 'Retrieving results...'
         groupcol = 'NULL' if groupby is None else '`%s`' % groupby
-        query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,%s FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'" % (groupcol, runcrit, self.job.id)
+        query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,%s FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'%s" % (groupcol, runcrit, self.job.id, lnl_condition)
         if limit != -1:
             query += ' LIMIT %i' % limit
         cursor.execute(query)

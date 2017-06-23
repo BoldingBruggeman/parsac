@@ -45,7 +45,7 @@ def main(args):
     npar = len(parnames)
 
     def update(fig=None):
-        res, source2history = result.get(groupby=args.groupby, constraints=parbounds, run_id=args.run, limit=args.limit)
+        res, source2history = result.get(groupby=args.groupby, constraints=parbounds, run_id=args.run, limit=args.limit, lnlrange=args.range)
         run2source = result.get_sources()
 
         # Sort by likelihood
