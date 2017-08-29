@@ -26,32 +26,61 @@ class OptimizationProblem:
         raise NotImplementedErrror('Classes deriving from OptimizationProblem must implement evaluateFitness.')
 
 class TransformedProblem:
-    """Filter that log-transforms one or more parameters."""
-    def __init__(self, problem, logtransform=False):
+    """Filter that transforms one or more parameters."""
+    def __init__(self, problem, transforms=()):
         self.problem = problem
-        self.logtransform = logtransform
+        self.transforms = []
+        self.inverse_transforms = []
+        self.transformed = False
+
+        if transforms is None:
+            transforms = ()
+        for transform in transforms:
+            if transform and not isinstance(transform, basestring):
+                # old convention: True means log10 transform
+                transform = 'log10'
+            if isinstance(transform, basestring):
+                if transform == 'log10':
+                    transform = lambda x: numpy.log10(x)
+                    inverse_transform = lambda x: 10.**x
+                    self.transformed = True
+                elif transform == 'log':
+                    transform = lambda x: numpy.log(x)
+                    inverse_transform = lambda x: numpy.exp(x)
+                    self.transformed = True
+                elif transform == 'logit':
+                    transform = lambda x: numpy.log(x/(1.-x))
+                    inverse_transform = lambda x: numpy.exp(x)/(1.+numpy.exp(x))
+                    self.transformed = True
+                else:
+                    assert False, 'Unknown transform %s selected' % transform
+            else:
+                transform = lambda x: x
+                inverse_transform = lambda x: x
+            self.transforms.append(transform)
+            self.inverse_transforms.append(inverse_transform)
 
     def transform(self, parameters):
-        if not numpy.any(self.logtransform):
+        if not self.transformed:
             return parameters
-        assert len(parameters) == len(self.logtransform)
-        vals = []
-        for v, tf in zip(parameters, self.logtransform):
-            if tf and v is not None:
-                v = numpy.log10(v)
-            vals.append(v)
-        return numpy.array(vals)
+        assert len(parameters) == len(self.transforms)
+        values = []
+        for value, transform in zip(parameters, self.transforms):
+            if value is not None:
+                value = transform(value)
+            values.append(value)
+        return numpy.array(values)
 
     def untransform(self, parameters):
-        if not numpy.any(self.logtransform):
+        if not self.transformed:
             return parameters
-        assert len(parameters) == len(self.logtransform)
-        vals = []
-        for v, tf in zip(parameters, self.logtransform):
-            if tf and v is not None:
-                v = 10.**v
-            vals.append(v)
-        return numpy.array(vals)
+        assert len(parameters) == len(self.transforms)
+        values = []
+        for value, transform in zip(parameters, self.inverse_transforms):
+            if value is not None:
+                value = transform(value)
+            values.append(value)
+        return numpy.array(values)
 
     def evaluateFitness(self, parameters):
         return self.problem.evaluateFitness(self.untransform(parameters))
@@ -94,19 +123,19 @@ class Optimizer:
         self.problem = problem
         self.reportfunction = reportfunction
 
-    def run(self, method=SIMPLEX, par_ini=None, par_min=None, par_max=None, logtransform=None,
+    def run(self, method=SIMPLEX, par_ini=None, par_min=None, par_max=None, transform=None,
             maxiter=1000, maxfun=1000, verbose=True,
             modules=(), reltol=0.01, abstol=1e-8, ftol=numpy.inf, popsize=None, maxgen=500, F=0.5, CR=0.9, initialpopulation=None, parallelize=True, ppservers=(), secret=None, ncpus=None, max_runtime=None):
         if isinstance(method, (list, tuple)):
             for curmethod in method:
-                par_ini = self.run(curmethod, par_ini, par_min, par_max, logtransform=logtransform, modules=modules, maxiter=maxiter, maxfun=maxfun, verbose=verbose, reltol=reltol, abstol=abstol, ftol=ftol, popsize=popsize, maxgen=maxgen, CR=CR, F=F, initialpopulation=initialpopulation, parallelize=parallelize, ppservers=ppservers, secret=secret, ncpus=ncpus, max_runtime=max_runtime)
+                par_ini = self.run(curmethod, par_ini, par_min, par_max, transform=transform, modules=modules, maxiter=maxiter, maxfun=maxfun, verbose=verbose, reltol=reltol, abstol=abstol, ftol=ftol, popsize=popsize, maxgen=maxgen, CR=CR, F=F, initialpopulation=initialpopulation, parallelize=parallelize, ppservers=ppservers, secret=secret, ncpus=ncpus, max_runtime=max_runtime)
             return par_ini
 
         problem = self.problem
         if method != DIFFERENTIALEVOLUTION:
             problem = ReportingProblem(problem, self.reportfunction)
 
-        problem = TransformedProblem(problem, logtransform=logtransform)
+        problem = TransformedProblem(problem, transform=transform)
         if par_min is not None:
             par_min = problem.transform(par_min)
         if par_max is not None:
@@ -159,7 +188,7 @@ class Optimizer:
         chi2_p = 1. - scipy.stats.chi2.cdf(chi2_crit, 1)
         return chi2_p
 
-    def profile(self, start, maxstep=None, targetdelta=None, profile=None, nzoom=4, logtransform=None):
+    def profile(self, start, maxstep=None, targetdelta=None, profile=None, nzoom=4, transform=None):
         if profile is None:
             profile = numpy.ones((len(start),), dtype=bool)
         if targetdelta is None:
@@ -168,7 +197,7 @@ class Optimizer:
 
         problem = self.problem
         problem = ReportingProblem(problem, self.reportfunction)
-        problem = TransformedProblem(problem, logtransform=logtransform)
+        problem = TransformedProblem(problem, transform=transform)
 
         start = problem.transform(start)
         startfitness = problem.evaluateFitness(start)
