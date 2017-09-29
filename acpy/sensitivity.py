@@ -55,7 +55,9 @@ def main(args):
     if args.create_dirs:
         # Only create setup directories
         assert isinstance(current_job, job.program.Job)
+        scenariodir = current_job.scenariodir
         for i in xrange(parameters.shape[0]):
+            current_job.scenariodir = scenariodir
             current_job.simulationdir = os.path.join(args.create_dirs, args.format % i)
             current_job.initialized = False
             current_job.prepareDirectory(parameters[i, :])
