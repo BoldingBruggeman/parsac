@@ -36,16 +36,12 @@ def configure_argument_parser(parser):
     de_options.add_argument('--repeat', action='store_true', help='Start a new optimization whenever the last completes.')
 
 def main(args):
-    allowedtransports = None
-    if args.transport is not None:
-        allowedtransports = (args.transport,)
-
     print 'Reading configuration from %s...' % args.xmlfile
     current_job = job.fromConfigurationFile(args.xmlfile, tempdir=args.tempdir)
 
     with open(args.xmlfile) as f:
         xml = f.read()
-    reporter = report.fromConfigurationFile(args.xmlfile, xml, allowedtransports=allowedtransports)
+    reporter = report.fromConfigurationFile(args.xmlfile, xml, allowedtransports=args.transport)
 
     # Configure result reporter
     reporter.interactive = args.interactive

@@ -379,7 +379,7 @@ class Job(shared.Job):
             tempscenariodir = tempfile.mkdtemp(prefix='gotmopt', dir=self.tempdir)
             atexit.register(shutil.rmtree, tempscenariodir, True)
 
-        print 'Copying files for model setup...'
+        print 'Copying files for model setup to %s...' % tempscenariodir
         for name in os.listdir(self.scenariodir):
             if name.endswith('.nc'):
                 print '   skipping %s because it is a NetCDF file' % name
@@ -403,19 +403,10 @@ class Job(shared.Job):
 
         self.initialized = True
 
-    def evaluateFitness(self, values, return_model_values=False, show_output=False):
+    def prepareDirectory(self, values):
         if not self.initialized:
             self.initialize()
             assert self.initialized
-
-        print 'Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values])
-
-        # If required, check whether all parameters are within their respective range.
-        if self.checkparameterranges:
-            for parameter, value in zip(self.parameters, values):
-                if value < parameter.minimum or value > parameter.maximum:
-                    errors = 'Parameter %s with value %.6g out of range (%.6g - %.6g), returning ln likelihood of -infinity.' % (parameter.name, value, parameter.minimum, parameter.maximum)
-                    return -numpy.Inf
 
         # Update the value of all untransformed parameters
         for parameter, value in zip(self.parameters, values):
@@ -435,6 +426,22 @@ class Job(shared.Job):
         # Save updated namelist/YAML files.
         for parameter in self.parameters:
             parameter.store()
+
+    def evaluateFitness(self, values, return_model_values=False, show_output=False):
+        if not self.initialized:
+            self.initialize()
+            assert self.initialized
+
+        print 'Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values])
+
+        # If required, check whether all parameters are within their respective range.
+        if self.checkparameterranges:
+            for parameter, value in zip(self.parameters, values):
+                if value < parameter.minimum or value > parameter.maximum:
+                    errors = 'Parameter %s with value %.6g out of range (%.6g - %.6g), returning ln likelihood of -infinity.' % (parameter.name, value, parameter.minimum, parameter.maximum)
+                    return -numpy.Inf
+
+        self.prepareDirectory(values)
 
         returncode = self.run(values, show_output=show_output)
 

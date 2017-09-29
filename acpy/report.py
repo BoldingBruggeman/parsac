@@ -16,6 +16,8 @@ def fromConfigurationFile(path, description, allowedtransports=None, interactive
     root_dir = os.path.dirname(path)
 
     # Parse transports section
+    if isinstance(allowedtransports, basestring):
+        allowedtransports = (allowedtransports,)
     transports = []
     for itransport, element in enumerate(tree.findall('transports/transport')):
         with shared.XMLAttributes(element, 'transport %i' % (itransport+1)) as att:

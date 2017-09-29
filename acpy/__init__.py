@@ -5,6 +5,7 @@ from . import service
 service.read()
 from . import run
 from . import result
+from . import sensitivity
 
 def main():
     parser = argparse.ArgumentParser(description='AutoCalibration Python - acpy')
@@ -35,6 +36,9 @@ def main():
 #    service.configure_argument_parser(parser_service)
     parser_service.set_defaults(func=service.main)
 
+    parser_sa = subparsers.add_parser('sa', help='Perform sensitivity analysis')
+    sensitivity.configure_argument_parser(parser_sa)
+    parser_sa.set_defaults(func=sensitivity.main)
 
     args = parser.parse_args()
     args.func(args)
