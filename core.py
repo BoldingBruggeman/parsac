@@ -25,6 +25,9 @@ class OptimizationProblem:
     def evaluateFitness(self, parameters):
         raise NotImplementedErrror('Classes deriving from OptimizationProblem must implement evaluateFitness.')
 
+    def start(self):
+        pass
+
 class TransformedProblem:
     """Filter that transforms one or more parameters."""
     def __init__(self, problem, transforms=()):
@@ -85,6 +88,9 @@ class TransformedProblem:
     def evaluateFitness(self, parameters):
         return self.problem.evaluateFitness(self.untransform(parameters))
 
+    def start(self):
+        self.problem.start()
+
 class ReducedProblem:
     """Filter that sets one parameter to a constant value."""
     def __init__(self, problem, ipar, value):
@@ -105,6 +111,9 @@ class ReducedProblem:
     def evaluateFitness(self,parameters):
         return self.problem.evaluateFitness(self.expand(parameters))
 
+    def start(self):
+        self.problem.start()
+
 class ReportingProblem:
     """Filter that sends all results to a reporting function."""
     def __init__(self, problem, reportfunction):
@@ -116,6 +125,9 @@ class ReportingProblem:
         if self.reportfunction is not None:
             self.reportfunction(parameters, fitness)
         return fitness
+
+    def start(self):
+        self.problem.start()
 
 class Optimizer:
     def __init__(self, problem, reportfunction=None):
@@ -133,6 +145,7 @@ class Optimizer:
 
         problem = self.problem
         if method != DIFFERENTIALEVOLUTION:
+            problem.start()
             problem = ReportingProblem(problem, self.reportfunction)
 
         problem = TransformedProblem(problem, transform=transform)
@@ -178,6 +191,7 @@ class Optimizer:
         return problem.untransform(p_final)
 
     def calculateP(self, best, ipar, altvalue):
+        self.problem.start()
         bestfitness = self.problem.evaluateFitness(best)
         problem = ReportingProblem(self.problem, self.reportfunction)
         problem = ReducedProblem(problem, ipar, altvalue)
@@ -189,6 +203,7 @@ class Optimizer:
         return chi2_p
 
     def profile(self, start, maxstep=None, targetdelta=None, profile=None, nzoom=4, transform=None):
+        self.problem.start()
         if profile is None:
             profile = numpy.ones((len(start),), dtype=bool)
         if targetdelta is None:

@@ -35,6 +35,7 @@ def processTrial(newjobid, newjob, trial):
             with open(newjob, 'rb') as f:
                 newjob = cPickle.load(f)
         job, jobid = newjob, newjobid
+        newjob.start()
 
     # Evaluate the fitness function (*more is better*)
     fitness = job.evaluateFitness(trial)
