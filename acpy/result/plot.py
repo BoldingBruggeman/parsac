@@ -128,7 +128,6 @@ def main(args):
         # Create subplots
         for ipar in range(npar):
             ax = fig.add_subplot(nrow, ncol, ipar+1)
-            ax.hold(True)
 
         # Approximate marginal by estimsting upper contour of cloud.
         marginals = []
@@ -183,7 +182,6 @@ def main(args):
             ax.set_title(name)
 
             # Plot marginal
-            ax.hold(True)
             #x = numpy.concatenate((parbinbounds[ipar, 0:1], numpy.repeat(parbinbounds[ipar, 1:-1], 2), parbinbounds[ipar, -1:]), 0)
             #y = numpy.repeat(parbins[ipar, :], 2)
             #ax.plot(x, y, '-k', label='_nolegend_')

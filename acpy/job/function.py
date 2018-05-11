@@ -14,12 +14,12 @@ class Job(shared.Job):
             self.module, self.name = att.get('name', unicode).rsplit('.', 1)
             self.path = os.path.join(root, att.get('path', unicode, default='.'))
         self.parameter_names = self.getParameterNames()
-        self.function = None
 
-    def evaluateFitness(self, parameter_values):
-        if self.function is None:
-            sys.path.append(self.path)
-            module = __import__(self.module)
-            self.function = getattr(module, self.name)
+    def on_start(self):
+        sys.path.append(self.path)
+        module = __import__(self.module)
+        self.function = getattr(module, self.name)
+
+    def evaluate(self, parameter_values):
         parameter2value = dict(zip(self.parameter_names, parameter_values))
         return self.function(**parameter2value)

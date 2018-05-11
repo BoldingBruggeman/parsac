@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy
 
 import shared
@@ -6,10 +8,14 @@ class Job(shared.Job):
     def __init__(self, job_id, xml_tree, root, **kwargs):
         shared.Job.__init__(self, job_id, xml_tree, root)
 
-        element = xml_tree.find('fitness')
+        element = xml_tree.find('target')
         if element is None:
-            raise Exception('The root node must contain a single "fitness" element.')
-        with shared.XMLAttributes(element, 'the fitness element') as att:
+            element = xml_tree.find('fitness')
+            if element is not None:
+                print('WARNING: XML file does not contain "target" element; using the deprecated "fitness" element instead.')
+        if element is None:
+            raise Exception('The root node must contain a single "target" element.')
+        with shared.XMLAttributes(element, 'the target element') as att:
             self.expression = att.get('expression', unicode)
 
         self.basedict = {}
@@ -20,7 +26,10 @@ class Job(shared.Job):
 
         self.parameter_names = self.getParameterNames()
 
-    def evaluateFitness(self, parameter_values):
+    def on_start(self):
+        self.expression = compile(self.expression, '<string>', 'eval')
+
+    def evaluate(self, parameter_values):
         for name, value in zip(self.parameter_names, parameter_values):
             self.basedict[name] = value
         return eval(self.expression, {}, self.basedict)

@@ -41,7 +41,7 @@ def main(args):
     print 'Original ln likelihood = %.8g' % lnl
 
     # Initialize the job (needed to load observations)
-    result.job.initialize()
+    result.job.start()
 
     # Build a list of all NetCDF variables that we want model results for.
     obsinfo = result.job.observations
@@ -60,7 +60,7 @@ def main(args):
     #nc = NetCDFFile(ncpath,'r')
     #res = result.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
     #nc.close()
-    likelihood, model_values = result.job.evaluateFitness(parameters, return_model_values=True, show_output=True)
+    likelihood, model_values = result.job.evaluate(parameters, return_model_values=True, show_output=True)
     print 'Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood, lnl)
 
     # # Copy NetCDF file
@@ -125,11 +125,11 @@ def main(args):
             valid_obs = zs > zmin
             valid_mod = z_centers > zmin
             varrange = (min(all_model_data[valid_mod].min(), observed_values[valid_obs].min()), max(all_model_data[valid_mod].max(), observed_values[valid_obs].max()))
+            print varrange
 
             t_interfaces = pylab.date2num(t_interfaces)
             ax = pylab.subplot(gs[i, 0:5])
-            pc = pylab.pcolormesh(t_interfaces, z_interfaces, all_model_data)
-            pylab.clim(varrange)
+            pc = pylab.pcolormesh(t_interfaces, z_interfaces, all_model_data, vmin=varrange[0], vmax=varrange[1])
             pylab.ylim(zmin, zmax)
             pylab.xlim(t_interfaces[0, 0], t_interfaces[-1, 0])
             loc = matplotlib.dates.AutoDateLocator()
@@ -145,12 +145,11 @@ def main(args):
             if args.grid:
                 from matplotlib.mlab import griddata
                 gridded_observed_values = griddata(numtimes, zs, observed_values, t_interfaces, z_interfaces, 'linear')
-                pylab.pcolormesh(t_interfaces, z_interfaces, gridded_observed_values)
+                pylab.pcolormesh(t_interfaces, z_interfaces, gridded_observed_values, vmin=varrange[0], vmax=varrange[1])
             else:
-                pylab.scatter(numtimes, zs, s=10, c=observed_values, cmap=matplotlib.cm.jet, vmin=varrange[0], vmax=varrange[1], edgecolors='none')
+                pylab.scatter(numtimes, zs, s=10, c=observed_values, vmin=varrange[0], vmax=varrange[1], edgecolors='none')
             pylab.ylim(zmin, zmax)
             pylab.xlim(t_interfaces[0, 0], t_interfaces[-1, 0])
-            pylab.clim(varrange)
             loc = matplotlib.dates.AutoDateLocator()
             ax.xaxis.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
             ax.xaxis.set_major_locator(loc)
@@ -175,7 +174,6 @@ def main(args):
         mi, ma = min(observed_values.min(), model_data.min()), max(observed_values.max(), model_data.max())
         pylab.xlim(mi, ma)
         pylab.ylim(mi, ma)
-        pylab.hold(True)
         pylab.plot((mi, ma), (mi, ma), '-k')
         pylab.xlabel('observation')
         pylab.ylabel('model')

@@ -154,7 +154,7 @@ class DummyParameter(Parameter):
 
 class Job(optimize.OptimizationProblem):
     def __init__(self, job_id, xml_tree, root, **kwargs):
-        self.initialized = False
+        self.started = False
         self.id = job_id
 
         self.parameters = []
@@ -181,6 +181,22 @@ class Job(optimize.OptimizationProblem):
                     outs.append((infile, namelist, variable, att.get('value', unicode)))
             tf = RunTimeTransform(ins, outs)
             self.controller.addParameterTransform(tf)
+
+    def start(self, force=False):
+        if not self.started or force:
+            self.on_start()
+            self.started = True
+
+    def evaluateFitness(self, parameter_values):
+        return self.evaluate(parameter_values)
+
+    # optionally to be implemented by derived classes
+    def on_start(self):
+        pass
+
+    # to be implemented by derived classes
+    def evaluate(self, parameter_values):
+        raise NotImplementedError('Classes deriving from Job must implement "evaluate"')
 
     def getParameter(self, att):
         if att.get('dummy', bool, default=False):

@@ -65,6 +65,35 @@ def getMD5(path):
             m.update(block)
     return m.digest()
 
+class NcDict(object):
+    def __init__(self, path):
+        self.nc = netCDF4.Dataset(path)
+        self.cache = {}
+        self.dimensions = None
+
+    def finalize(self):
+        self.nc.close()
+        self.cache = None
+        self.nc = None
+
+    def __getitem__(self, key):
+        if key not in self.cache:
+            ncvar = self.nc.variables[key]
+            if self.dimensions is not None:
+                self.dimensions.update(ncvar.dimensions)
+            self.cache[key] = ncvar[...]
+        return self.cache[key]
+
+    def __contains__(self, key):
+        return key in self.nc.variables
+
+    def eval(self, expression, no_trailing_singletons=True):
+        data = eval(expression, {}, self)
+        if no_trailing_singletons and data.ndim > 0:
+            while data.shape[-1] == 1:
+                data = data[..., 0]
+        return data
+
 class NamelistParameter(shared.Parameter):
     def __init__(self, job, att):
         self.file = os.path.normpath(att.get('file', unicode))
@@ -189,12 +218,19 @@ class Job(shared.Job):
         # Initialize base class
         shared.Job.__init__(self, job_id, xml_tree, root)
 
-        # Array to hold observation datasets
-        self.observations = []
-
         # Whether to reject parameter sets outside of initial parameter ranges.
         # Rejection means returning a ln likelihood of negative infinity.
         self.checkparameterranges = True
+
+        # If the XML contains a "target" element at root level, we will use that rather than compute a likelihood.
+        element = xml_tree.find('target')
+        if element is not None:
+            with shared.XMLAttributes(element, 'the target element') as att:
+                self.target = (att.get('expression', unicode), att.get('path', unicode))
+            return
+
+        # Array to hold observation datasets
+        self.observations = []
 
         # Parse observations section
         n = 0
@@ -358,9 +394,7 @@ class Job(shared.Job):
         parameter_info = [parameter.getInfo() for parameter in self.parameters]
         return cPickle.dumps({'parameters':parameter_info, 'observations':obs})
 
-    def initialize(self):
-        assert not self.initialized, 'Job has already been initialized.'
-
+    def on_start(self):
         # Check for presence of GOTM executable.
         if not os.path.isfile(self.exe):
             raise Exception('Cannot locate executable at "%s".' % self.exe)
@@ -372,7 +406,8 @@ class Job(shared.Job):
         if self.simulationdir is not None:
             # A specific directory in which to simulate has been provided.
             tempscenariodir = os.path.abspath(self.simulationdir)
-            if not os.path.isdir(tempscenariodir): os.mkdir(tempscenariodir)
+            if not os.path.isdir(tempscenariodir):
+                os.mkdir(tempscenariodir)
         else:
             # Create a temporary directory for the scenario on disk
             # (decreases runtime compared to network because GOTM can access observations faster)
@@ -401,12 +436,8 @@ class Job(shared.Job):
         for parameter in self.parameters:
             parameter.initialize()
 
-        self.initialized = True
-
     def prepareDirectory(self, values):
-        if not self.initialized:
-            self.initialize()
-            assert self.initialized
+        assert self.started
 
         # Update the value of all untransformed parameters
         for parameter, value in zip(self.parameters, values):
@@ -427,10 +458,8 @@ class Job(shared.Job):
         for parameter in self.parameters:
             parameter.store()
 
-    def evaluateFitness(self, values, return_model_values=False, show_output=False):
-        if not self.initialized:
-            self.initialize()
-            assert self.initialized
+    def evaluate(self, values, return_model_values=False, show_output=False):
+        assert self.started
 
         print 'Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values])
 
@@ -443,7 +472,7 @@ class Job(shared.Job):
 
         self.prepareDirectory(values)
 
-        returncode = self.run(values, show_output=show_output)
+        returncode = self.run(show_output=show_output)
 
         if returncode != 0:
             # Run failed
@@ -451,82 +480,64 @@ class Job(shared.Job):
             #self.reportResult(values, None, error='Run stopped prematurely')
             return -numpy.Inf
 
-        resultroot = self.scenariodir
+        outputpath2nc = {}
+        for obsinfo in self.observations:
+            ncpath = os.path.join(self.scenariodir, obsinfo['outputpath'])
+            if not os.path.isfile(ncpath):
+                raise Exception('Output file "%s" was not created.' % ncpath)
+            outputpath2nc[obsinfo['outputpath']] = NcDict(ncpath)
 
         # Check if this is the first model run/evaluation of the likelihood.
-        if not hasattr(self, 'file2variables'):
+        if not getattr(self, 'processed_expressions', False):
             # This is the first time that we evaluate the likelihood.
             # Find a list of all NetCDF variables that we need.
             # Also find the coordinates in the result arrays and the weights that should be
             # used to interpolate to the observations.
 
-            self.file2variables = {}
-            file2re = {}
+            self.processed_expressions = True
             for obsinfo in self.observations:
-                obsvar, outputpath = obsinfo['outputvariable'], obsinfo['outputpath']
-                if not os.path.isfile(os.path.join(resultroot, outputpath)):
-                    raise Exception('Output file "%s"" was not created.' % os.path.join(resultroot, outputpath))
-                with netCDF4.Dataset(os.path.join(resultroot, outputpath)) as nc:
-                    if outputpath not in file2re:
-                        file2re[outputpath] = re.compile(r'(?<!\w)('+'|'.join(nc.variables.keys())+r')(?!\w)')  # variable name that is not preceded and followed by a "word" character
-                    if outputpath not in self.file2variables:
-                        self.file2variables[outputpath] = set()
-
+                # Get time indices (for left side of bracket for linear interpolation)
+                # This also eliminates points outside the simulated period.
+                print 'Calculating weights for linear interpolation to "%s" observations...' % obsinfo['outputvariable'],
+                wrappednc = outputpath2nc[obsinfo['outputpath']]
+                time_units = wrappednc.nc.variables['time'].units
+                time_vals = wrappednc['time']
+                if 'itimes' not in obsinfo:
+                    itimes_left, iweights_left = [], []
+                    valid = numpy.zeros((len(obsinfo['times']),), dtype=bool)
+                    numtimes = netCDF4.date2num(obsinfo['times'], time_units)
+                    for i, numtime in enumerate(numtimes):
+                        iright = time_vals.searchsorted(numtime)
+                        if iright == 0 or iright >= len(time_vals): continue
+                        valid[i] = True
+                        itimes_left.append(iright-1)
+                        iweights_left.append((numtime-time_vals[iright-1])/(time_vals[iright]-time_vals[iright-1]))
+                    obsinfo['times'] = [t for t, v in zip(obsinfo['times'], valid) if v]
+                    obsinfo['numtimes'] = numtimes[valid]
+                    obsinfo['itimes'] = numpy.array(itimes_left, dtype=int)
+                    obsinfo['time_weights'] = numpy.array(iweights_left, dtype=float)
+                    obsinfo['values'] = obsinfo['values'][valid]
                     if obsinfo['zs'] is not None:
-                        self.file2variables[outputpath].add('h') # always include cell thickness "h"
+                        obsinfo['zs'] = obsinfo['zs'][valid]
 
-                    # Find variable names in expression.
-                    curncvars = set(file2re[outputpath].findall(obsvar))
-                    assert len(curncvars) > 0, 'No variables in found in NetCDF file %s that match %s.' % (outputpath, obsvar)
-                    self.file2variables[outputpath] |= curncvars
+                # Compile expression
+                obsinfo['outputexpression'] = compile(obsinfo['outputvariable'], '<string>', 'eval')
 
-                    # Check dimensions of all used NetCDF variables
-                    firstvar, dimnames = None, None
-                    for varname in curncvars:
-                        curdimnames = tuple(nc.variables[varname].dimensions)
-                        if dimnames is None:
-                            firstvar, dimnames = varname, curdimnames
-                            assert dimnames[0] == 'time', 'Dimension 1 of variable %s must be time, but is "%s".' % (varname, dimnames[0])
-                            assert dimnames[-2:] == ('lat','lon'), 'Last two dimensions of variable %s must be latitude and longitude, but are "%s".'  % (varname, dimnames[-2:])
-                            if obsinfo['zs'] is None:
-                                assert len(dimnames) == 3, 'Expected 3 dimensions (time, y, x). "%s" has %i dimensions.' % (varname, len(dimnames))
-                            else:
-                                assert len(dimnames) == 4, 'Expected 4 dimensions (time, z, y, x). "%s" has %i dimensions.' % (varname, len(dimnames))
-                                assert dimnames[1] in ('z', 'z1'), 'Dimension 2 of variable %s must be depth (z or z1), but is "%s".' % (varname, dimnames[1])
-                                obsinfo['depth_dimension'] = dimnames[1]
-                        else:
-                            assert curdimnames == dimnames, 'Dimensions of %s %s do not match dimensions of %s %s. Cannot combine both in one expression.' % (varname, curdimnames, firstvar, dimnames)
+                # Retrieve data and check dimensions
+                wrappednc.dimensions = set()
+                data = wrappednc.eval(obsinfo['outputexpression'])
+                if data.shape[0] != time_vals.size:
+                    raise Exception('The first dimension of %s should have length %i (= number of time points), but has length %i.' % (obsinfo['outputvariable'], time_vals.size, data.shape[0]))
+                if obsinfo['zs'] is not None:
+                    assert data.ndim == 2, 'Expected two dimensions (time, depth) in %s, but found %i dimensions.' % (obsinfo['outputvariable'], data.ndim)
+                    depth_dimensions = wrappednc.dimensions.intersection(('z', 'z1', 'zi'))
+                    assert len(depth_dimensions) > 0, 'No depth dimension (z, zi or z1) used by expression %s' % obsinfo['outputvariable']
+                    assert len(depth_dimensions) <= 1, 'More than one depth dimension (%s) used by expression %s' % (', '.join(depth_dimensions), obsinfo['outputvariable'])
+                    obsinfo['depth_dimension'] = depth_dimensions.pop()
+                else:
+                    assert data.ndim == 1, 'Expected only one dimension (time) in %s, but found %i dimensions.' % (obsinfo['outputvariable'], data.ndim)
 
-                    # Get time indices (for left side of bracket for linear interpolation)
-                    # This also eliminates points outside the simulated period.
-                    print 'Calculating weights for linear interpolation to "%s" observations...' % obsvar,
-                    nctime = nc.variables['time']
-                    time_vals = nctime[:]
-                    if 'itimes' not in obsinfo:
-                        itimes_left, iweights_left = [], []
-                        valid = numpy.zeros((len(obsinfo['times']),), dtype=bool)
-                        numtimes = netCDF4.date2num(obsinfo['times'], nctime.units)
-                        for i, numtime in enumerate(numtimes):
-                            iright = time_vals.searchsorted(numtime)
-                            if iright == 0 or iright >= len(time_vals): continue
-                            valid[i] = True
-                            itimes_left.append(iright-1)
-                            iweights_left.append((numtime-time_vals[iright-1])/(time_vals[iright]-time_vals[iright-1]))
-                        obsinfo['times'] = [t for t, v in zip(obsinfo['times'], valid) if v]
-                        obsinfo['numtimes'] = numtimes[valid]
-                        obsinfo['itimes'] = numpy.array(itimes_left, dtype=int)
-                        obsinfo['time_weights'] = numpy.array(iweights_left, dtype=float)
-                        obsinfo['values'] = obsinfo['values'][valid]
-                        if obsinfo['zs'] is not None:
-                            obsinfo['zs'] = obsinfo['zs'][valid]
-
-                    print 'done.'
-
-        # Get all model variables that we need from the NetCDF file.
-        file2vardata  = {}
-        for path, variables in self.file2variables.items():
-           with netCDF4.Dataset(os.path.join(resultroot, path)) as nc:
-              file2vardata[path] = dict([(vn, nc.variables[vn][..., 0, 0]) for vn in variables])
+                print 'done.'
 
         # Start with zero ln likelihood (likelihood of 1)
         lnlikelihood = 0.
@@ -536,18 +547,20 @@ class Job(shared.Job):
             model_values = []
         for obsinfo in self.observations:
             obsvar, outputpath, obsvals = obsinfo['outputvariable'], obsinfo['outputpath'], obsinfo['values']
+            wrappednc = outputpath2nc[outputpath]
 
             # Get model predictions for current variable or expression.
-            all_values_model = eval(obsvar, file2vardata[outputpath])
+            all_values_model = wrappednc.eval(obsinfo['outputexpression'])
 
             if obsinfo['zs'] is not None:
                 # Get model depth coordinates (currently expresses depth as distance from current surface elevation!)
-                h = file2vardata[outputpath]['h']
+                h = wrappednc['h']
+                h = h.reshape(h.shape[:2])
                 h_cumsum = h.cumsum(axis=1)
                 if obsinfo['depth_dimension'] == 'z':
                     # Centres (all)
                     zs_model = h_cumsum - h_cumsum[:, -1, numpy.newaxis] - h/2
-                elif obsinfo['depth_dimension'] == 'z1':
+                else:
                     # Interfaces (all except bottom)
                     zs_model = h_cumsum - h_cumsum[:, -1, numpy.newaxis]
 
@@ -569,18 +582,18 @@ class Job(shared.Job):
                 print 'WARNING: one or more model values for %s are not finite.' % obsvar
                 print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
                 #self.reportResult(values,None,error='Some model values for %s are not finite' % obsvar)
+                for wrappednc in outputpath2nc.values():
+                    wrappednc.finalize()
                 return -numpy.Inf
 
             if return_model_values:
-                with netCDF4.Dataset(os.path.join(resultroot, outputpath)) as nc:
-                    nctime = nc.variables['time']
-                    t_centers = nctime[:]
-                    time_unit = nctime.units
+                time_units = wrappednc.nc.variables['time'].units
+                t_centers = wrappednc['time']
                 if obsinfo['zs'] is not None:
-                    if obsinfo['depth_dimension']=='z':
+                    if obsinfo['depth_dimension'] == 'z':
                         # Centres (all)
                         z_interfaces = numpy.hstack((-h_cumsum[:, -1, numpy.newaxis], h_cumsum-h_cumsum[:, -1, numpy.newaxis]))
-                    elif obsinfo['depth_dimension']=='z1':
+                    else:
                         # Interfaces (all except bottom)
                         zs_model = h_cumsum-h_cumsum[:, -1, numpy.newaxis]
                     z_interfaces2 = numpy.empty((z_interfaces.shape[0]+1, z_interfaces.shape[1]))
@@ -594,10 +607,10 @@ class Job(shared.Job):
                     tim_stag[0 ] = t_centers[0] - half_delta_time[0]
                     tim_stag[1:-1] = t_centers[:-1] + half_delta_time
                     tim_stag[-1] = t_centers[-1] + half_delta_time[-1]
-                    t_interfaces = numpy.repeat(netCDF4.num2date(tim_stag, time_unit)[:, numpy.newaxis], z_interfaces2.shape[1], axis=1)
+                    t_interfaces = numpy.repeat(netCDF4.num2date(tim_stag, time_units)[:, numpy.newaxis], z_interfaces2.shape[1], axis=1)
                     model_values.append((t_interfaces, z_interfaces2, all_values_model, modelvals))
                 else:
-                    model_values.append((netCDF4.num2date(t_centers, time_unit), all_values_model, modelvals))
+                    model_values.append((netCDF4.num2date(t_centers, time_units), all_values_model, modelvals))
 
             if obsinfo['logscale']:
                 modelvals = numpy.log10(numpy.maximum(modelvals, obsinfo['minimum']))
@@ -614,6 +627,8 @@ class Job(shared.Job):
                     if (modelvals == 0.).all():
                         print 'WARNING: cannot calculate optimal scaling factor for %s because all model values equal zero.' % obsvar
                         print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                        for wrappednc in outputpath2nc.values():
+                            wrappednc.finalize()
                         #self.reportResult(values, None, error='All model values for %s equal 0' % obsvar)
                         return -numpy.Inf
                     scale = (obsvals*modelvals).sum()/(modelvals**2).sum()
@@ -621,6 +636,8 @@ class Job(shared.Job):
                         print 'WARNING: optimal scaling factor for %s is not finite.' % obsvar
                         print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
                         #self.reportResult(values, None, error='Optimal scaling factor for %s is not finite' % obsvar)
+                        for wrappednc in outputpath2nc.values():
+                            wrappednc.finalize()
                         return -numpy.Inf
 
                 # Report and check optimal scale factor.
@@ -660,10 +677,13 @@ class Job(shared.Job):
 
         print 'ln Likelihood = %.6g.' % lnlikelihood
 
-        if return_model_values: return lnlikelihood, model_values
+        for wrappednc in outputpath2nc.values():
+            wrappednc.finalize()
+        if return_model_values:
+            return lnlikelihood, model_values
         return lnlikelihood
 
-    def run(self, values, show_output=False):
+    def run(self, show_output=False):
         # Take time and start executable
         time_start = time.time()
         print 'Starting model run...'
