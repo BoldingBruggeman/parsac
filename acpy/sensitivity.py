@@ -204,9 +204,9 @@ def main(args):
 
         Y = numpy.empty((len(simulationdirs),))
         expression, ncpath = current_job.target
-        print('Retrieving value of target expression for esah ensemble member...')
+        expression = compile(expression, '<string>', 'eval')
+        print('Retrieving value of target expression for each ensemble member...')
         for i, simulationdir in enumerate(simulationdirs):
-
             wrappednc = job.program.NcDict(os.path.join(simulationdir, ncpath))
             Y[i] = wrappednc.eval(expression)
             print('  - %i: %s' % (i, Y[i]))

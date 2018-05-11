@@ -65,6 +65,14 @@ def getMD5(path):
             m.update(block)
     return m.digest()
 
+def filter_by_time(values, time, time_units, months=()):
+    dts = netCDF4.num2date(time, time_units)
+    current_months = numpy.array([dt.month for dt in dts], dtype=int)
+    valid = numpy.zeros(current_months.shape, dtype=bool)
+    for month in months:
+        valid |= current_months == month
+    return values[valid, ...]
+
 class NcDict(object):
     def __init__(self, path):
         self.nc = netCDF4.Dataset(path)
@@ -88,7 +96,8 @@ class NcDict(object):
         return key in self.nc.variables
 
     def eval(self, expression, no_trailing_singletons=True):
-        data = eval(expression, {}, self)
+        namespace = {'filter_by_time': lambda values, months: filter_by_time(values, self['time'], self.nc.variables['time'].units, months)}
+        data = eval(expression, namespace, self)
         if no_trailing_singletons and data.ndim > 0:
             while data.shape[-1] == 1:
                 data = data[..., 0]
