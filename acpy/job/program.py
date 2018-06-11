@@ -445,6 +445,10 @@ class Job(shared.Job):
         for parameter in self.parameters:
             parameter.initialize()
 
+        if getattr(self, 'target', None) is not None:
+            expression, ncpath = self.target
+            self.target = compile(expression, '<string>', 'eval'), os.path.join(self.scenariodir, ncpath)
+
     def prepareDirectory(self, values):
         assert self.started
 
@@ -488,6 +492,13 @@ class Job(shared.Job):
             print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
             #self.reportResult(values, None, error='Run stopped prematurely')
             return -numpy.Inf
+
+        if getattr(self, 'observations', None) is None:
+            expression, ncpath = self.target
+            wrappednc = NcDict(ncpath)
+            result = wrappednc.eval(expression)
+            wrappednc.finalize()
+            return result
 
         outputpath2nc = {}
         for obsinfo in self.observations:

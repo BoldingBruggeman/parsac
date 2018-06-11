@@ -7,6 +7,23 @@ try:
 except ValueError:
     import optimize
 
+def run_ensemble_member(new_job_path, parameter_values):
+    global job_path, job
+
+    if 'job_path' not in globals() or job_path != new_job_path:
+        # This worker is being run for the first time with the specified job.
+        # Store the job object, which will be reused for all consequentive runs
+        # as long as the job identifier remaisn the same.
+        # This job object is uninitialized, so the call to job.evaluateFitness
+        # will force initialization for this worker only.
+        import cPickle
+        with open(new_job_path, 'rb') as f:
+            job = cPickle.load(f)
+        job_path = new_job_path
+        job.start()
+    result = job.evaluate(parameter_values)
+    return parameter_values, result
+
 class ParameterTransform:
     def __init__(self, bounds=None, logscale=None):
         if bounds is None: bounds = {}
@@ -197,6 +214,56 @@ class Job(optimize.OptimizationProblem):
     # to be implemented by derived classes
     def evaluate(self, parameter_values):
         raise NotImplementedError('Classes deriving from Job must implement "evaluate"')
+
+    def evaluate_ensemble(self, ensemble, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False):
+        results = []
+        if ncpus != 1 or ppservers:
+            import pp
+            import time
+            import uuid
+            import cPickle
+            import atexit
+
+            # Create job server and give it time to conenct to nodes.
+            if verbose:
+                print 'Starting Parallel Python server...'
+            if ncpus is None:
+                ncpus = 'autodetect'
+            job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
+            if ppservers:
+                if verbose:
+                    print 'Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers))
+                time.sleep(10)
+                if verbose:
+                    print 'Running on:'
+                    for node, ncpu in job_server.get_active_nodes().iteritems():
+                        print '   %s: %i cpus' % (node, ncpu)
+
+            # Make sure the population size is a multiple of the number of workers
+            nworkers = sum(job_server.get_active_nodes().values())
+            if verbose:
+                print 'Total number of cpus: %i' % nworkers
+            if nworkers == 0:
+                raise Exception('No cpus available; exiting.')
+
+            jobpath = os.path.abspath('%s.ppjob' % uuid.uuid4())
+            with open(jobpath, 'wb') as f:
+                cPickle.dump(self, f, cPickle.HIGHEST_PROTOCOL)
+            atexit.register(os.remove, jobpath)
+
+            ppjobs = []
+            print 'Submitting %i jobs for parallel processing...' % len(ensemble)
+            for member in ensemble:
+                ppjob = job_server.submit(run_ensemble_member, (jobpath, member))
+                ppjobs.append(ppjob)
+            for ijob, ppjob in enumerate(ppjobs):
+                member, result = ppjob()
+                results.append(result)
+        else:
+            for member in ensemble:
+                result = self.evaluate(member)
+                results.append(result)
+        return results
 
     def getParameter(self, att):
         if att.get('dummy', bool, default=False):
