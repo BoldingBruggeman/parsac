@@ -8,6 +8,7 @@ import os
 import argparse
 import tempfile
 import cPickle
+import xml.etree.ElementTree
 
 # Import third party libraries
 import numpy
@@ -55,6 +56,7 @@ def configure_argument_parser(parser):
     parser_analyze = subparsers.add_parser('analyze')
     parser_analyze.add_argument('info', type=str, help='Path to output of the "sample" step')
     parser_analyze.add_argument('--print_to_console', action='store_true', help='Print results directly to console')
+    parser_analyze.add_argument('--select', nargs=2, help='This requires two values: N OUTPUTXML. Selects the N most sensitive parameters for a calibation run and save it to OUTPUTXML')
     subparsers_analyze = parser_analyze.add_subparsers(dest='method')
 
     subparser_analyze_fast = subparsers_analyze.add_parser('fast')
@@ -124,8 +126,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y):
         assert sample_args.method == 'morris'
         import SALib.analyze.morris
         analysis = SALib.analyze.morris.analyze(SAlib_problem, X, Y, num_resamples=args.num_resamples, conf_level=args.conf_level, print_to_console=args.print_to_console, grid_jump=sample_args.grid_jump, num_levels=sample_args.num_levels)
-        for name, mu_star in sorted(zip(SAlib_problem['names'], analysis['mu_star']), cmp=lambda x, y: cmp(y[1], x[1])):
-            print('%s: %s' % (name, mu_star))
+        sensitivities = analysis['mu_star']
     elif args.method == 'sobol':
         # https://dx.doi.org/10.1016/S0378-4754(00)00270-6
         # https://dx.doi.org/10.1016/S0010-4655(02)00280-1
@@ -133,8 +134,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y):
         assert sample_args.method == 'saltelli'
         import SALib.analyze.sobol
         analysis = SALib.analyze.sobol.analyze(SAlib_problem, Y, calc_second_order=sample_args.calc_second_order, num_resamples=args.num_resamples, conf_level=args.conf_level, print_to_console=args.print_to_console)
-        for name, ST in sorted(zip(SAlib_problem['names'], analysis['ST']), cmp=lambda x, y: cmp(y[1], x[1])):
-            print('%s: %s' % (name, ST))
+        sensitivities = analysis['ST']
     elif args.method == 'delta':
         # https://dx.doi.org/10.1016/j.ress.2006.04.015
         # https://dx.doi.org/10.1016/j.ejor.2012.11.047
@@ -148,7 +148,9 @@ def analyze(SAlib_problem, args, sample_args, X, Y):
         assert sample_args.method == 'ff'
         import SALib.analyze.ff
         analysis = SALib.analyze.ff.analyze(SAlib_problem, X, Y, second_order=args.second_order, print_to_console=args.print_to_console)
-    return  analysis
+    for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), cmp=lambda x, y: cmp(y[1], x[1])):
+        print('%s: %s' % (name, sensitivity))
+    return sensitivities
 
 def undoLogTransform(values, logscale):
     return numpy.array([v if not log else 10.**v for log, v in zip(logscale, values)])
@@ -225,7 +227,25 @@ def main(args):
         if 'Y' not in job_info:
             print('"analyze" step can only be used after "run" step')
             sys.exit(2)
-        analyze(SAlib_problem, args, job_info['sample_args'], job_info['X'], job_info['Y'])
+        sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], job_info['X'], job_info['Y'])
+        if args.select is not None:
+            n, path = args.select
+            n = int(n)
+            isort = numpy.argsort(sensitivities)
+            print('Selecting top %i parameters:' % n)
+            selected = set()
+            for i in isort[-n:][::-1]:
+                print('- %s' % (names[i],))
+                selected.add(names[i])
+            xml_tree = xml.etree.ElementTree.parse(args.xmlfile)
+            parameters_xml = xml_tree.find('./parameters')
+            children = list(parameters_xml)
+            for ipar, element in enumerate(parameters_xml.findall('./parameter')):
+                with job.shared.XMLAttributes(element, 'parameter %i' % (ipar+1)) as att:
+                    name = current_job.getParameter(att).name
+                if name not in selected:
+                    element.tag = 'disabled_parameter'
+            xml_tree.write(path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
