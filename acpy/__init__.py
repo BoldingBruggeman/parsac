@@ -6,6 +6,7 @@ service.read()
 from . import run
 from . import result
 from . import sensitivity
+from . import ensemble
 
 def main():
     parser = argparse.ArgumentParser(description='AutoCalibration Python - acpy')
@@ -39,6 +40,10 @@ def main():
     parser_sa = subparsers.add_parser('sa', help='Perform sensitivity analysis')
     sensitivity.configure_argument_parser(parser_sa)
     parser_sa.set_defaults(func=sensitivity.main)
+
+    parser_ensemble = subparsers.add_parser('ensemble', help='Perform ensemble simulation')
+    ensemble.configure_argument_parser(parser_ensemble)
+    parser_ensemble.set_defaults(func=ensemble.main)
 
     args = parser.parse_args()
     args.func(args)
