@@ -32,13 +32,23 @@ class TransformedProblem:
     """Filter that transforms one or more parameters."""
     def __init__(self, problem, transforms=()):
         self.problem = problem
+        if transforms is None:
+            transforms = ()
+        self.transform_names = transforms
+        self.createTransformFunctions()
+
+    def __getstate__(self):
+        return {'problem': self.problem, 'transform_names': self.transform_names}
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.createTransformFunctions()
+
+    def createTransformFunctions(self):
         self.transforms = []
         self.inverse_transforms = []
         self.transformed = False
-
-        if transforms is None:
-            transforms = ()
-        for transform in transforms:
+        for transform in self.transform_names:
             if transform and not isinstance(transform, basestring):
                 # old convention: True means log10 transform
                 transform = 'log10'
@@ -148,7 +158,7 @@ class Optimizer:
             problem.start()
             problem = ReportingProblem(problem, self.reportfunction)
 
-        problem = TransformedProblem(problem, transform=transform)
+        problem = TransformedProblem(problem, transforms=transform)
         if par_min is not None:
             par_min = problem.transform(par_min)
         if par_max is not None:
