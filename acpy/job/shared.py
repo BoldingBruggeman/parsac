@@ -224,7 +224,7 @@ class Job(optimize.OptimizationProblem):
             import cPickle
             import atexit
 
-            # Create job server and give it time to conenct to nodes.
+            # Create job server and give it time to connect to nodes.
             if verbose:
                 print 'Starting Parallel Python server...'
             if ncpus is None:
