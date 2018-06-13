@@ -9,6 +9,7 @@ import argparse
 import tempfile
 import cPickle
 import xml.etree.ElementTree
+import glob
 
 # Import third party libraries
 import numpy
@@ -27,12 +28,17 @@ def configure_argument_parser(parser):
     parser_sample.add_argument('--gridsize', type=int, help='number of cells per parameter grid', default=20)
     parser_sample.add_argument('--plot', action='store_true', help='show histogram of ensemble members')
     parser_sample.add_argument('--dir', type=str, help='directory to create ensemble setups in (one per member)')
+    parser_sample.add_argument('--scenario', type=str, help='Scenario directory to use as template for ensemble-member-specific setups (only in combination with --dir).')
     parser_sample.add_argument('--format', type=str, help='Format for subdirectory name (only in combination with --dir).', default='%04i')
+
+    parser_sample = subparsers.add_parser('run')
+    parser_sample.add_argument('xmlfile', type=str, help='XML formatted configuration file')
+    parser_sample.add_argument('dirs', nargs='+', help='Directories to run in (may contain wildcards)')
 
 def get_weights_grid(job, results, gridsize):
     # Build parameter grid (one dimension per parameter)
     # We will use this to normalize a parameetr set's probability of beign selected
-    # by the number fo other parameter sets that fall within the same grid point.
+    # by the number of other parameter sets that fall within the same grid point.
     minpar, maxpar = job.getParameterBounds()
     logscale = job.getParameterLogScale()
     pargrid = numpy.empty((len(minpar), gridsize))
@@ -77,6 +83,14 @@ def get_weights_radius(job, results, M=10):
     return weights
 
 def main(args):
+    if args.subcommand == 'run':
+        dirs = []
+        for d in args.dirs:
+            dirs.extend(glob.glob(d))
+        current_job = acpy.job.fromConfigurationFile(args.xmlfile)
+        current_job.runEnsemble(dirs)
+        return
+
     result = acpy.result.Result(args.xmlfile)
     results = result.get()
 
@@ -96,6 +110,8 @@ def main(args):
 
     if args.dir:
         assert isinstance(result.job, acpy.job.program.Job)
+        if args.scenario is not None:
+            result.job.scenariodir = args.scenario
         result.job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
 
     if args.plot:
