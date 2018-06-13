@@ -95,6 +95,7 @@ def main(args):
         print(ensemble[i, :])
 
     if args.dir:
+        assert isinstance(result.job, acpy.job.program.Job)
         result.job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
 
     if args.plot:

@@ -192,16 +192,11 @@ def main(args):
 
         if args.dir is not None:
             assert isinstance(current_job, job.program.Job)
-            if not os.path.isdir(args.dir):
-                os.mkdir(args.dir)
-            scenariodir = current_job.scenariodir
-            job_info['simulationdirs'] = [os.path.join(args.dir, args.format % i) for i in xrange(X.shape[0])]
-            for i, simulationdir in enumerate(job_info['simulationdirs']):
-                current_job.scenariodir = scenariodir
-                current_job.simulationdir = simulationdir
-                current_job.start(force=True)
-                parameter_values = undoLogTransform(X[i, :], logscale)
-                current_job.prepareDirectory(parameter_values)
+            ensemble = X.copy()
+            for i, log in enumerate(logscale):
+                if log:
+                    ensemble[:, i] = 10.**ensemble[:, i]
+            current_job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
         save_info(args.info, job_info)
     elif args.subcommand == 'run':
         X = job_info['X']

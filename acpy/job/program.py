@@ -736,12 +736,12 @@ class Job(shared.Job):
         ensemble = numpy.asarray(ensemble)
         if not os.path.isdir(root):
             os.mkdir(root)
-        scenariodir = self.scenariodir
+        scenariodir, target = self.scenariodir, getattr(self, 'target', None)
         dir_paths = [os.path.join(root, format % i) for i in xrange(ensemble.shape[0])]
         for i, simulationdir in enumerate(dir_paths):
-            self.scenariodir = scenariodir
             self.simulationdir = simulationdir
             self.start(force=True)
             self.prepareDirectory(ensemble[i, :])
-        self.scenariodir = scenariodir
+            self.scenariodir = scenariodir
+            self.target = target
         return dir_paths
