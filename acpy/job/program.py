@@ -24,13 +24,8 @@ except ImportError:
 import namelist
 import shared
 
-IDLE_PRIORITY_CLASS = 0x00000040
-
 # Regular expression for GOTM datetimes
 datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
-
-# Determine if we are running on Windows
-windows = sys.platform == 'win32'
 
 def writeNamelistFile(path, nmls, nmlorder):
     with open(path, 'w') as f:
@@ -485,7 +480,7 @@ class Job(shared.Job):
 
         self.prepareDirectory(values)
 
-        returncode = self.run(show_output=show_output)
+        returncode = run_program(self.exe, self.scenariodir, use_shell=self.use_shell, show_output=show_output)
 
         if returncode != 0:
             # Run failed
@@ -703,35 +698,6 @@ class Job(shared.Job):
             return lnlikelihood, model_values
         return lnlikelihood
 
-    def run(self, show_output=False):
-        # Take time and start executable
-        time_start = time.time()
-        print 'Starting model run...'
-        args = [self.exe]
-        if self.exe.endswith('.py'):
-            args = [sys.executable] + args
-            self.use_shell = False
-        if windows:
-            # We start the process with low priority
-            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS, shell=self.use_shell)
-        else:
-            proc = subprocess.Popen(args, cwd=self.scenariodir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=self.use_shell)
-
-        # Simulation is now running
-        if show_output:
-            while 1:
-                line = proc.stdout.readline()
-                if line == '': break
-                print line,
-        proc.communicate()
-
-        # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
-        elapsed = time.time() - time_start
-        print 'Model run took %.1f s.' % elapsed
-        if proc.returncode != 0:
-            print 'WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode 
-        return proc.returncode
-
     def prepareEnsembleDirectories(self, ensemble, root, format='%04i'):
         ensemble = numpy.asarray(ensemble)
         if not os.path.isdir(root):
@@ -745,3 +711,63 @@ class Job(shared.Job):
             self.scenariodir = scenariodir
             self.target = target
         return dir_paths
+
+    def runEnsemble(self, directories, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False):
+        import pp
+        if verbose:
+            print 'Starting Parallel Python server...'
+        if ncpus is None:
+            ncpus = 'autodetect'
+        job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
+        if ppservers:
+            if verbose:
+                print 'Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers))
+            time.sleep(10)
+            if verbose:
+                print 'Running on:'
+                for node, ncpu in job_server.get_active_nodes().iteritems():
+                    print '   %s: %i cpus' % (node, ncpu)
+        nworkers = sum(job_server.get_active_nodes().values())
+        if verbose:
+            print 'Total number of cpus: %i' % nworkers
+        if nworkers == 0:
+            raise Exception('No cpus available; exiting.')
+        jobs = []
+        for rundir in directories:
+            localexe = os.path.join(self.scenariodir, os.path.basename(self.exe))
+            exe = localexe if os.path.isfile(localexe) else self.exe
+            job = job_server.submit(run_program, (exe, rundir), modules=('time', 'subprocess'))
+            jobs.append(job)
+        for job, rundir in zip(jobs, directories):
+            job()
+            print('Processed %s...' % rundir)
+
+def run_program(exe, rundir, use_shell=False, show_output=True):
+    time_start = time.time()
+    print 'Starting model run...'
+    args = [exe]
+    if exe.endswith('.py'):
+        args = [sys.executable] + args
+        use_shell = False
+    if sys.platform == 'win32':
+        # We start the process with low priority
+        IDLE_PRIORITY_CLASS = 0x00000040
+        proc = subprocess.Popen(args, cwd=rundir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS, shell=use_shell)
+    else:
+        proc = subprocess.Popen(args, cwd=rundir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=use_shell)
+
+    # Simulation is now running
+    if show_output:
+        while 1:
+            line = proc.stdout.readline()
+            if line == '':
+                break
+            print line,
+    proc.communicate()
+
+    # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
+    elapsed = time.time() - time_start
+    print 'Model run took %.1f s.' % elapsed
+    if proc.returncode != 0:
+        print 'WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode 
+    return proc.returncode
