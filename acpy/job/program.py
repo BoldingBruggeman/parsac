@@ -731,3 +731,17 @@ class Job(shared.Job):
         if proc.returncode != 0:
             print 'WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode 
         return proc.returncode
+
+    def prepareEnsembleDirectories(self, ensemble, root, format='%04i'):
+        ensemble = numpy.asarray(ensemble)
+        if not os.path.isdir(root):
+            os.mkdir(root)
+        scenariodir = self.scenariodir
+        dir_paths = [os.path.join(root, format % i) for i in xrange(ensemble.shape[0])]
+        for i, simulationdir in enumerate(dir_paths):
+            self.scenariodir = scenariodir
+            self.simulationdir = simulationdir
+            self.start(force=True)
+            self.prepareDirectory(ensemble[i, :])
+        self.scenariodir = scenariodir
+        return dir_paths
