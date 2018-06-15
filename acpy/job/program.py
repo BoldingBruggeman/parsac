@@ -203,8 +203,11 @@ class Job(shared.Job):
         if element is None:
             raise Exception('The root node must contain a single "executable" element.')
         with shared.XMLAttributes(element, 'the executable element') as att:
-            self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
             self.use_shell = att.get('shell', bool, False)
+            if self.use_shell:
+                self.exe = att.get('path', unicode)
+            else:
+                self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
             self.max_runtime = att.get('max_runtime', int, required=False)
 
         self.simulationdir = simulationdir
@@ -400,8 +403,9 @@ class Job(shared.Job):
 
     def on_start(self):
         # Check for presence of GOTM executable.
-        if not os.path.isfile(self.exe):
-            raise Exception('Cannot locate executable at "%s".' % self.exe)
+        if not self.use_shell:
+            if not os.path.isfile(self.exe):
+                raise Exception('Cannot locate executable at "%s".' % self.exe)
 
         # Check for presence of custom temporary directory (if set)
         if self.tempdir is not None and not os.path.isdir(self.tempdir):
@@ -431,11 +435,12 @@ class Job(shared.Job):
             shutil.copy(srcname, dstname)
         self.scenariodir = tempscenariodir
 
-        if self.copyexe:
-            print 'Copying %s executable...' % os.path.basename(self.exe)
-            dstname = os.path.join(self.scenariodir, os.path.basename(self.exe))
-            shutil.copy(self.exe, dstname)
-            self.exe = dstname
+        if not self.use_shell:
+            if self.copyexe:
+                print 'Copying %s executable...' % os.path.basename(self.exe)
+                dstname = os.path.join(self.scenariodir, os.path.basename(self.exe))
+                shutil.copy(self.exe, dstname)
+                self.exe = dstname
 
         for parameter in self.parameters:
             parameter.initialize()
