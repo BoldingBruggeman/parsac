@@ -99,7 +99,7 @@ def main(args):
     rel_likelihood = numpy.exp(results[:, -1] - results[:, -1].max())
     #weights2 = get_weights_grid(result.job, results, args.gridsize)
     weights = get_weights_radius(result.job, results)
-    p = rel_likelihood/weights
+    p = rel_likelihood*weights
     p /= p.sum()
 
     # Select ensemble members
@@ -116,12 +116,19 @@ def main(args):
 
     if args.plot:
         # Show histogram of ensemble members
+        names = result.job.getParameterNames()
         from matplotlib import pyplot
         fig = pyplot.figure()
         npar = results.shape[1] - 1
-        for i in xrange(npar):
+        for i, name in enumerate(names):
             ax = fig.add_subplot(1, npar, i+1)
             ax.hist(results[ipicked, i], bins=50)
+            ax.set_xlabel(name)
+        fig = pyplot.figure()
+        ax = fig.gca()
+        ax.plot(weights)
+        ax.set_xlabel('calibration trial number')
+        ax.set_ylabel('sampling weight for ensemble')
         pyplot.show()
 
 if __name__ == '__main__':
