@@ -93,6 +93,9 @@ def main(args):
 
     result = acpy.result.Result(args.xmlfile)
     results = result.get()
+    if results.shape[0] < args.N:
+        print('An ensemble of %i members was requested, but only %i results were found.' % (args.N, results.shape[0]))
+        sys.exit(1)
 
     # Calculate probability-of-being-chosen for each original parameter set,
     # based on log-likelihood and the proximity of other results (i..e, their co-occurence in the same grid cell)
@@ -126,7 +129,8 @@ def main(args):
             ax.set_xlabel(name)
         fig = pyplot.figure()
         ax = fig.gca()
-        ax.plot(weights)
+        ax.semilogy(weights)
+        ax.semilogy(rel_likelihood)
         ax.set_xlabel('calibration trial number')
         ax.set_ylabel('sampling weight for ensemble')
         pyplot.show()
