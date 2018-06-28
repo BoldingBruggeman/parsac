@@ -196,7 +196,7 @@ def main(args):
             for i, log in enumerate(logscale):
                 if log:
                     ensemble[:, i] = 10.**ensemble[:, i]
-            current_job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
+            job_info['simulationdirs'] = current_job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
         save_info(args.info, job_info)
     elif args.subcommand == 'run':
         X = job_info['X']
