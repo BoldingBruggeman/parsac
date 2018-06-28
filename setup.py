@@ -7,7 +7,7 @@ def readme():
         return f.read()
 
 setup(name='acpy',
-      version='0.2',
+      version='0.3',
       description='AutoCalibration tool written in Python',
       long_description=readme(),
       url='http://github.com/BoldingBruggeman/acpy',
