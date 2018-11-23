@@ -246,7 +246,7 @@ def main(args):
             selected = set()
             print('Consensus ranking (top %i parameters):' % n)
             for i in numpy.argsort(mean_rank)[:n]:
-                print('  - %s' % (names[i],))
+                print('  - %s (mean rank = %.1f)' % (names[i], mean_rank[i]/float(Y.shape[1])))
                 selected.add(names[i])
             xml_tree = xml.etree.ElementTree.parse(args.xmlfile)
             parameters_xml = xml_tree.find('./parameters')
