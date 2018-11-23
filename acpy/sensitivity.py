@@ -227,7 +227,8 @@ def main(args):
             sys.exit(2)
         X, Y = job_info['X'], job_info['Y']
         Y.shape = (X.shape[0], -1)
-        for itarget, (expression, ncpath) in enumerate(current_job.targets):
+        targets = getattr(current_job, 'targets', [getattr(current_job, 'target', None)]):
+        for itarget, (expression, ncpath) in enumerate(targets):
             print('Target %s (read from %s):' % (expression, ncpath))
             sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
             if args.select is not None:
