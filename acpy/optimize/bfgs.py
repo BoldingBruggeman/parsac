@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy
 
 _epsilon = numpy.sqrt(numpy.finfo(float).eps)
@@ -428,10 +429,10 @@ def fmin_bfgs(f, x0, fprime=None, args=(), gtol=1e-5, norm=numpy.Inf,
             rhok = 1.0 / (numpy.dot(yk,sk))
         except ZeroDivisionError:
             rhok = 1000.0
-            print "Divide-by-zero encountered: rhok assumed large"
+            print("Divide-by-zero encountered: rhok assumed large")
         if isinf(rhok): # this is patch for numpy
             rhok = 1000.0
-            print "Divide-by-zero encountered: rhok assumed large"
+            print("Divide-by-zero encountered: rhok assumed large")
         A1 = I - sk[:,numpy.newaxis] * yk[numpy.newaxis,:] * rhok
         A2 = I - yk[:,numpy.newaxis] * sk[numpy.newaxis,:] * rhok
         Hk = numpy.dot(A1,numpy.dot(Hk,A2)) + rhok * sk[:,numpy.newaxis] \
@@ -441,28 +442,28 @@ def fmin_bfgs(f, x0, fprime=None, args=(), gtol=1e-5, norm=numpy.Inf,
         fval = old_fval
     if warnflag == 2:
         if disp:
-            print "Warning: Desired error not necessarily achieved" \
-                  "due to precision loss"
-            print "         Current function value: %f" % fval
-            print "         Iterations: %d" % k
-            print "         Function evaluations: %d" % func_calls[0]
-            print "         Gradient evaluations: %d" % grad_calls[0]
+            print("Warning: Desired error not necessarily achieved" \
+                  "due to precision loss")
+            print("         Current function value: %f" % fval)
+            print("         Iterations: %d" % k)
+            print("         Function evaluations: %d" % func_calls[0])
+            print("         Gradient evaluations: %d" % grad_calls[0])
 
     elif k >= maxiter:
         warnflag = 1
         if disp:
-            print "Warning: Maximum number of iterations has been exceeded"
-            print "         Current function value: %f" % fval
-            print "         Iterations: %d" % k
-            print "         Function evaluations: %d" % func_calls[0]
-            print "         Gradient evaluations: %d" % grad_calls[0]
+            print("Warning: Maximum number of iterations has been exceeded")
+            print("         Current function value: %f" % fval)
+            print("         Iterations: %d" % k)
+            print("         Function evaluations: %d" % func_calls[0])
+            print("         Gradient evaluations: %d" % grad_calls[0])
     else:
         if disp:
-            print "Optimization terminated successfully."
-            print "         Current function value: %f" % fval
-            print "         Iterations: %d" % k
-            print "         Function evaluations: %d" % func_calls[0]
-            print "         Gradient evaluations: %d" % grad_calls[0]
+            print("Optimization terminated successfully.")
+            print("         Current function value: %f" % fval)
+            print("         Iterations: %d" % k)
+            print("         Function evaluations: %d" % func_calls[0])
+            print("         Gradient evaluations: %d" % grad_calls[0])
 
     if full_output:
         retlist = xk, fval, gfk, Hk, func_calls[0], grad_calls[0], warnflag
