@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import time
 import numpy
@@ -17,10 +18,11 @@ if pp is not None:
         if v > tv:
             break
         if v < tv:
-            print 'Old Parallel Python version %s. Minimum required = %s.' % (pp.version, minppversion)
-            print 'Parallel Python support for Differential Evolution is disabled.'
+            print('Old Parallel Python version %s. Minimum required = %s.' % (pp.version, minppversion))
+            print('Parallel Python support for Differential Evolution is disabled.')
             pp = None
 
+jobid = None
 def processTrial(newjobid, newjob, trial):
     global jobid, job
 
@@ -30,10 +32,13 @@ def processTrial(newjobid, newjob, trial):
         # as long as the job identifier remaisn the same.
         # This job object is uninitialized, so the call to job.evaluateFitness
         # will force initialization for this worker only.
-        if isinstance(newjob, basestring):
-            import cPickle
+        if isinstance(newjob, (str, u''.__class__)):
+            try:
+                import cPickle as pickle
+            except ImportError:
+                import pickle
             with open(newjob, 'rb') as f:
-                newjob = cPickle.load(f)
+                newjob = pickle.load(f)
         job, jobid = newjob, newjobid
         newjob.start()
 
@@ -69,7 +74,7 @@ class DESolver:
         self.strictbounds = strictbounds
 
         # Parallel Python settings
-        if isinstance(ppservers, basestring):
+        if isinstance(ppservers, (str, u''.__class__)):
             match = re.match(r'(.*)\[(.*)\](.*)', ppservers)
             if match is not None:
                 # Hostnames in PBS/SLURM notation, e.g., node[01-06]
@@ -93,9 +98,9 @@ class DESolver:
             ncpus = 'autodetect'
         else:
             if ncpus == 1 and not ppservers:
-                print 'Parallelization of Differential Evolution is disabled because number of cores is set to 1.'
+                print('Parallelization of Differential Evolution is disabled because number of cores is set to 1.')
             else:
-                print 'Local number of cores for Differential Evolution set to %i by user.' % ncpus
+                print('Local number of cores for Differential Evolution set to %i by user.' % ncpus)
         self.ncpus = ncpus
         self.ppservers = ppservers
         self.secret = secret
@@ -103,7 +108,7 @@ class DESolver:
 
         if pp is None:
             if self.ncpus != 1 or ppservers:
-                print 'Parallelization of Differential Evolution is disabled because Parallel Python is not available or the wrong version.'
+                print('Parallelization of Differential Evolution is disabled because Parallel Python is not available or the wrong version.')
             self.ncpus = 1
             self.ppservers = ()
 
@@ -135,27 +140,27 @@ class DESolver:
         if self.ncpus != 1 or self.ppservers:
             # Create job server and give it time to conenct to nodes.
             if self.verbose:
-                print 'Starting Parallel Python server...'
+                ('Starting Parallel Python server...')
             job_server = pp.Server(ncpus=self.ncpus, ppservers=self.ppservers, socket_timeout=self.socket_timeout, secret=self.secret)
             if self.ppservers:
                 if self.verbose:
-                    print 'Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(self.ppservers))
+                    print('Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(self.ppservers)))
                 time.sleep(10)
                 if self.verbose:
-                    print 'Running on:'
-                    for node, ncpu in job_server.get_active_nodes().iteritems():
-                        print '   %s: %i cpus' % (node, ncpu)
+                    print('Running on:')
+                    for node, ncpu in job_server.get_active_nodes().items():
+                        print('   %s: %i cpus' % (node, ncpu))
 
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
             if self.verbose:
-                print 'Total number of cpus: %i' % nworkers
+                print('Total number of cpus: %i' % nworkers)
             if nworkers == 0:
                 raise Exception('No cpus available; exiting.')
             jobsperworker = int(round(self.populationSize/float(nworkers)))
             if self.populationSize != jobsperworker*nworkers:
                 if self.verbose:
-                    print 'Setting population size to %i (was %i) to ensure it is a multiple of number of workers (%i).' % (jobsperworker*nworkers, self.populationSize, nworkers)
+                    print('Setting population size to %i (was %i) to ensure it is a multiple of number of workers (%i).' % (jobsperworker*nworkers, self.populationSize, nworkers))
                 self.populationSize = jobsperworker*nworkers
 
         # Create initial population.
@@ -174,10 +179,13 @@ class DESolver:
         jobid = self.randomstate.rand()
 
         if job_server is not None:
-            import cPickle
+            try:
+                import cPickle as pickle
+            except ImportError:
+                import pickle
             jobpath = '%s.ppjob' % jobid
             with open(jobpath, 'wb') as f:
-                cPickle.dump(self.job, f, cPickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.job, f, pickle.HIGHEST_PROTOCOL)
             self.job = os.path.abspath(jobpath)
             atexit.register(os.remove, self.job)
 
@@ -187,8 +195,8 @@ class DESolver:
 
         # try/finally block is to ensure remote worker processes are killed
         try:
-
-            for igeneration in xrange(self.maxGenerations):
+            igeneration = 1
+            while 1:
 
                 # Generate list with target,trial vector combinations to try.
                 # If using Parallel Python, submit these trials to the workers.
@@ -227,25 +235,25 @@ class DESolver:
                 tol = numpy.maximum(self.abstol, abs(curcent)*self.reltol)
                 frange = (fitness[ibest] - fitness).max()
                 if self.verbose:
-                    print 'Finished generation %i' % igeneration
-                    print '  Range:     %s' % ', '.join(['%.2e' % v for v in currange])
-                    print '  Tolerance: %s' % ', '.join(['%.2e' % v for v in tol])
-                    print '  Fitness range: %s' % frange
-                if (currange <= tol).all() and frange <= self.ftol:
+                    print('Finished generation %i' % igeneration)
+                    print('  Range:     %s' % ', '.join(['%.2e' % v for v in currange]))
+                    print('  Tolerance: %s' % ', '.join(['%.2e' % v for v in tol]))
+                    print('  Fitness range: %s' % frange)
+                if igeneration == self.maxGenerations or ((currange <= tol).all() and frange <= self.ftol):
                     break
-
+                igeneration += 1
                 #dup = False
                 #for ipar in range(len(curminpar)):
                 #    if len(set(self.population[:,ipar]))!=self.population.shape[0]:
-                #        print 'WARNING: duplicates detected in generation %i, parameter %i:' % (igeneration,ipar)
-                #        print self.population[:,ipar]
+                #        print('WARNING: duplicates detected in generation %i, parameter %i:' % (igeneration,ipar))
+                #        print(self.population[:,ipar])
                 #        dup = True
                 #if dup: break
         finally:
             if job_server is not None:
                 job_server.destroy()
 
-        #print self.picked
+        #print(self.picked)
 
         return self.population[ibest, :]
 
@@ -255,7 +263,7 @@ class DESolver:
         """
         vectors = []
         excluded = list(exclude)
-        for i in range(n):
+        for _ in range(n):
             ind = self.randomstate.randint(self.population.shape[0]-len(excluded))
             excluded.sort()
             for oldind in excluded:
@@ -276,7 +284,7 @@ class DESolver:
         Journal of Global Optimization 11:341-59.
         """
         if ibest is None: randomancestor = True
-        #print 'CR=%.1f,F=%.1f,strictbounds=%s,randomancestor=%s,ndiffvector=%i' % (CR,F,strictbounds,randomancestor,ndiffvector)
+        #print('CR=%.1f,F=%.1f,strictbounds=%s,randomancestor=%s,ndiffvector=%i' % (CR,F,strictbounds,randomancestor,ndiffvector))
 
         # Draw random vectors
         if randomancestor:
@@ -294,7 +302,7 @@ class DESolver:
 
         # Mutate base vector
         delta = numpy.zeros_like(ref)
-        for i in range(ndiffvector):
+        for _ in range(ndiffvector):
             r1 = vectors.pop()
             r2 = vectors.pop()
             delta += r1-r2

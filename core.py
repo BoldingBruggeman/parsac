@@ -1,7 +1,9 @@
+from __future__ import print_function
 import numpy
-import desolver
+
+from . import desolver
 try:
-    import bfgs
+    from . import bfgs
 except ImportError:
     bfgs = None
 
@@ -23,7 +25,7 @@ class OptimizationProblem:
         pass
 
     def evaluateFitness(self, parameters):
-        raise NotImplementedErrror('Classes deriving from OptimizationProblem must implement evaluateFitness.')
+        raise NotImplementedError('Classes deriving from OptimizationProblem must implement evaluateFitness.')
 
     def start(self):
         pass
@@ -49,10 +51,10 @@ class TransformedProblem:
         self.inverse_transforms = []
         self.transformed = False
         for transform in self.transform_names:
-            if transform and not isinstance(transform, basestring):
+            if transform and not isinstance(transform, (str, u''.__class__)):
                 # old convention: True means log10 transform
                 transform = 'log10'
-            if isinstance(transform, basestring):
+            if isinstance(transform, (str, u''.__class__)):
                 if transform == 'log10':
                     transform = lambda x: numpy.log10(x)
                     inverse_transform = lambda x: 10.**x
@@ -251,7 +253,7 @@ class Optimizer:
                 right.append(None)
                 continue
 
-            print 'Profiling parameter %i...' % ipar
+            print('Profiling parameter %i...' % ipar)
 
             if maxstep is None:
                 # Assume parabolic shape of likelihood, and estimate 2nd derivative by finite differences.
@@ -263,10 +265,10 @@ class Optimizer:
                 pertfitness_l = problem.evaluateFitness(pert)
                 ddfddpar = (pertfitness_h+pertfitness_l-2*startfitness)/pertstep/pertstep
                 curmaxstep = numpy.sqrt(targetdelta/abs(ddfddpar))/5.
-                print '   auto-selected initial step size of %s' % curmaxstep
+                print('   auto-selected initial step size of %s' % curmaxstep)
             else:
                 if maxstep[ipar] == 0:
-                    print 'Skipping profiling of parameter %i because min and max are equal (%s).' % (ipar, x_min_ori[ipar])
+                    print('Skipping profiling of parameter %i because min and max are equal (%s).' % (ipar, x_min_ori[ipar]))
                     left.append(start[ipar])
                     right.append(start[ipar])
                     continue
