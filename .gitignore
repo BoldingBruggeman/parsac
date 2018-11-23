@@ -5,3 +5,4 @@
 *.whl
 acpy.egg-info/
 Licenses/
+*.ppjob
