@@ -221,8 +221,12 @@ class Job(optimize.OptimizationProblem):
 
     def evaluate_ensemble(self, ensemble, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False):
         results = []
-        if ncpus != 1 or ppservers:
+        try:
             import pp
+        except ImportError:
+            assert ncpus in (1, None) and not ppservers, 'ParallelPython not found. Unable to run ensemble in parallel.'
+            ncpus = 1
+        if ncpus != 1 or ppservers:
             import time
             import uuid
             try:
