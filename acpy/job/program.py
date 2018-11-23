@@ -9,7 +9,10 @@ import tempfile
 import atexit
 import shutil
 import subprocess
-import cPickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import hashlib
 
 # Import third-party modules
@@ -299,12 +302,12 @@ class Job(shared.Job):
         if cache and os.path.isfile(sourcepath+'.cache'):
             # Retrieve cached copy of the observations
             with open(sourcepath+'.cache', 'rb') as f:
-                oldmd5 = cPickle.load(f)
+                oldmd5 = pickle.load(f)
                 if oldmd5 != md5:
                     print('Cached copy of %s is out of date - file will be reparsed.' % sourcepath)
                 else:
                     print('Loading cached copy of %s...' % sourcepath)
-                    observeddata = cPickle.load(f)
+                    observeddata = pickle.load(f)
 
         if not isinstance(observeddata, tuple):
             # Parse ASCII file and store observations as matrix.
@@ -350,8 +353,8 @@ class Job(shared.Job):
             if cache:
                 try:
                     with open(sourcepath+'.cache', 'wb') as f:
-                        cPickle.dump(md5, f, cPickle.HIGHEST_PROTOCOL)
-                        cPickle.dump((times, zs, values), f, cPickle.HIGHEST_PROTOCOL)
+                        pickle.dump(md5, f, pickle.HIGHEST_PROTOCOL)
+                        pickle.dump((times, zs, values), f, pickle.HIGHEST_PROTOCOL)
                 except Exception as e:
                     print('Unable to store cached copy of observation file. Reason: %s' % e)
         else:
@@ -404,7 +407,7 @@ class Job(shared.Job):
             infocopy['valuerange'] = (float(values.min()), float(values.max()))
             obs.append(infocopy)
         parameter_info = [parameter.getInfo() for parameter in self.parameters]
-        return cPickle.dumps({'parameters':parameter_info, 'observations':obs})
+        return pickle.dumps({'parameters':parameter_info, 'observations':obs})
 
     def on_start(self):
         # Check for presence of GOTM executable.
@@ -712,7 +715,7 @@ class Job(shared.Job):
         if not os.path.isdir(root):
             os.mkdir(root)
         scenariodir, targets = self.scenariodir, getattr(self, 'targets', None)
-        dir_paths = [os.path.join(root, format % i) for i in xrange(ensemble.shape[0])]
+        dir_paths = [os.path.join(root, format % i) for i in range(ensemble.shape[0])]
         for i, simulationdir in enumerate(dir_paths):
             self.simulationdir = simulationdir
             self.start(force=True)

@@ -7,7 +7,10 @@ import sys
 import os
 import argparse
 import tempfile
-import cPickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import xml.etree.ElementTree
 
 # Import third party libraries
@@ -148,7 +151,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y):
         assert sample_args.method == 'ff'
         import SALib.analyze.ff
         analysis = SALib.analyze.ff.analyze(SAlib_problem, X, Y, second_order=args.second_order, print_to_console=args.print_to_console)
-    for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), cmp=lambda x, y: cmp(y[1], x[1])):
+    for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), key=lambda x: x[1], reverse=True):
         print('%s: %s' % (name, sensitivity))
     return sensitivities
 
@@ -157,13 +160,13 @@ def undoLogTransform(values, logscale):
 
 def save_info(path, info):
     with open(path, 'wb') as f:
-        cPickle.dump(info, f, cPickle.HIGHEST_PROTOCOL)
+        pickle.dump(info, f, pickle.HIGHEST_PROTOCOL)
 
 def main(args):
     if args.subcommand != 'sample':
         print('Reading acpy/sa info from %s...' % args.info)
         with open(args.info, 'rb') as f:
-            job_info = cPickle.load(f)
+            job_info = pickle.load(f)
         args.xmlfile = job_info['sample_args'].xmlfile
 
     print('Reading configuration from %s...' % args.xmlfile)
@@ -213,7 +216,7 @@ def main(args):
                 wrappednc.finalize()
         else:
             # We run the model ourselves.
-            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in xrange(X.shape[0])])
+            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])])
             Y = numpy.array(Y)
         job_info['Y'] = Y
         print('Updating acpy/sa info in %s...' % args.info)

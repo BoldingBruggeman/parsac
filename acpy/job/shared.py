@@ -8,6 +8,7 @@ try:
 except ValueError:
     import optimize
 
+job_path = None
 def run_ensemble_member(new_job_path, parameter_values):
     global job_path, job
 
@@ -17,9 +18,12 @@ def run_ensemble_member(new_job_path, parameter_values):
         # as long as the job identifier remaisn the same.
         # This job object is uninitialized, so the call to job.evaluateFitness
         # will force initialization for this worker only.
-        import cPickle
+        try:
+            import cPickle as pickle
+        except ImportError:
+            import pickle
         with open(new_job_path, 'rb') as f:
-            job = cPickle.load(f)
+            job = pickle.load(f)
         job_path = new_job_path
         job.start()
     result = job.evaluate(parameter_values)
@@ -222,7 +226,10 @@ class Job(optimize.OptimizationProblem):
             import pp
             import time
             import uuid
-            import cPickle
+            try:
+                import cPickle as pickle
+            except ImportError:
+                import pickle
             import atexit
 
             # Create job server and give it time to connect to nodes.
@@ -249,7 +256,7 @@ class Job(optimize.OptimizationProblem):
 
             jobpath = os.path.abspath('%s.ppjob' % uuid.uuid4())
             with open(jobpath, 'wb') as f:
-                cPickle.dump(self, f, cPickle.HIGHEST_PROTOCOL)
+                pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
             atexit.register(os.remove, jobpath)
 
             ppjobs = []
@@ -257,7 +264,7 @@ class Job(optimize.OptimizationProblem):
             for member in ensemble:
                 ppjob = job_server.submit(run_ensemble_member, (jobpath, member))
                 ppjobs.append(ppjob)
-            for ijob, ppjob in enumerate(ppjobs):
+            for ppjob in ppjobs:
                 member, result = ppjob()
                 results.append(result)
         else:

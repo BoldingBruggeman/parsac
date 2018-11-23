@@ -24,7 +24,7 @@ def configure_argument_parser(parser):
     parser.add_argument('-i', '--interactive',    action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
     parser.add_argument('--tempdir',              type=str, help='Temporary directory to use for setups when using a parallelized optimization method (default: %s).' % tempfile.gettempdir())
     parser.add_argument('--maxfun',               type=int, help='Maximum number of function evaluations (or simulations) to perform (default: unlimited).')
-    parser.add_argument('--maxiter',              type=int, help='Maximum number of iterations (Nelder-Mead simplex) or generations (Differential Evolution) to perform (default: unlimited).', default=sys.maxint)
+    parser.add_argument('--maxiter',              type=int, help='Maximum number of iterations (Nelder-Mead simplex) or generations (Differential Evolution) to perform (default: unlimited).', default=sys.maxsize)
 
     de_options = parser.add_argument_group('Option specific to Differential Evolution (http://dx.doi.org/10.1023/A:1008202821328)')
     if service.parallel is not None:
