@@ -119,7 +119,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y):
         # https://dx.doi.org/10.1080/19401493.2015.1112430
         assert sample_args.method == 'latin'
         import SALib.analyze.rbd_fast
-        analysis = SALib.analyze.rbd_fast.analyze(SAlib_problem, Y, X, M=M, print_to_console=args.print_to_console)
+        analysis = SALib.analyze.rbd_fast.analyze(SAlib_problem, Y, X, M=sample_args.M, print_to_console=args.print_to_console)
     elif args.method == 'morris':
         # https://dx.doi.org/10.1080/00401706.1991.10484804
         # https://dx.doi.org/10.1016/j.envsoft.2006.10.004
@@ -202,14 +202,14 @@ def main(args):
         X = job_info['X']
         if 'simulationdirs' in job_info:
             # We have created all setup directories during the sample setp. The user must have run to model in each.
-            Y = numpy.empty((len(job_info['simulationdirs']),))
-            expression, ncpath = current_job.target
-            expression = compile(expression, '<string>', 'eval')
-            print('Retrieving value of target expression for each ensemble member...')
+            targets = [(compile(expression, '<string>', 'eval'), ncpath) for (expression, ncpath) in current_job.targets]
+            Y = numpy.empty((len(job_info['simulationdirs']), len(targets)))
+            print('Retrieving value of target expression(s) for each ensemble member...')
             for i, simulationdir in enumerate(job_info['simulationdirs']):
-                wrappednc = job.program.NcDict(os.path.join(simulationdir, ncpath))
-                Y[i] = wrappednc.eval(expression)
-                print('  - %i: %s' % (i, Y[i]))
+                for itarget, (expression, ncpath) in enumerate(targets):
+                    wrappednc = job.program.NcDict(os.path.join(simulationdir, ncpath))
+                    Y[i, itarget] = wrappednc.eval(expression)
+                print('  - %i: %s' % (i, Y[i, :]))
                 wrappednc.finalize()
         else:
             # We run the model ourselves.
@@ -222,21 +222,25 @@ def main(args):
         if 'Y' not in job_info:
             print('"analyze" step can only be used after "run" step')
             sys.exit(2)
-        sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], job_info['X'], job_info['Y'])
+        X, Y = job_info['X'], job_info['Y']
+        Y.shape = (X.shape[0], -1)
+        for itarget, (expression, ncpath) in enumerate(current_job.targets):
+            print('Target %s (read from %s):' % (expression, ncpath))
+            sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
+            if args.select is not None:
+                n, path = args.select
+                n = int(n)
+                isort = numpy.argsort(sensitivities)
+                print('  Top %i parameters:' % n)
+                selected = set()
+                for i in isort[-n:][::-1]:
+                    print('  - %s' % (names[i],))
+                    selected.add(names[i])
         if args.select is not None:
-            n, path = args.select
-            n = int(n)
-            isort = numpy.argsort(sensitivities)
-            print('Selecting top %i parameters:' % n)
-            selected = set()
-            for i in isort[-n:][::-1]:
-                print('- %s' % (names[i],))
-                selected.add(names[i])
             xml_tree = xml.etree.ElementTree.parse(args.xmlfile)
             parameters_xml = xml_tree.find('./parameters')
-            children = list(parameters_xml)
             for ipar, element in enumerate(parameters_xml.findall('./parameter')):
-                with job.shared.XMLAttributes(element, 'parameter %i' % (ipar+1)) as att:
+                with job.shared.XMLAttributes(element, 'parameter %i' % (ipar + 1,)) as att:
                     name = current_job.getParameter(att).name
                 if name not in selected:
                     element.tag = 'disabled_parameter'

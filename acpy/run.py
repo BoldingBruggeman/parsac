@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # Import from standard Python library
+from __future__ import print_function
 import sys
 import os.path
 import argparse
@@ -36,7 +37,7 @@ def configure_argument_parser(parser):
     de_options.add_argument('--repeat', action='store_true', help='Start a new optimization whenever the last completes.')
 
 def main(args):
-    print 'Reading configuration from %s...' % args.xmlfile
+    print('Reading configuration from %s...' % args.xmlfile)
     current_job = job.fromConfigurationFile(args.xmlfile, tempdir=args.tempdir)
 
     with open(args.xmlfile) as f:
@@ -62,13 +63,13 @@ def main(args):
                 maxgen = args.maxiter
                 if args.maxfun is not None:
                     maxgen = min(maxgen, int(numpy.ceil(args.maxfun/float(popsize))))
-                print 'Maximum number of generations for Differential Evolution (based on maxfun and maxiter): %i' % maxgen
+                print('Maximum number of generations for Differential Evolution (based on maxfun and maxiter): %i' % maxgen)
                 startpoppath = 'startpop.dat'
 
                 startpop = None
                 if os.path.isfile(startpoppath):
                     # Retrieve cached copy of the observations
-                    print 'Reading initial population from file %s...' % startpoppath
+                    print('Reading initial population from file %s...' % startpoppath)
                     startpop = numpy.load(startpoppath)
 
                 extra_args = {'parallelize': False}
@@ -80,9 +81,9 @@ def main(args):
 
                 reporter.finalize()
 
-            print 'Best parameter set:'
+            print('Best parameter set:')
             for parameter, value in zip(current_job.parameters, vals):
-                print '  %s = %.6g' % (parameter.name, value)
+                print('  %s = %.6g' % (parameter.name, value))
 
             if args.method == 'fmin' or not args.repeat:
                 break

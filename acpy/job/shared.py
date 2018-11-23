@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os.path
 
 import numpy
@@ -108,7 +109,7 @@ class XMLAttributes():
 
     def __exit__(self, *exc):
         if self.unused:
-            print 'WARNING: the following attributes of %s are ignored: %s' % (self.description, ', '.join(['"%s"' % k for k in self.unused]))
+            print('WARNING: the following attributes of %s are ignored: %s' % (self.description, ', '.join(['"%s"' % k for k in self.unused])))
 
     def get(self, name, type, default=None, required=None, minimum=None, maximum=None):
         value = self.att.get(name, None)
@@ -226,23 +227,23 @@ class Job(optimize.OptimizationProblem):
 
             # Create job server and give it time to connect to nodes.
             if verbose:
-                print 'Starting Parallel Python server...'
+                print('Starting Parallel Python server...')
             if ncpus is None:
                 ncpus = 'autodetect'
             job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
             if ppservers:
                 if verbose:
-                    print 'Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers))
+                    print('Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers)))
                 time.sleep(10)
                 if verbose:
-                    print 'Running on:'
+                    print('Running on:')
                     for node, ncpu in job_server.get_active_nodes().iteritems():
-                        print '   %s: %i cpus' % (node, ncpu)
+                        print('   %s: %i cpus' % (node, ncpu))
 
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
             if verbose:
-                print 'Total number of cpus: %i' % nworkers
+                print('Total number of cpus: %i' % nworkers)
             if nworkers == 0:
                 raise Exception('No cpus available; exiting.')
 
@@ -252,7 +253,7 @@ class Job(optimize.OptimizationProblem):
             atexit.register(os.remove, jobpath)
 
             ppjobs = []
-            print 'Submitting %i jobs for parallel processing...' % len(ensemble)
+            print('Submitting %i jobs for parallel processing...' % len(ensemble))
             for member in ensemble:
                 ppjob = job_server.submit(run_ensemble_member, (jobpath, member))
                 ppjobs.append(ppjob)

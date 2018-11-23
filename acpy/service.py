@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import os
 import argparse
-import ConfigParser
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 
 user = None
 email = None
@@ -13,7 +17,7 @@ have_service = False
 path = os.path.dirname(os.path.realpath(__file__))
 service_file  = os.path.join(path, 'service.txt')
 
-config = ConfigParser.SafeConfigParser()
+config = configparser.SafeConfigParser()
 
 def read():
     global user
@@ -36,8 +40,8 @@ def read():
             key = config.get('Key','key')
             parallel = config.get('Features','parallel')
             have_service = True
-        except ConfigParser.ParsingError, err:
-            print 'Could not parse:', err
+        except configparser.ParsingError as err:
+            print('Could not parse:', err)
 
 #def write():
 #    print('Write cfg-file')
@@ -47,9 +51,9 @@ def print_c():
         print('Reading service from:')
         print('   '+service_file)
         for section_name in config.sections():
-            print 'Section:', section_name
+            print('Section:', section_name)
             for name, value in config.items(section_name):
-                print '  %s = %s' % (name, value)
+                print('  %s = %s' % (name, value))
     else:
         print("No service file found!")
 

@@ -1,4 +1,5 @@
 # Import from standard Python library (>= 2.4)
+from __future__ import print_function
 import sys
 import os.path
 import re
@@ -51,7 +52,7 @@ def parseNamelistFile(path):
     return nmls, tuple(nmlorder)
 
 def getMD5(path):
-    #print 'Calculating MD5 hash of %s...' % path
+    #print('Calculating MD5 hash of %s...' % path)
     with open(path, 'rb') as f:
         m = hashlib.md5()
         while 1:
@@ -136,8 +137,7 @@ class NamelistParameter(shared.Parameter):
 
     def store(self):
         if self.own_file:
-            with open(self.path, 'w') as f:
-                writeNamelistFile(self.path, self.job.namelistfiles[self.file], self.job.namelistorder[self.file])
+            writeNamelistFile(self.path, self.job.namelistfiles[self.file], self.job.namelistorder[self.file])
 
 class YamlParameter(shared.Parameter):
     def __init__(self, job, att):
@@ -230,10 +230,15 @@ class Job(shared.Job):
         self.checkparameterranges = True
 
         # If the XML contains a "target" element at root level, we will use that rather than compute a likelihood.
+        self.targets = []
+        for itarget, element in enumerate(xml_tree.findall('targets/target')):
+            with shared.XMLAttributes(element, 'target %i' % (itarget + 1,)) as att:
+                self.targets.append((att.get('expression', unicode), att.get('path', unicode)))
         element = xml_tree.find('target')
         if element is not None:
             with shared.XMLAttributes(element, 'the target element') as att:
-                self.target = (att.get('expression', unicode), att.get('path', unicode))
+                self.targets.append((att.get('expression', unicode), att.get('path', unicode)))
+        if self.targets:
             return
 
         # Array to hold observation datasets
@@ -281,7 +286,7 @@ class Job(shared.Job):
         sourcepath = None
         if mindepth is None: mindepth = -numpy.inf
         if maxdepth is None: maxdepth = numpy.inf
-        if maxdepth < 0: print 'WARNING: maxdepth=%s, but typically should be positive (downward distance from surface in meter).' % maxdepth
+        if maxdepth < 0: print('WARNING: maxdepth=%s, but typically should be positive (downward distance from surface in meter).' % maxdepth)
         assert maxdepth > mindepth, 'ERROR: maxdepth=%s should be greater than mindepth=%s' % (maxdepth, mindepth)
 
         assert isinstance(observeddata, basestring), 'Currently observations must be supplied as path to an 3-column ASCII file.'
@@ -296,22 +301,22 @@ class Job(shared.Job):
             with open(sourcepath+'.cache', 'rb') as f:
                 oldmd5 = cPickle.load(f)
                 if oldmd5 != md5:
-                    print 'Cached copy of %s is out of date - file will be reparsed.' % sourcepath
+                    print('Cached copy of %s is out of date - file will be reparsed.' % sourcepath)
                 else:
-                    print 'Loading cached copy of %s...' % sourcepath
+                    print('Loading cached copy of %s...' % sourcepath)
                     observeddata = cPickle.load(f)
 
         if not isinstance(observeddata, tuple):
             # Parse ASCII file and store observations as matrix.
             if self.verbose:
-                print 'Reading observations for variable "%s" from "%s".' % (outputvariable, sourcepath)
+                print('Reading observations for variable "%s" from "%s".' % (outputvariable, sourcepath))
             if not os.path.isfile(sourcepath):
                 raise Exception('"%s" is not a file.' % sourcepath)
             times, zs, values = [], [], []
             with open(sourcepath, 'rU') as f:
                 for iline, line in enumerate(f):
                     if self.verbose and (iline+1)%20000 == 0:
-                        print 'Read "%s" upto line %i.' % (sourcepath, iline)
+                        print('Read "%s" upto line %i.' % (sourcepath, iline))
                     if line.startswith('#'): continue
                     datematch = datetimere.match(line)
                     if datematch is None:
@@ -347,8 +352,8 @@ class Job(shared.Job):
                     with open(sourcepath+'.cache', 'wb') as f:
                         cPickle.dump(md5, f, cPickle.HIGHEST_PROTOCOL)
                         cPickle.dump((times, zs, values), f, cPickle.HIGHEST_PROTOCOL)
-                except Exception, e:
-                    print 'Unable to store cached copy of observation file. Reason: %s' % e
+                except Exception as e:
+                    print('Unable to store cached copy of observation file. Reason: %s' % e)
         else:
             times, zs, values = observeddata
 
@@ -393,7 +398,7 @@ class Job(shared.Job):
 
             # Add attributes describing the data matrix
             times, zs, values = obsinfo['times'], obsinfo['zs'], obsinfo['values']
-            infocopy['observationcount'] = data.shape[0]
+            infocopy['observationcount'] = len(times)
             infocopy['timerange'] = (min(times), max(times))
             infocopy['depthrange'] = (-float(zs.max()), -float(zs.min()))
             infocopy['valuerange'] = (float(values.min()), float(values.max()))
@@ -422,14 +427,14 @@ class Job(shared.Job):
             tempscenariodir = tempfile.mkdtemp(prefix='gotmopt', dir=self.tempdir)
             atexit.register(shutil.rmtree, tempscenariodir, True)
 
-        print 'Copying files for model setup to %s...' % tempscenariodir
+        print('Copying files for model setup to %s...' % tempscenariodir)
         for name in os.listdir(self.scenariodir):
             if name.endswith('.nc'):
-                print '   skipping %s because it is a NetCDF file' % name
+                print('   skipping %s because it is a NetCDF file' % name)
                 continue
             srcname = os.path.join(self.scenariodir, name)
             if os.path.isdir(srcname):
-                print '   skipping %s because it is a directory' % name
+                print('   skipping %s because it is a directory' % name)
                 continue
             dstname = os.path.join(tempscenariodir, name)
             shutil.copy(srcname, dstname)
@@ -437,7 +442,7 @@ class Job(shared.Job):
 
         if not self.use_shell:
             if self.copyexe:
-                print 'Copying %s executable...' % os.path.basename(self.exe)
+                print('Copying %s executable...' % os.path.basename(self.exe))
                 dstname = os.path.join(self.scenariodir, os.path.basename(self.exe))
                 shutil.copy(self.exe, dstname)
                 self.exe = dstname
@@ -445,9 +450,7 @@ class Job(shared.Job):
         for parameter in self.parameters:
             parameter.initialize()
 
-        if getattr(self, 'target', None) is not None:
-            expression, ncpath = self.target
-            self.target = compile(expression, '<string>', 'eval'), os.path.join(self.scenariodir, ncpath)
+        self.targets = [(compile(expression, '<string>', 'eval'), os.path.join(self.scenariodir, ncpath)) for (expression, ncpath) in self.targets]
 
     def prepareDirectory(self, values):
         assert self.started
@@ -463,7 +466,7 @@ class Job(shared.Job):
         #    basevals = transform.undoTransform(values[ipar:ipar+len(ext)])
         #    for p, value in zip(transform.getOriginalParameters(), basevals):
         #        nmlpath = os.path.join(self.scenariodir, p[0])
-        #        #print 'Setting %s/%s/%s to %s.' % (nmlpath,p[1],p[2],value)
+        #        #print('Setting %s/%s/%s to %s.' % (nmlpath,p[1],p[2],value))
         #        self.namelistfiles[nmlpath][p[1]][p[2]] = '%.15g' % value
         #    ipar += len(ext)
 
@@ -474,7 +477,7 @@ class Job(shared.Job):
     def evaluate(self, values, return_model_values=False, show_output=False):
         assert self.started
 
-        print 'Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values])
+        print('Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values]))
 
         # If required, check whether all parameters are within their respective range.
         if self.checkparameterranges:
@@ -489,16 +492,17 @@ class Job(shared.Job):
 
         if returncode != 0:
             # Run failed
-            print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+            print('Returning ln likelihood = negative infinity to discourage use of this parameter set.')
             #self.reportResult(values, None, error='Run stopped prematurely')
             return -numpy.Inf
 
         if getattr(self, 'observations', None) is None:
-            expression, ncpath = self.target
-            wrappednc = NcDict(ncpath)
-            result = wrappednc.eval(expression)
-            wrappednc.finalize()
-            return result
+            results = []
+            for expression, ncpath in self.targets:
+                wrappednc = NcDict(ncpath)
+                results.append(wrappednc.eval(expression))
+                wrappednc.finalize()
+            return results[0] if len(results) == 1 else results
 
         outputpath2nc = {}
         for obsinfo in self.observations:
@@ -518,7 +522,7 @@ class Job(shared.Job):
             for obsinfo in self.observations:
                 # Get time indices (for left side of bracket for linear interpolation)
                 # This also eliminates points outside the simulated period.
-                print 'Calculating weights for linear interpolation to "%s" observations...' % obsinfo['outputvariable'],
+                print('Calculating weights for linear interpolation to "%s" observations...' % obsinfo['outputvariable'], end='')
                 wrappednc = outputpath2nc[obsinfo['outputpath']]
                 time_units = wrappednc.nc.variables['time'].units
                 time_vals = wrappednc['time']
@@ -557,7 +561,7 @@ class Job(shared.Job):
                 else:
                     assert data.ndim == 1, 'Expected only one dimension (time) in %s, but found %i dimensions.' % (obsinfo['outputvariable'], data.ndim)
 
-                print 'done.'
+                print('done.')
 
         # Start with zero ln likelihood (likelihood of 1)
         lnlikelihood = 0.
@@ -599,8 +603,8 @@ class Job(shared.Job):
                 modelvals = obsinfo['time_weights']*all_values_model[obsinfo['itimes']] + (1-obsinfo['time_weights'])*all_values_model[obsinfo['itimes']+1]
 
             if not numpy.isfinite(modelvals).all():
-                print 'WARNING: one or more model values for %s are not finite.' % obsvar
-                print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                print('WARNING: one or more model values for %s are not finite.' % obsvar)
+                print('Returning ln likelihood = negative infinity to discourage use of this parameter set.')
                 #self.reportResult(values,None,error='Some model values for %s are not finite' % obsvar)
                 for wrappednc in outputpath2nc.values():
                     wrappednc.finalize()
@@ -645,28 +649,28 @@ class Job(shared.Job):
                 else:
                     # Calculate optimal scale factor.
                     if (modelvals == 0.).all():
-                        print 'WARNING: cannot calculate optimal scaling factor for %s because all model values equal zero.' % obsvar
-                        print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                        print('WARNING: cannot calculate optimal scaling factor for %s because all model values equal zero.' % obsvar)
+                        print('Returning ln likelihood = negative infinity to discourage use of this parameter set.')
                         for wrappednc in outputpath2nc.values():
                             wrappednc.finalize()
                         #self.reportResult(values, None, error='All model values for %s equal 0' % obsvar)
                         return -numpy.Inf
                     scale = (obsvals*modelvals).sum()/(modelvals**2).sum()
                     if not numpy.isfinite(scale):
-                        print 'WARNING: optimal scaling factor for %s is not finite.' % obsvar
-                        print 'Returning ln likelihood = negative infinity to discourage use of this parameter set.'
+                        print('WARNING: optimal scaling factor for %s is not finite.' % obsvar)
+                        print('Returning ln likelihood = negative infinity to discourage use of this parameter set.')
                         #self.reportResult(values, None, error='Optimal scaling factor for %s is not finite' % obsvar)
                         for wrappednc in outputpath2nc.values():
                             wrappednc.finalize()
                         return -numpy.Inf
 
                 # Report and check optimal scale factor.
-                print 'Optimal model-to-observation scaling factor for %s = %.6g.' % (obsvar, scale)
+                print('Optimal model-to-observation scaling factor for %s = %.6g.' % (obsvar, scale))
                 if obsinfo['min_scale_factor'] is not None and scale < obsinfo['min_scale_factor']:
-                    print 'Clipping optimal scale factor to minimum = %.6g.' % obsinfo['min_scale_factor']
+                    print('Clipping optimal scale factor to minimum = %.6g.' % obsinfo['min_scale_factor'])
                     scale = obsinfo['min_scale_factor']
                 elif obsinfo['max_scale_factor'] is not None and scale > obsinfo['max_scale_factor']:
-                    print 'Clipping optimal scale factor to maximum = %.6g.' % obsinfo['max_scale_factor']
+                    print('Clipping optimal scale factor to maximum = %.6g.' % obsinfo['max_scale_factor'])
                     scale = obsinfo['max_scale_factor']
             elif obsinfo['fixed_scale_factor'] is not None:
                 scale = obsinfo['fixed_scale_factor']
@@ -690,12 +694,12 @@ class Job(shared.Job):
             if sd is None:
                 # No standard deviation specified: calculate the optimal s.d.
                 sd = numpy.sqrt(ssq/(n-1))
-                print 'Using optimal s.d. for %s = %.6g.' % (obsvar, sd)
+                print('Using optimal s.d. for %s = %.6g.' % (obsvar, sd))
 
             # Note: assuming normally distributed errors, and omitting constant terms in the log likelihood = -n*ln(2*pi)/2
             lnlikelihood += -n*numpy.log(sd)-ssq/2/sd/sd
 
-        print 'ln Likelihood = %.6g.' % lnlikelihood
+        print('ln Likelihood = %.6g.' % lnlikelihood)
 
         for wrappednc in outputpath2nc.values():
             wrappednc.finalize()
@@ -707,34 +711,34 @@ class Job(shared.Job):
         ensemble = numpy.asarray(ensemble)
         if not os.path.isdir(root):
             os.mkdir(root)
-        scenariodir, target = self.scenariodir, getattr(self, 'target', None)
+        scenariodir, targets = self.scenariodir, getattr(self, 'targets', None)
         dir_paths = [os.path.join(root, format % i) for i in xrange(ensemble.shape[0])]
         for i, simulationdir in enumerate(dir_paths):
             self.simulationdir = simulationdir
             self.start(force=True)
             self.prepareDirectory(ensemble[i, :])
             self.scenariodir = scenariodir
-            self.target = target
+            self.targets = targets
         return dir_paths
 
     def runEnsemble(self, directories, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False):
         import pp
         if verbose:
-            print 'Starting Parallel Python server...'
+            print('Starting Parallel Python server...')
         if ncpus is None:
             ncpus = 'autodetect'
         job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
         if ppservers:
             if verbose:
-                print 'Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers))
+                print('Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers)))
             time.sleep(10)
             if verbose:
-                print 'Running on:'
+                print('Running on:')
                 for node, ncpu in job_server.get_active_nodes().iteritems():
-                    print '   %s: %i cpus' % (node, ncpu)
+                    print('   %s: %i cpus' % (node, ncpu))
         nworkers = sum(job_server.get_active_nodes().values())
         if verbose:
-            print 'Total number of cpus: %i' % nworkers
+            print('Total number of cpus: %i' % nworkers)
         if nworkers == 0:
             raise Exception('No cpus available; exiting.')
         jobs = []
@@ -749,7 +753,7 @@ class Job(shared.Job):
 
 def run_program(exe, rundir, use_shell=False, show_output=True):
     time_start = time.time()
-    print 'Starting model run...'
+    print('Starting model run...')
     args = [exe]
     if exe.endswith('.py'):
         args = [sys.executable] + args
@@ -767,12 +771,12 @@ def run_program(exe, rundir, use_shell=False, show_output=True):
             line = proc.stdout.readline()
             if line == '':
                 break
-            print line,
+            print(line, end='')
     proc.communicate()
 
     # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
     elapsed = time.time() - time_start
-    print 'Model run took %.1f s.' % elapsed
+    print('Model run took %.1f s.' % elapsed)
     if proc.returncode != 0:
-        print 'WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode 
+        print('WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode )
     return proc.returncode
