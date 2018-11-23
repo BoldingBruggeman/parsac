@@ -175,7 +175,7 @@ class HTTP(Transport):
 class SQLite(Transport):
     @classmethod
     def fromXML(cls, att, job_id, root_dir, **kwargs):
-        return cls(path=os.path.join(root_dir, att.get('path', unicode, '%s.db' % job_id)))
+        return cls(path=os.path.join(root_dir, att.get('path', default='%s.db' % job_id)))
 
     def __init__(self, path):
         Transport.__init__(self)
