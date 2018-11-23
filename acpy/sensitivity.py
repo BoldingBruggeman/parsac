@@ -108,7 +108,7 @@ def sample(SAlib_problem, args):
     print('Generated an ensemble with %i members' % (X.shape[0],))
     return X
 
-def analyze(SAlib_problem, args, sample_args, X, Y):
+def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
     if args.method == 'fast':
         # https://dx.doi.org/10.1063/1.1680571
         # https://dx.doi.org/10.1080/00401706.1999.10485594
@@ -151,8 +151,9 @@ def analyze(SAlib_problem, args, sample_args, X, Y):
         assert sample_args.method == 'ff'
         import SALib.analyze.ff
         analysis = SALib.analyze.ff.analyze(SAlib_problem, X, Y, second_order=args.second_order, print_to_console=args.print_to_console)
-    for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), key=lambda x: x[1], reverse=True):
-        print('%s: %s' % (name, sensitivity))
+    if verbose:
+        for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), key=lambda x: x[1], reverse=True):
+            print('%s: %s' % (name, sensitivity))
     return sensitivities
 
 def undoLogTransform(values, logscale):
@@ -227,26 +228,30 @@ def main(args):
             sys.exit(2)
         X, Y = job_info['X'], job_info['Y']
         Y.shape = (X.shape[0], -1)
-        #targets = getattr(current_job, 'targets', [getattr(current_job, 'target', None)])
+        if hasattr(current_job, 'targets'):
+            target_names = ['Target %i (%s/%s)' % (i, path, expr) for i, (expr, path) in enumerate(current_job.targets)]
+        elif hasattr(current_job, 'target'):
+            target_names = ['Target %s/%s' % (current_job.target[1], current_job.target[0])]
+        else:
+            target_names = ['Target %i' % i for i in range(Y.shape[1])]
         mean_rank = numpy.zeros((X.shape[1],), dtype=int)
-        for itarget in range(Y.shape[1]):
-            print('Target %i' % itarget)
+        for itarget, target_name in enumerate(target_names):
             sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
-            if args.select is not None:
-                n, path = args.select
-                n = int(n)
-                isort = numpy.argsort(sensitivities)[::-1]
-                for irank, ipar in enumerate(isort):
-                    mean_rank[ipar] += irank
-                print('  Top %i parameters:' % n)
-                for i in isort[:n]:
-                    print('  - %s' % (names[i],))
+            isort = numpy.argsort(sensitivities)[::-1]
+            for irank, ipar in enumerate(isort):
+                mean_rank[ipar] += irank
+            print(target_name)
+            for i in isort:
+                print('  - %s (%s)' % (names[i], sensitivities[i]))
+        mean_rank = 1 + mean_rank / float(Y.shape[1])
 
         if args.select is not None:
+            n, path = args.select
+            n = int(n)
             selected = set()
             print('Consensus ranking (top %i parameters):' % n)
             for i in numpy.argsort(mean_rank)[:n]:
-                print('  - %s (mean rank = %.1f)' % (names[i], mean_rank[i]/float(Y.shape[1])))
+                print('  - %s (mean rank = %.1f)' % (names[i], mean_rank[i]))
                 selected.add(names[i])
             xml_tree = xml.etree.ElementTree.parse(args.xmlfile)
             parameters_xml = xml_tree.find('./parameters')
