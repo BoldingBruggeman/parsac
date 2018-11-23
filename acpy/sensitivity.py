@@ -228,19 +228,26 @@ def main(args):
         X, Y = job_info['X'], job_info['Y']
         Y.shape = (X.shape[0], -1)
         #targets = getattr(current_job, 'targets', [getattr(current_job, 'target', None)])
+        mean_rank = numpy.zeros((X.shape[1],), dtype=int)
         for itarget in range(Y.shape[1]):
             print('Target %i' % itarget)
             sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
             if args.select is not None:
                 n, path = args.select
                 n = int(n)
-                isort = numpy.argsort(sensitivities)
+                isort = numpy.argsort(sensitivities)[::-1]
+                for irank, ipar in enumerate(isort):
+                    mean_rank[ipar] += irank
                 print('  Top %i parameters:' % n)
-                selected = set()
-                for i in isort[-n:][::-1]:
+                for i in isort[:n]:
                     print('  - %s' % (names[i],))
-                    selected.add(names[i])
+
         if args.select is not None:
+            selected = set()
+            print('Consensus ranking (top %i parameters):' % n)
+            for i in numpy.argsort(mean_rank)[:n]:
+                print('  - %s' % (names[i],))
+                selected.add(names[i])
             xml_tree = xml.etree.ElementTree.parse(args.xmlfile)
             parameters_xml = xml_tree.find('./parameters')
             for ipar, element in enumerate(parameters_xml.findall('./parameter')):
