@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
@@ -22,7 +23,7 @@ def main(args):
     import acpy.result
 
     if args.depth is not None and args.depth < 0:
-        print 'Depth argument must be positive, but is %.6g.' % args.depth
+        print('Depth argument must be positive, but is %.6g.' % args.depth)
         sys.exit(2)
 
     extravars = ()
@@ -35,10 +36,10 @@ def main(args):
     parameters, lnl = result.get_best(args.rank)
 
     # Show best parameter set
-    print '%ith best parameter set:' % args.rank
+    print('%ith best parameter set:' % args.rank)
     for name, value in zip(result.job.getParameterNames(), parameters):
-        print '  %s = %.6g' % (name, value)
-    print 'Original ln likelihood = %.8g' % lnl
+        print('  %s = %.6g' % (name, value))
+    print('Original ln likelihood = %.8g' % lnl)
 
     # Initialize the job (needed to load observations)
     result.job.start()
@@ -55,17 +56,17 @@ def main(args):
     # Run and retrieve results.
     #returncode = result.job.controller.run(parameters,showoutput=True)
     #if returncode!=0:
-    #    print 'GOTM run failed - exiting.'
+    #    print('GOTM run failed - exiting.')
     #    sys.exit(1)
     #nc = NetCDFFile(ncpath,'r')
     #res = result.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
     #nc.close()
     likelihood, model_values = result.job.evaluate(parameters, return_model_values=True, show_output=True)
-    print 'Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood, lnl)
+    print('Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood, lnl))
 
     # # Copy NetCDF file
     # if args.savenc is not None:
-    #     print 'Saving NetCDF output to %s...' % args.savenc,
+    #     print('Saving NetCDF output to %s...' % args.savenc, end='')
     #     shutil.copyfile(ncpath,args.savenc)
     #     fout = open('%s.info' % args.savenc,'w')
     #     fout.write('job %i, %ith best parameter set\n' % (result.job.id,args.rank))
@@ -76,7 +77,7 @@ def main(args):
     #         fout.write('  %s = %.6g\n' % (pi['name'],val))
     #     fout.write('ln likelihood = %.8g\n' % lnl)
     #     fout.close()
-    #     print ' done'
+    #     print(' done')
 
     hres = pylab.figure(figsize=(10, 9))
     herr = pylab.figure()
@@ -102,10 +103,10 @@ def main(args):
         # If we do a relative fit, scale the model result to best match observations.
         if oi['relativefit']:
             if (model_data == 0.).all():
-                print 'ERROR: cannot calculate optimal scaling factor for %s because all model values equal zero.' % oi['outputvariable']
+                print('ERROR: cannot calculate optimal scaling factor for %s because all model values equal zero.' % oi['outputvariable'])
                 sys.exit(1)
             scale = (observed_values*model_data).sum()/(model_data**2).sum()
-            print 'Optimal model-to-observation scaling factor for %s = %.6g.' % (oi['outputvariable'], scale)
+            print('Optimal model-to-observation scaling factor for %s = %.6g.' % (oi['outputvariable'], scale))
             model_data *= scale
             all_model_data *= scale
         elif oi['fixed_scale_factor'] is not None:
@@ -125,7 +126,7 @@ def main(args):
             valid_obs = zs > zmin
             valid_mod = z_centers > zmin
             varrange = (min(all_model_data[valid_mod].min(), observed_values[valid_obs].min()), max(all_model_data[valid_mod].max(), observed_values[valid_obs].max()))
-            print varrange
+            print(varrange)
 
             t_interfaces = pylab.date2num(t_interfaces)
             ax = pylab.subplot(gs[i, 0:5])
@@ -193,7 +194,7 @@ def main(args):
         #pylab.figure()
         n, bins, patches = pylab.hist(diff, 100, normed=True)
         pylab.xlabel('model - observation')
-        print '%s:\n- bias: %.4g\n- mean absolute error = %.4g\n- rmse = %.4g\n- cor = %.4g\n- s.d. mod = %.4g\n- s.d. obs = %.4g' % (oi['outputvariable'], bias, mae, rmse, cor, numpy.sqrt(var_mod), numpy.sqrt(var_obs))
+        print('%s:\n- bias: %.4g\n- mean absolute error = %.4g\n- rmse = %.4g\n- cor = %.4g\n- s.d. mod = %.4g\n- s.d. obs = %.4g' % (oi['outputvariable'], bias, mae, rmse, cor, numpy.sqrt(var_mod), numpy.sqrt(var_obs)))
         y = pylab.normpdf(bins, 0., rmse)
         l = pylab.plot(bins, y, 'r--', linewidth=2)
 

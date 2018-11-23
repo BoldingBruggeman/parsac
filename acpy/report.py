@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 import os.path
 import threading
@@ -43,9 +44,9 @@ class Reporter:
             if transport.available():
                 validtp.append(transport)
             else:
-                print 'Transport %s is not available.' % str(transport)
+                print('Transport %s is not available.' % str(transport))
         if not validtp:
-            print 'No transport available; exiting...'
+            print('No transport available; exiting...')
             sys.exit(1)
         self.transports = tuple(validtp)
 
@@ -76,16 +77,16 @@ class Reporter:
             if not transport.available(): continue
             try:
                 runid = transport.initialize(self.jobid, self.description)
-            except Exception, e:
-                print 'Failed to initialize run over %s.\nReason: %s' % (str(transport), str(e))
+            except Exception as e:
+                print('Failed to initialize run over %s.\nReason: %s' % (str(transport), str(e)))
                 runid = None
             if runid is not None:
-                print 'Successfully initialized run over %s.\nRun identifier = %i' % (str(transport), runid)
+                print('Successfully initialized run over %s.\nRun identifier = %i' % (str(transport), runid))
                 self.lasttransport = transport
                 break
 
         if runid is None:
-            print 'Unable to initialize run. Exiting...'
+            print('Unable to initialize run. Exiting...')
             sys.exit(1)
 
         self.runid = runid
@@ -144,11 +145,11 @@ class Reporter:
                 success = True
                 try:
                     transport.reportResults(self.runid, batch, timeout=5)
-                except Exception, e:
-                    print 'Unable to report result(s) over %s. Reason:\n%s' % (str(transport), str(e))
+                except Exception as e:
+                    print('Unable to report result(s) over %s. Reason:\n%s' % (str(transport), str(e)))
                     success = False
                 if success:
-                    print 'Successfully delivered %i result(s) over %s.' % (len(batch), str(transport))
+                    print('Successfully delivered %i result(s) over %s.' % (len(batch), str(transport)))
                     self.lasttransport = transport
                     break
 
@@ -161,7 +162,7 @@ class Reporter:
 
             # If we arrived here, reporting failed.
             self.reportfailcount += 1
-            print 'Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch), time.time()-self.lastreporttime)
+            print('Unable to report %i result(s). Last report was sent %.0f s ago.' % (len(batch), time.time()-self.lastreporttime))
 
             # Put unreported results back in queue
             self.queuelock.acquire()
@@ -176,10 +177,10 @@ class Reporter:
             # Check if the report failure tolerances (count and period) have been exceeded.
             exceeded = False
             if self.allowedreportfailcount is not None and self.reportfailcount > self.allowedreportfailcount:
-                print 'Maximum number of reporting failures (%i) exceeded.' % self.allowedreportfailcount
+                print('Maximum number of reporting failures (%i) exceeded.' % self.allowedreportfailcount)
                 exceeded = True
             elif self.allowedreportfailperiod is not None and time.time() > (self.lastreporttime+self.allowedreportfailperiod):
-                print 'Maximum period of reporting failure (%i s) exceeded.' % self.allowedreportfailperiod
+                print('Maximum period of reporting failure (%i s) exceeded.' % self.allowedreportfailperiod)
                 exceeded = True
 
             # If the report failure tolerance has been exceeded, ask the user whether to continue.
@@ -193,16 +194,16 @@ class Reporter:
                 self.lastreporttime = time.time()
 
             # We will tolerate this failure (the server-side script may be unavailable temporarily)
-            print 'Queuing current result for later reporting.'
+            print('Queuing current result for later reporting.')
             return
 
     def finalize(self):
         if self.reportingthread and self.reportingthread.isAlive():
             self.reportingthread.exit_event.set()
-            print 'Waiting for reporting thread to shut down...'
+            print('Waiting for reporting thread to shut down...')
             self.reportingthread.join(self.timebetweenreports*2)
             if self.reportingthread.isAlive():
-                print 'WARNING: failed to shut down reporting thread.'
+                print('WARNING: failed to shut down reporting thread.')
         self.reportingthread = None
         self.runid = None
         self.queuelock = None

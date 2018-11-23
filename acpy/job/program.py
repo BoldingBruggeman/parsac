@@ -25,8 +25,8 @@ except ImportError:
     yaml = None
 
 # Import custom packages
-import namelist
-import shared
+from . import namelist
+from . import shared
 
 # Regular expression for GOTM datetimes
 datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')

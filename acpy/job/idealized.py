@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import numpy
 
-import shared
+from . import shared
 
 class Job(shared.Job):
     def __init__(self, job_id, xml_tree, root, **kwargs):

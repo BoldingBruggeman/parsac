@@ -7,7 +7,6 @@ import sys
 import os
 import argparse
 import tempfile
-import cPickle
 import xml.etree.ElementTree
 import glob
 

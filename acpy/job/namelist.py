@@ -27,7 +27,7 @@ class NamelistSubstitutions:
         if isinstance(valuesfile,basestring):
             try:
                 valuesfile = open(valuesfile,'rU')
-            except Exception,e:
+            except Exception as e:
                 raise NamelistParseException('Cannot open .values file "%s". Error: %s' % (path,str(e)))
             ownfile = True
             
@@ -118,7 +118,7 @@ class NamelistFile:
             # Attempt to open namelist file and read all data
             try:
                 nmlfile = open(nmlfile,'rU')
-            except Exception,e:
+            except Exception as e:
                 raise NamelistParseException('Cannot open namelist file. Error: %s' % (str(e),),nmlfile)
             self.path = nmlfile
         else:

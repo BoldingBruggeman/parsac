@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
@@ -36,8 +37,8 @@ def main(args):
 
     ix = parnames.index(args.x)
     iy = parnames.index(args.y)
-    print 'x axis: %s (parameter %i)' % (args.x, ix)
-    print 'y axis: %s (parameter %i)' % (args.y, iy)
+    print('x axis: %s (parameter %i)' % (args.x, ix))
+    print('y axis: %s (parameter %i)' % (args.y, iy))
 
     def update(fig=None):
         res = result.get(constraints=parbounds, run_id=args.run, limit=args.limit)
@@ -120,7 +121,7 @@ def main(args):
                 series_marg1.set_data(res[:i, ix], res[:i, -1])
             path = '%i.png' % i
             pylab.savefig(path, dpi=96)
-            print 'Saved %s.' % path
+            print('Saved %s.' % path)
 
     update()
 

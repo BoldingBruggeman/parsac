@@ -1,4 +1,5 @@
 # Import from standard Python library
+from __future__ import print_function
 import socket
 import os
 
@@ -76,15 +77,15 @@ class Result(object):
 
         lnl_condition = ''
         if lnlrange is not None:
-            print 'Finding maximum of fitness function...',
+            print('Finding maximum of fitness function...', end='')
             query = "SELECT DISTINCT MAX(`lnlikelihood`) FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'" % (runcrit, self.job.id)
             cursor.execute(query)
             maxlnl, = cursor.fetchone()
-            print maxlnl
+            print(maxlnl)
             lnl_condition = ' AND `lnlikelihood`>%s' % (maxlnl+lnlrange)
 
         # Retrieve all results
-        print 'Retrieving results...'
+        print('Retrieving results...')
         groupcol = 'NULL' if groupby is None else '`%s`' % groupby
         query = "SELECT DISTINCT `results`.`id`,`parameters`,`lnlikelihood`,%s FROM `runs`,`results` WHERE `results`.`run`=%s AND `runs`.`job`='%s'%s" % (groupcol, runcrit, self.job.id, lnl_condition)
         if limit != -1:
@@ -102,10 +103,10 @@ class Result(object):
                 try:
                     parameters = numpy.array(strpars.split(';'), dtype=float)
                 except ValueError:
-                    print 'Row %i: cannot parse "%s".' % (rowid, strpars)
+                    print('Row %i: cannot parse "%s".' % (rowid, strpars))
                     valid = False
                 if valid and len(parameters) != npar:
-                    print 'Row %i: Number of parameters (%i) does not match that of run (%i).' % (rowid, len(parameters), npar)
+                    print('Row %i: Number of parameters (%i) does not match that of run (%i).' % (rowid, len(parameters), npar))
                     valid = False
                 if valid:
                     for ipar, minval, maxval in parconstraints:
@@ -120,7 +121,7 @@ class Result(object):
                     if group is not None:
                         source2history.setdefault(group, []).append(dat)
             i += 1
-        print 'Found %i results, of which %i were invalid.' % (len(history)+badcount, badcount)
+        print('Found %i results, of which %i were invalid.' % (len(history)+badcount, badcount))
 
         # Convert results into numpy arrays
         all_results = numpy.array(history)

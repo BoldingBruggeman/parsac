@@ -1,7 +1,7 @@
 import sys
 import os.path
 
-import shared
+from . import shared
 
 class Job(shared.Job):
     def __init__(self, job_id, xml_tree, root, **kwargs):

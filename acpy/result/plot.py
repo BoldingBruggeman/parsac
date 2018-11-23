@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
     parser.add_argument('-r', '--range', type=float, help='Lower boundary for relative ln likelihood (always < 0)')
@@ -59,7 +61,7 @@ def main(args):
         lbounds, rbounds = res[iinc:, :-1].min(axis=0), res[iinc:, :-1].max(axis=0)
         best = res[-1, :-1]
         outside = res[:iinc, :-1]
-        print 'Best parameter set is # %i with ln likelihood = %.6g:' % (indices[-1], maxlnl)
+        print('Best parameter set is # %i with ln likelihood = %.6g:' % (indices[-1], maxlnl))
         for ipar, parname in enumerate(parnames):
             # Get conservative confidence interval by extending it to the first point
             # from the boundary that has a likelihood value outside the allowed range.
@@ -71,9 +73,9 @@ def main(args):
                 rbounds[ipar] = outside[rvalid, ipar].min()
 
             # Report estimate and confidence interval
-            print '  %s: %.6g (%.6g - %.6g)' % (parname, best[ipar], lbounds[ipar], rbounds[ipar])
+            print('  %s: %.6g (%.6g - %.6g)' % (parname, best[ipar], lbounds[ipar], rbounds[ipar]))
         if args.save is not None:
-            print 'Writing best parameter set to %s...' % args.save
+            print('Writing best parameter set to %s...' % args.save)
             with open(args.save, 'w') as f:
                 for parname, value in zip(parnames, best):
                     f.write('%s\t%s\n' % (parname, value))
@@ -92,7 +94,7 @@ def main(args):
 
         # Order sources (runs or clients) according to counts or ln likelihood.
         if args.groupby is not None:
-            print 'Points per %s:' % args.groupby
+            print('Points per %s:' % args.groupby)
             sources = source2history.keys()
             if args.orderby == 'count':
                 sources = sorted(sources, cmp=lambda x, y: cmp(len(source2history[y]), len(source2history[x])))
@@ -105,10 +107,10 @@ def main(args):
                 label = source
                 if args.groupby == 'run':
                     label = '%s (%s)' % (source, run2source[source])
-                print '  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source])
+                print('  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source]))
 
         if pyplot is None:
-            print 'MatPlotLib not found - skipping plotting.'
+            print('MatPlotLib not found - skipping plotting.')
             return
 
         nrow = int(numpy.ceil(numpy.sqrt(0.5*npar)))
@@ -214,21 +216,21 @@ def main(args):
 
     if args.update:
         if pyplot is None:
-            print 'MatPlotLib not found - cannot run in continuous update mode (-u/--update).'
+            print('MatPlotLib not found - cannot run in continuous update mode (-u/--update).')
             sys.exit(1)
         fig = None
         pyplot.ion()
         count = result.count()
         while 1:
             fig = update(fig)
-            print 'Waiting for new results...',
+            print('Waiting for new results...', end='')
             while 1:
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore')
                     pyplot.pause(5.)
                 newcount = result.count()
                 if newcount != count:
-                    print '%i found.' % (newcount-count)
+                    print('%i found.' % (newcount-count))
                     count = newcount
                     break
     else:

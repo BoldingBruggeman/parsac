@@ -1,17 +1,18 @@
+from __future__ import print_function
 import os.path
 import xml.etree.ElementTree
 
-import shared
-import program
-import gotm
-import idealized
-import function
+from . import shared
+from . import program
+from . import gotm
+from . import idealized
+from . import function
 
 name2class = {'gotm': gotm.Job, 'program': program.Job, 'idealized': idealized.Job, 'function': function.Job}
 
 def fromConfigurationFile(path, **kwargs):
     if not os.path.isfile(path):
-        print 'Configuration file "%s" not found.' % path
+        print('Configuration file "%s" not found.' % path)
         return None
 
     xml_tree = xml.etree.ElementTree.parse(path)

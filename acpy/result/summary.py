@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',       type=str, help='XML formatted configuration file')
@@ -18,7 +19,7 @@ def main(args):
     group2maxlnl = dict([(s,curres[:, -1].max()) for s, curres in source2history.items()])
 
     # Order sources (runs or clients) according to counts or ln likelihood.
-    print 'Points per %s:' % args.groupby
+    print('Points per %s:' % args.groupby)
     sources = source2history.keys()
     if args.orderby == 'count':
         sources = sorted(sources, cmp=lambda x, y: cmp(len(source2history[y]), len(source2history[x])))
@@ -29,7 +30,7 @@ def main(args):
         label = source
         if args.groupby == 'run':
             label = '%4s %10s' % (source, run2source[source])
-        print '  %s: %5i points, best lnl = %.10g' % (label, len(dat), group2maxlnl[source])
+        print('  %s: %5i points, best lnl = %.10g' % (label, len(dat), group2maxlnl[source]))
 
 if __name__ == '__main__':
     import argparse

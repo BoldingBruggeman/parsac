@@ -1,7 +1,7 @@
 import os
 import datetime
 
-import program
+from . import program
 
 class Job(program.Job):
 
