@@ -16,7 +16,7 @@ class NamelistParseException(Exception):
 
 class NamelistSubstitutions:
     # Commonly used regular expression (for parsing substitions in the .values file)
-    subs_re = re.compile('\s*s/(\w+)/(.+)/')
+    subs_re = re.compile(r'\s*s/(\w+)/(.+)/')
 
     def __init__(self,valuesfile):
         self.subs = []
@@ -24,11 +24,11 @@ class NamelistSubstitutions:
         # If the supplied argument is a string, it should be a path to a file.
         # Try to open it. Otherwise the supplied argument should be a file-like object.
         ownfile = False
-        if isinstance(valuesfile,basestring):
+        if isinstance(valuesfile, (str, u''.__class__)):
             try:
                 valuesfile = open(valuesfile,'rU')
             except Exception as e:
-                raise NamelistParseException('Cannot open .values file "%s". Error: %s' % (path,str(e)))
+                raise NamelistParseException('Cannot open .values file "%s". Error: %s' % (valuesfile,str(e)))
             ownfile = True
             
         line = valuesfile.readline()
@@ -52,8 +52,8 @@ class NamelistSubstitutions:
 
 class Namelist:
 
-    varassign_re = re.compile('\s*(\w+)\s*=\s*')
-    varstopchar_re = re.compile('[/,\n"\']')
+    varassign_re = re.compile(r'\s*(\w+)\s*=\s*')
+    varstopchar_re = re.compile(r'[/,\n"\']')
 
     def __init__(self,name,data,filepath=None):
         self.name = name
@@ -63,15 +63,17 @@ class Namelist:
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         ret = self.getNextVariable()
-        if ret==None: raise StopIteration
+        if ret is None:
+            raise StopIteration
         return ret
+    next = __next__
 
     def getNextVariable(self):
         if self.isEmpty(): return None
         
-        match = self.varassign_re.match(self.data);
+        match = self.varassign_re.match(self.data)
         if match==None:
             raise NamelistParseException('Cannot find a variable assignment (variable_name = ...). Current namelist data: "%s"' % (self.data,),self.filepath,self.name,None)
         foundvarname = match.group(1)
@@ -106,13 +108,13 @@ class NamelistFile:
     #   - locating the start of comments, or opening quotes.
     #   - locating the start of namelist (ampersand followed by list name).
     #   - locating the end of a namelist, i.e. a slash, or opening quotes.
-    commentchar_re = re.compile('[!#"\']')
-    namelistname_re = re.compile('\s*&\s*(\w+)\s*')
-    stopchar_re = re.compile('[/"\']')
+    commentchar_re = re.compile(r'[!#"\']')
+    namelistname_re = re.compile(r'\s*&\s*(\w+)\s*')
+    stopchar_re = re.compile(r'[/"\']')
 
     def __init__(self,nmlfile,subs=[]):
         ownfile = False
-        if isinstance(nmlfile,basestring):
+        if isinstance(nmlfile, (str, u''.__class__)):
             ownfile = True
             
             # Attempt to open namelist file and read all data
@@ -141,7 +143,7 @@ class NamelistFile:
                         ipos = match.end(0)
                         inextquote = line.find(ch,ipos)
                         if inextquote==-1:
-                            raise NamelistParseException('Line %i: opening quote %s was not matched by end quote.' % (iline,ch),path)
+                            raise NamelistParseException('Line %i: opening quote %s was not matched by end quote.' % (iline,ch),self.path)
                         ipos = inextquote+1
                     else:
                         # Found start of comment; only keep everything preceding the start position.

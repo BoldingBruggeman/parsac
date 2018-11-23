@@ -16,11 +16,11 @@ import xml.etree.ElementTree
 # Import third party libraries
 import numpy
 
-# Import personal custom stuff
-import service
-import optimize
-import job
-import report
+# Import custom stuff
+from . import service
+from . import optimize
+from . import job
+from . import report
 
 def configure_argument_parser(parser):
     subparsers = parser.add_subparsers(dest='subcommand')
@@ -104,7 +104,7 @@ def sample(SAlib_problem, args):
         from SALib.sample.ff import sample
         X = sample(SAlib_problem)
     else:
-        print('Unknown sampler "%s" specified.' % args.method)
+        raise Exception('Unknown sampler "%s" specified.' % args.method)
     print('Generated an ensemble with %i members' % (X.shape[0],))
     return X
 

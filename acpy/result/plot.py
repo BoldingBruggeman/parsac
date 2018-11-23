@@ -97,9 +97,9 @@ def main(args):
             print('Points per %s:' % args.groupby)
             sources = source2history.keys()
             if args.orderby == 'count':
-                sources = sorted(sources, cmp=lambda x, y: cmp(len(source2history[y]), len(source2history[x])))
+                sources = sorted(sources, key=lambda x: len(source2history[x]), reverse=True)
             else:
-                sources = sorted(sources, cmp=lambda x, y: cmp(group2maxlnl[y], group2maxlnl[x]))
+                sources = sorted(sources, cmp=lambda x: group2maxlnl[x], reverse=True)
             if args.maxcount is not None and len(sources) > args.maxcount:
                 sources[args.maxcount:] = []
             for source in sources:

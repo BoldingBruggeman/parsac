@@ -10,11 +10,11 @@ import tempfile
 # Import third party libraries
 import numpy
 
-# Import personal custom stuff
-import service
-import optimize
-import job
-import report
+# Import custom stuff
+from . import service
+from . import optimize
+from . import job
+from . import report
 
 def configure_argument_parser(parser):
     parser.add_argument('xmlfile',                type=str, help='XML formatted configuration file')

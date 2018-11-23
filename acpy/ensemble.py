@@ -50,7 +50,7 @@ def get_weights_grid(job, results, gridsize):
     # Determine where each result sits in our npar-dimensional parameter grid
     index2count = {}
     indices = []
-    for iresult in xrange(results.shape[0]):
+    for iresult in range(results.shape[0]):
         inds = tuple([pargrid[ipar, :].searchsorted(value) for ipar, value in enumerate(results[iresult, :-1])])
         indices.append(inds)
         index2count[inds] = index2count.get(inds, 0) + 1
@@ -75,7 +75,7 @@ def get_weights_radius(job, results, M=10):
             minval, maxval, values = numpy.log10(minval), numpy.log10(maxval), numpy.log10(values)
         relparvalues[:, ipar] = (values - minval) / (maxval - minval)
     weights = numpy.empty((results.shape[0],))
-    for iresult in xrange(relparvalues.shape[0]):
+    for iresult in range(relparvalues.shape[0]):
         dist = numpy.sqrt(((relparvalues - relparvalues[iresult, :])**2).sum(axis=1))
         imindist = dist.argsort()[:M+1]
         weights[iresult] = dist[imindist[-1]]**len(minpar)
@@ -107,7 +107,7 @@ def main(args):
     # Select ensemble members
     ipicked = numpy.random.choice(numpy.arange(results.shape[0]), size=args.N, p=p)
     ensemble = results[ipicked, :-1]
-    for i in xrange(ensemble.shape[0]):
+    for i in range(ensemble.shape[0]):
         print(ensemble[i, :])
 
     if args.dir:

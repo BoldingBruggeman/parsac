@@ -12,7 +12,6 @@ def configure_argument_parser(parser):
 
 def main(args):
     import sys
-    import os.path
 
     import numpy
     import pylab
@@ -48,7 +47,7 @@ def main(args):
     obsinfo = result.job.observations
     outputvars = [oi['outputvariable'] for oi in obsinfo]
     for vardata in extravars:
-        if isinstance(vardata, basestring):
+        if isinstance(vardata, (str, u''.__class__)):
             outputvars.append(vardata)
         else:
             outputvars.append(vardata[0])
@@ -97,8 +96,8 @@ def main(args):
 
         modelmin = oi.get('modelminimum', None)
         if modelmin is not None:
-            all_model_data[modeldata < modelmin] = modelmin
-            model_data[modeldata < modelmin] = modelmin
+            all_model_data[all_model_data < modelmin] = modelmin
+            model_data[model_data < modelmin] = modelmin
 
         # If we do a relative fit, scale the model result to best match observations.
         if oi['relativefit']:
@@ -204,7 +203,7 @@ def main(args):
         rowcount = int(numpy.ceil(numpy.sqrt(varcount)))
         colcount = int(numpy.ceil(varcount/rowcount))
         for i, vardata in enumerate(extravars):
-            if isinstance(vardata, basestring):
+            if isinstance(vardata, (str, u''.__class__)):
                 varname = vardata
                 logscale = False
             else:

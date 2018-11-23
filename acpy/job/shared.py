@@ -115,7 +115,7 @@ class XMLAttributes():
         if self.unused:
             print('WARNING: the following attributes of %s are ignored: %s' % (self.description, ', '.join(['"%s"' % k for k in self.unused])))
 
-    def get(self, name, type, default=None, required=None, minimum=None, maximum=None):
+    def get(self, name, type=None, default=None, required=None, minimum=None, maximum=None):
         value = self.att.get(name, None)
         if value is None:
             # No value specified - use default or report error.
@@ -136,8 +136,7 @@ class XMLAttributes():
                 raise Exception('The value of "%s" of %s must exceed %s.' % (name, self.description, minimum))
             if maximum is not None and value > maximum:
                 raise Exception('The value of "%s" of %s must lie below %s.' % (name, self.description, maximum))
-        else:
-            # String
+        elif type is not None:
             value = type(value)
         self.unused.discard(name)
         return value
@@ -147,7 +146,7 @@ class Parameter(object):
         self.job = job
         att.description = 'parameter %s' % name
         if name is None:
-            self.name = att.get('name', unicode)
+            self.name = att.get('name')
         else:
             self.name = name
         self.minimum = att.get('minimum', float, default_minimum)
@@ -191,16 +190,16 @@ class Job(optimize.OptimizationProblem):
             ins, outs = [], []
             for iin, inelement in enumerate(element.findall('in')):
                 with XMLAttributes(inelement, 'transform %i, input %i' % (ipar+1, iin+1)) as att:
-                    name = att.get('name', unicode)
+                    name = att.get('name')
                     att.description = 'transform %i, input %s' % (ipar+1, name)
                     ins.append((name, att.get('minimum', float), att.get('maximum', float), att.get('logscale', bool, default=False)))
             for iout, outelement in enumerate(element.findall('out')):
                 with XMLAttributes(outelement, 'transform %i, output %i' % (ipar+1, iout+1)) as att:
-                    infile = att.get('file', unicode)
-                    namelist = att.get('namelist', unicode)
-                    variable = att.get('variable', unicode)
+                    infile = att.get('file')
+                    namelist = att.get('namelist')
+                    variable = att.get('variable')
                     att.description = 'transform %i, output %s/%s/%s' % (ipar+1, infile, namelist, variable)
-                    outs.append((infile, namelist, variable, att.get('value', unicode)))
+                    outs.append((infile, namelist, variable, att.get('value')))
             tf = RunTimeTransform(ins, outs)
             self.controller.addParameterTransform(tf)
 

@@ -104,9 +104,9 @@ class NcDict(object):
 
 class NamelistParameter(shared.Parameter):
     def __init__(self, job, att):
-        self.file = os.path.normpath(att.get('file', unicode))
-        self.namelist = att.get('namelist', unicode)
-        self.variable = att.get('variable', unicode)
+        self.file = os.path.normpath(att.get('file'))
+        self.namelist = att.get('namelist')
+        self.variable = att.get('variable')
         shared.Parameter.__init__(self, job, att, name='%s/%s/%s' % (self.file, self.namelist, self.variable))
 
         if not hasattr(job, 'namelistfiles'):
@@ -144,8 +144,8 @@ class NamelistParameter(shared.Parameter):
 
 class YamlParameter(shared.Parameter):
     def __init__(self, job, att):
-        self.file = os.path.normpath(att.get('file', unicode))
-        self.variable = att.get('variable', unicode)
+        self.file = os.path.normpath(att.get('file'))
+        self.variable = att.get('variable')
         if yaml is None:
             raise Exception('Unable to handle parameter %s/%s because pyyaml package is not available.' % (self.file, self.variable)) 
         shared.Parameter.__init__(self, job, att, name='%s/%s' % (self.file, self.variable))
@@ -197,7 +197,7 @@ class Job(shared.Job):
         element = xml_tree.find('setup')
         if element is not None:
             with shared.XMLAttributes(element, 'the setup element') as att:
-                self.scenariodir = os.path.join(root, att.get('path', unicode))
+                self.scenariodir = os.path.join(root, att.get('path'))
         else:
             self.scenariodir = root
 
@@ -208,9 +208,9 @@ class Job(shared.Job):
         with shared.XMLAttributes(element, 'the executable element') as att:
             self.use_shell = att.get('shell', bool, False)
             if self.use_shell:
-                self.exe = att.get('path', unicode)
+                self.exe = att.get('path')
             else:
-                self.exe = os.path.realpath(os.path.join(root, att.get('path', unicode)))
+                self.exe = os.path.realpath(os.path.join(root, att.get('path')))
             self.max_runtime = att.get('max_runtime', int, required=False)
 
         self.simulationdir = simulationdir
@@ -236,11 +236,11 @@ class Job(shared.Job):
         self.targets = []
         for itarget, element in enumerate(xml_tree.findall('targets/target')):
             with shared.XMLAttributes(element, 'target %i' % (itarget + 1,)) as att:
-                self.targets.append((att.get('expression', unicode), att.get('path', unicode)))
+                self.targets.append((att.get('expression'), att.get('path')))
         element = xml_tree.find('target')
         if element is not None:
             with shared.XMLAttributes(element, 'the target element') as att:
-                self.targets.append((att.get('expression', unicode), att.get('path', unicode)))
+                self.targets.append((att.get('expression'), att.get('path')))
         if self.targets:
             return
 
@@ -251,13 +251,13 @@ class Job(shared.Job):
         n = 0
         for iobs, element in enumerate(xml_tree.findall('observations/variable')):
             with shared.XMLAttributes(element, 'observed variable %i' % (iobs+1)) as att:
-                source = att.get('source', unicode)
+                source = att.get('source')
                 att.description = 'observation set %s' % source
                 sourcepath = os.path.normpath(os.path.join(root, source))
                 assert os.path.isfile(sourcepath), 'Observation source file "%s" does not exist.' % sourcepath
-                modelvariable = att.get('modelvariable', unicode)
-                modelpath = att.get('modelpath', unicode)
-                file_format = att.get('format', unicode, default='profiles')
+                modelvariable = att.get('modelvariable')
+                modelpath = att.get('modelpath')
+                file_format = att.get('format', default='profiles')
                 n += self.addObservation(sourcepath, modelvariable, modelpath,
                     maxdepth          =att.get('maxdepth',           float, required=False, minimum=0.),
                     mindepth          =att.get('mindepth',           float, required=False, minimum=0.),
@@ -277,7 +277,7 @@ class Job(shared.Job):
     def getParameter(self, att):
         if att.get('dummy', bool, default=False):
             return shared.DummyParameter(self, att)
-        strfile = att.get('file', unicode, required=False)
+        strfile = att.get('file', required=False)
         if strfile.endswith('.yaml'):
             return YamlParameter(self, att)
         return NamelistParameter(self, att)
@@ -292,7 +292,7 @@ class Job(shared.Job):
         if maxdepth < 0: print('WARNING: maxdepth=%s, but typically should be positive (downward distance from surface in meter).' % maxdepth)
         assert maxdepth > mindepth, 'ERROR: maxdepth=%s should be greater than mindepth=%s' % (maxdepth, mindepth)
 
-        assert isinstance(observeddata, basestring), 'Currently observations must be supplied as path to an 3-column ASCII file.'
+        assert isinstance(observeddata, (str, u''.__class__)), 'Currently observations must be supplied as path to an 3-column ASCII file.'
 
         # Observations are specified as path to ASCII file.
         sourcepath = observeddata

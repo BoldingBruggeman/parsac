@@ -16,7 +16,7 @@ class Job(shared.Job):
         if element is None:
             raise Exception('The root node must contain a single "target" element.')
         with shared.XMLAttributes(element, 'the target element') as att:
-            self.expression = att.get('expression', unicode)
+            self.expression = att.get('expression')
 
         self.basedict = {}
         for name in dir(numpy):

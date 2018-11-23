@@ -7,25 +7,25 @@ import os
 import numpy
 
 # Import custom modules
-import acpy.job
-import acpy.report
-import acpy.transport
+from .. import job
+from .. import report
+from .. import transport
 
-import acpy.result.plot
-import acpy.result.plotbest
-import acpy.result.animate_2d
-import acpy.result.summary
+from . import plot
+from . import plotbest
+from . import animate_2d
+from . import summary
 
 class Result(object):
     def __init__(self, xml_path, simulationdir=None):
-        self.job = acpy.job.fromConfigurationFile(xml_path, simulationdir=simulationdir)
+        self.job = job.fromConfigurationFile(xml_path, simulationdir=simulationdir)
 
-        reporter = acpy.report.fromConfigurationFile(xml_path, '')
+        reporter = report.fromConfigurationFile(xml_path, '')
         for transport in reporter.transports:
-            if isinstance(transport, acpy.transport.MySQL):
+            if isinstance(transport, transport.MySQL):
                 import mysqlinfo
                 self.db = mysqlinfo.connect(mysqlinfo.select)
-            elif isinstance(transport, acpy.transport.SQLite):
+            elif isinstance(transport, transport.SQLite):
                 import sqlite3
                 if not os.path.isfile(transport.path):
                     raise Exception('SQLite database %s does not exist.' % transport.path)

@@ -1,4 +1,8 @@
 from __future__ import print_function
+try:
+    input = raw_input
+except NameError:
+    pass
 import sys
 import os.path
 import threading
@@ -7,8 +11,8 @@ import xml.etree.ElementTree
 
 import numpy
 
-from job import shared
-import transport
+from .job import shared
+from  . import transport
 
 def fromConfigurationFile(path, description, allowedtransports=None, interactive=True):
     tree = xml.etree.ElementTree.parse(path)
@@ -17,12 +21,12 @@ def fromConfigurationFile(path, description, allowedtransports=None, interactive
     root_dir = os.path.dirname(path)
 
     # Parse transports section
-    if isinstance(allowedtransports, basestring):
+    if isinstance(allowedtransports, (str, u''.__class__)):
         allowedtransports = (allowedtransports,)
     transports = []
     for itransport, element in enumerate(tree.findall('transports/transport')):
         with shared.XMLAttributes(element, 'transport %i' % (itransport+1)) as att:
-            transport_type = att.get('type', unicode)
+            transport_type = att.get('type')
             if allowedtransports is not None and transport_type not in allowedtransports:
                 continue
             curtransport = transport.getClass(transport_type).fromXML(att, job_id=job_id, root_dir=root_dir)
@@ -187,7 +191,7 @@ class Reporter:
             if exceeded:
                 resp = None
                 while resp not in ('y', 'n'):
-                    resp = raw_input('To report results, connectivity to the server should be restored. Continue for now (y/n)? ')
+                    resp = input('To report results, connectivity to the server should be restored. Continue for now (y/n)? ')
                 if resp == 'n':
                     sys.exit(1)
                 self.reportfailcount = 0

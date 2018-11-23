@@ -6,11 +6,8 @@ from __future__ import print_function
 import argparse
 
 # Import personal custom stuff
-import run
-import result.plot
-import result.plotbest
-import result.animate_2d
-import result.summary
+from . import run
+from . import result
 
 def configure_argument_parser(parser):
     subparsers = parser.add_subparsers(dest='subcommand')
