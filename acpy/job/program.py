@@ -35,7 +35,7 @@ def writeNamelistFile(path, nmls, nmlorder):
     with open(path, 'w') as f:
         for nml in nmlorder:
             f.write('&%s\n' % nml)
-            for name, value in nmls[nml].iteritems():
+            for name, value in nmls[nml].items():
                 f.write('\t%s = %s,\n' % (name, value))
             f.write('/\n\n')
 
@@ -737,7 +737,7 @@ class Job(shared.Job):
             time.sleep(10)
             if verbose:
                 print('Running on:')
-                for node, ncpu in job_server.get_active_nodes().iteritems():
+                for node, ncpu in job_server.get_active_nodes().items():
                     print('   %s: %i cpus' % (node, ncpu))
         nworkers = sum(job_server.get_active_nodes().values())
         if verbose:

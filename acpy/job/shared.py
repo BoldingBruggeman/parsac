@@ -247,7 +247,7 @@ class Job(optimize.OptimizationProblem):
                 time.sleep(10)
                 if verbose:
                     print('Running on:')
-                    for node, ncpu in job_server.get_active_nodes().iteritems():
+                    for node, ncpu in job_server.get_active_nodes().items():
                         print('   %s: %i cpus' % (node, ncpu))
 
             # Make sure the population size is a multiple of the number of workers
@@ -271,6 +271,7 @@ class Job(optimize.OptimizationProblem):
                 member, result = ppjob()
                 results.append(result)
         else:
+            self.start()
             for member in ensemble:
                 result = self.evaluate(member)
                 results.append(result)
