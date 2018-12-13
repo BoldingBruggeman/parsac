@@ -167,13 +167,13 @@ class YamlParameter(shared.Parameter):
             with io.open(os.path.join(job.scenariodir, self.file), 'rU', encoding='utf-8') as f:
                 job.yamlfiles[self.file] = yaml.load(f)
 
-        self.target_dict = job.yamlfiles[self.file]
         path_comps = self.variable.split('/')
-        for i, comp in enumerate(path_comps[:-1]):
+        self.name = path_comps.pop()
+        self.target_dict = job.yamlfiles[self.file]
+        for i, comp in enumerate(path_comps):
             if comp not in self.target_dict:
                 raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, comp, '/'.join(path_comps[:i])))
             self.target_dict = self.target_dict[comp]
-        self.name = path_comps[-1]
         if self.name not in self.target_dict:
             raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, self.name, '/'.join(path_comps[:-1])))
 
