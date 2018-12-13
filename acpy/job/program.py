@@ -164,7 +164,7 @@ class YamlParameter(shared.Parameter):
         self.own_file = self.file not in job.yamlfiles
         if self.own_file:
             # Read all namelist in the file, and store their data and order.
-            with io.open(os.path.join(job.scenariodir, self.file, encoding='utf-8'), 'rU') as f:
+            with io.open(os.path.join(job.scenariodir, self.file), 'rU', encoding='utf-8') as f:
                 job.yamlfiles[self.file] = yaml.load(f)
 
         self.target_dict = job.yamlfiles[self.file]
