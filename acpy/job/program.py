@@ -9,6 +9,7 @@ import tempfile
 import atexit
 import shutil
 import subprocess
+import io
 try:
     import cPickle as pickle
 except ImportError:
@@ -156,7 +157,7 @@ class YamlParameter(shared.Parameter):
         self.own_file = self.file not in job.yamlfiles
         if self.own_file:
             # Read all namelist in the file, and store their data and order.
-            with open(os.path.join(job.scenariodir, self.file), 'rU') as f:
+            with io.open(os.path.join(job.scenariodir, self.file, encoding='utf-8'), 'rU') as f:
                 job.yamlfiles[self.file] = yaml.load(f)
 
         self.target_dict = job.yamlfiles[self.file]
@@ -186,7 +187,7 @@ class YamlParameter(shared.Parameter):
 
     def store(self):
         if self.own_file:
-            with open(self.path, 'w') as f:
+            with io.open(self.path, 'w', encoding='utf-8') as f:
                 yaml.dump(self.job.yamlfiles[self.file], f, default_flow_style=False)
 
 class Job(shared.Job):
