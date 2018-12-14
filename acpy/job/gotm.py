@@ -1,5 +1,8 @@
 import os
 import datetime
+import io
+
+import yaml
 
 from . import program
 
@@ -12,23 +15,32 @@ class Job(program.Job):
 
     def getSimulationStart(self):
         if self.start_time is None:
+            # Find start and stop of simulation.
+            # These will be used to prune the observation table.
+
             # Check for existence of scenario directory
             # (we need it now already to find start/stop of simulation)
             if not os.path.isdir(self.scenariodir):
                 raise Exception('GOTM scenario directory "%s" does not exist.' % self.scenariodir)
 
-            # Parse file with namelists describing the main scenario settings.
-            path = os.path.join(self.scenariodir, 'gotmrun.nml')
-            nmls, order = program.parseNamelistFile(path)
-            assert 'time' in nmls, 'Cannot find namelist named "time" in "%s".' % path
+            # Parse GOTM configuration file with settings specifying the simulated period.
+            gotmyaml_path = os.path.join(self.scenariodir, 'gotm.yaml')
+            if os.path.isfile(gotmyaml_path):
+                # Using yaml configuration
+                with io.open(gotmyaml_path, 'rU', encoding='utf-8') as f:
+                    gotmyaml = yaml.load(f)
+                period = gotmyaml['period']
+                start_time = period['start']
+                stop_time = period['stop']
+            else:
+                # Using namelist configuration
+                gotmrun_path = os.path.join(self.scenariodir, 'gotmrun.nml')
+                nmls, order = program.parseNamelistFile(gotmrun_path)
+                assert 'time' in nmls, 'Cannot find namelist named "time" in "%s".' % gotmrun_path
+                start_time = nmls['time']['start'][1:-1]
+                stop_time = nmls['time']['stop'][1:-1]
 
-            # Find start and stop of simulation.
-            # These will be used to prune the observation table.
-            datematch = program.datetimere.match(nmls['time']['start'][1:-1])
-            assert datematch is not None, 'Unable to parse start datetime in "%s".' % nmls['time']['start'][1:-1]
-            self.start_time = datetime.datetime(*map(int, datematch.group(1, 2, 3, 4, 5, 6)))
-            datematch = program.datetimere.match(nmls['time']['stop'][1:-1])
-            assert datematch is not None, 'Unable to parse stop datetime in "%s".' % nmls['time']['stop'][1:-1]
-            self.stop_time = datetime.datetime(*map(int, datematch.group(1, 2, 3, 4, 5, 6)))
+            self.start_time = datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+            self.stop_time = datetime.datetime.strptime(stop_time, '%Y-%m-%d %H:%M:%S')
 
         return self.start_time
