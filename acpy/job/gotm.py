@@ -30,8 +30,8 @@ class Job(program.Job):
                 with io.open(gotmyaml_path, 'rU', encoding='utf-8') as f:
                     gotmyaml = yaml.load(f)
                 period = gotmyaml['period']
-                start_time = period['start']
-                stop_time = period['stop']
+                self.start_time = period['start']
+                self.stop_time = period['stop']
             else:
                 # Using namelist configuration
                 gotmrun_path = os.path.join(self.scenariodir, 'gotmrun.nml')
@@ -39,8 +39,7 @@ class Job(program.Job):
                 assert 'time' in nmls, 'Cannot find namelist named "time" in "%s".' % gotmrun_path
                 start_time = nmls['time']['start'][1:-1]
                 stop_time = nmls['time']['stop'][1:-1]
-
-            self.start_time = datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
-            self.stop_time = datetime.datetime.strptime(stop_time, '%Y-%m-%d %H:%M:%S')
+                self.start_time = datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+                self.stop_time = datetime.datetime.strptime(stop_time, '%Y-%m-%d %H:%M:%S')
 
         return self.start_time
