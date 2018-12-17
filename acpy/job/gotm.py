@@ -27,7 +27,7 @@ class Job(program.Job):
             gotmyaml_path = os.path.join(self.scenariodir, 'gotm.yaml')
             if os.path.isfile(gotmyaml_path):
                 # Using yaml configuration
-                with io.open(gotmyaml_path, 'rU', encoding='utf-8') as f:
+                with io.open(gotmyaml_path, 'rU') as f:
                     gotmyaml = yaml.load(f)
                 period = gotmyaml['period']
                 self.start_time = period['start']
