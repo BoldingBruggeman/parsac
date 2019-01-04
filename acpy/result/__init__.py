@@ -21,15 +21,15 @@ class Result(object):
         self.job = job.fromConfigurationFile(xml_path, simulationdir=simulationdir)
 
         reporter = report.fromConfigurationFile(xml_path, '')
-        for transport in reporter.transports:
-            if isinstance(transport, transport.MySQL):
+        for tp in reporter.transports:
+            if isinstance(tp, transport.MySQL):
                 import mysqlinfo
                 self.db = mysqlinfo.connect(mysqlinfo.select)
-            elif isinstance(transport, transport.SQLite):
+            elif isinstance(tp, transport.SQLite):
                 import sqlite3
-                if not os.path.isfile(transport.path):
-                    raise Exception('SQLite database %s does not exist.' % transport.path)
-                self.db = sqlite3.connect(transport.path)
+                if not os.path.isfile(tp.path):
+                    raise Exception('SQLite database %s does not exist.' % tp.path)
+                self.db = sqlite3.connect(tp.path)
 
     def get_sources(self):
         # Build map from run identifier to source machine
