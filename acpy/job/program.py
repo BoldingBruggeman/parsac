@@ -364,7 +364,7 @@ class Job(shared.Job):
         cache_path = sourcepath + ('' if variable is None else '.%s' % variable) + '.cache'
         if cache and os.path.isfile(cache_path):
             # Retrieve cached copy of the observations
-            with open(sourcepath+'.cache', 'rb') as f:
+            with open(cache_path, 'rb') as f:
                 oldmd5 = pickle.load(f)
                 if oldmd5 != md5:
                     print('Cached copy of %s is out of date - file will be reparsed.' % sourcepath)
