@@ -200,6 +200,55 @@ class YamlParameter(shared.Parameter):
             with io.open(self.path, 'w', encoding='utf-8') as f:
                 yaml.dump(self.job.yamlfiles[self.file], f, default_flow_style=False)
 
+def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf):
+    times, zs, values = [], [], []
+    with open(path, 'rU') as f:
+        for iline, line in enumerate(f):
+            if verbose and (iline + 1) % 20000 == 0:
+                print('Read "%s" upto line %i.' % (path, iline))
+            if line.startswith('#'):
+                continue
+            datematch = datetimere.match(line)
+            if datematch is None:
+                raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline+1, line))
+            refvals = map(int, datematch.group(1, 2, 3, 4, 5, 6)) # Convert matched strings into integers
+            curtime = datetime.datetime(*refvals)
+            data = line[datematch.end():].rstrip('\n').split()
+            if format == 0:
+                if len(data) != 2:
+                    raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline + 1, len(data)))
+                z = float(data[0])
+                if not numpy.isfinite(z):
+                    raise Exception('Depth on line %i is not a valid number: %s.' % (iline + 1, data[0]))
+                if -z < mindepth or -z > maxdepth:
+                    continue
+                zs.append(z)
+            else:
+                if len(data) != 1:
+                    raise Exception('Line %i does not contain one value (observation) after the date + time, but %i values.' % (iline + 1, len(data)))
+            times.append(curtime)
+            value = float(data[-1])
+            if not numpy.isfinite(value):
+                raise Exception('Observed value on line %i is not a valid number: %s.' % (iline + 1, data[-1]))
+            values.append(value)
+    if format == 0:
+        zs = numpy.array(zs)
+    else:
+        zs = None
+    values = numpy.array(values)
+    return times, zs, values
+
+def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf):
+    assert format != 0, 'Only time series can currently be read from NetCDF'
+    with netCDF4.Dataset(path) as nc:
+        ncvar = nc.variables[name]
+        assert ncvar.ndim == 1
+        nctime = nc.variables[ncvar.dimensions[0]]
+        times = netCDF4.num2date(nctime[:], nctime.units)
+        values = nc.variables[name][:]
+        zs = None if depth_name is None else nc.variables[depth_name][:]
+    return times, zs, values
+
 class Job(shared.Job):
     verbose = True
 
@@ -281,6 +330,8 @@ class Job(shared.Job):
                     minimum           =att.get('minimum',            float, default=0.1),
                     sd                =att.get('sd',                 float, required=False, minimum=0.),
                     file_format       ={'profiles':0, 'timeseries':1}[file_format],
+                    variable          =att.get('variable', required=False),
+                    depth_variable    =att.get('depth_variable', required=False),
                     cache=True)
         if n == 0:
             raise Exception('No valid observations found within specified depth and time range.')
@@ -296,7 +347,7 @@ class Job(shared.Job):
     def getSimulationStart(self):
         raise NotImplementedError()
 
-    def addObservation(self, observeddata, outputvariable, outputpath, spinupyears=None, relativefit=False, min_scale_factor=None, max_scale_factor=None, sd=None, maxdepth=None, mindepth=None, cache=True, fixed_scale_factor=None, logscale=False, minimum=None, file_format=0):
+    def addObservation(self, observeddata, outputvariable, outputpath, spinupyears=None, relativefit=False, min_scale_factor=None, max_scale_factor=None, sd=None, maxdepth=None, mindepth=None, cache=True, fixed_scale_factor=None, logscale=False, minimum=None, file_format=0, variable=None, depth_variable=None):
         sourcepath = None
         if mindepth is None: mindepth = -numpy.inf
         if maxdepth is None: maxdepth = numpy.inf
@@ -310,7 +361,8 @@ class Job(shared.Job):
         md5 = getMD5(sourcepath)
 
         observeddata = None
-        if cache and os.path.isfile(sourcepath+'.cache'):
+        cache_path = sourcepath + ('' if variable is None else '.%s' % variable) + '.cache'
+        if cache and os.path.isfile(cache_path):
             # Retrieve cached copy of the observations
             with open(sourcepath+'.cache', 'rb') as f:
                 oldmd5 = pickle.load(f)
@@ -326,44 +378,17 @@ class Job(shared.Job):
                 print('Reading observations for variable "%s" from "%s".' % (outputvariable, sourcepath))
             if not os.path.isfile(sourcepath):
                 raise Exception('"%s" is not a file.' % sourcepath)
-            times, zs, values = [], [], []
-            with open(sourcepath, 'rU') as f:
-                for iline, line in enumerate(f):
-                    if self.verbose and (iline+1)%20000 == 0:
-                        print('Read "%s" upto line %i.' % (sourcepath, iline))
-                    if line.startswith('#'): continue
-                    datematch = datetimere.match(line)
-                    if datematch is None:
-                        raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline+1, line))
-                    refvals = map(int, datematch.group(1, 2, 3, 4, 5, 6)) # Convert matched strings into integers
-                    curtime = datetime.datetime(*refvals)
-                    data = line[datematch.end():].rstrip('\n').split()
-                    if file_format == 0:
-                        if len(data) != 2:
-                            raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline+1, len(data)))
-                        z = float(data[0])
-                        if not numpy.isfinite(z):
-                            raise Exception('Depth on line %i is not a valid number: %s.' % (iline+1, data[0]))
-                        if -z < mindepth or -z > maxdepth: continue
-                        zs.append(z)
-                    else:
-                        if len(data) != 1:
-                            raise Exception('Line %i does not contain one value (observation) after the date + time, but %i values.' % (iline+1, len(data)))
-                    times.append(curtime)
-                    value = float(data[-1])
-                    if not numpy.isfinite(value):
-                        raise Exception('Observed value on line %i is not a valid number: %s.' % (iline+1, data[-1]))
-                    values.append(value)
-            if file_format == 0:
-                zs = numpy.array(zs)
+            if sourcepath.endswith('.nc'):
+                if variable is None:
+                    raise Exception('"variable" attribute must be provided since "%s" is a NetCDF file.' % sourcepath)
+                times, zs, values = parseNcFile(sourcepath, variable, depth_variable, self.verbose, mindepth, maxdepth)
             else:
-                zs = None
-            values = numpy.array(values)
+                times, zs, values = parseTextFile(sourcepath, file_format, self.verbose, mindepth, maxdepth)
 
             # Try to store cached copy of observations
             if cache:
                 try:
-                    with open(sourcepath+'.cache', 'wb') as f:
+                    with open(cache_path, 'wb') as f:
                         pickle.dump(md5, f, pickle.HIGHEST_PROTOCOL)
                         pickle.dump((times, zs, values), f, pickle.HIGHEST_PROTOCOL)
                 except Exception as e:
