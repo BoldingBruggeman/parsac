@@ -1,4 +1,5 @@
 import os.path
+import json
 
 try:
     import MySQLdb
@@ -12,10 +13,14 @@ except ImportError:
 
 try:
     import httplib
-    import urllib
     import socket
 except ImportError:
     httplib = None
+
+try:
+    from urllib import parse as urllib_parse
+except ImportError:
+    import urllib as urllib_parse
 
 def getClass(transport_type):
     if transport_type not in type2class:
@@ -49,11 +54,11 @@ class Dummy(Transport):
 class MySQL(Transport):
     @classmethod
     def fromXML(cls, att, **kwargs):
-        defaultfile = att.get('defaultfile', unicode, required=False)
-        return cls(server=att.get('server', unicode, required=(defaultfile is None)),
-                   user=att.get('user', unicode, required=(defaultfile is None)),
-                   password=att.get('password', unicode, required=(defaultfile is None)),
-                   database=att.get('database', unicode, required=(defaultfile is None)),
+        defaultfile = att.get('defaultfile', required=False)
+        return cls(server=att.get('server', required=(defaultfile is None)),
+                   user=att.get('user', required=(defaultfile is None)),
+                   password=att.get('password', required=(defaultfile is None)),
+                   database=att.get('database', required=(defaultfile is None)),
                    defaultfile = defaultfile)
 
     def __init__(self, server, user, password, database, timeout=30, defaultfile=None):
@@ -96,7 +101,7 @@ class MySQL(Transport):
         c = db.cursor()
 
         # Enumerate over results and insert them in the database.
-        for values, lnlikelihood in results:
+        for values, lnlikelihood, extra_outputs in results:
             strpars = ';'.join('%.12e' % v for v in values)
             if lnlikelihood is None:
                 lnlikelihood = 'NULL'
@@ -111,7 +116,7 @@ class MySQL(Transport):
 class HTTP(Transport):
     @classmethod
     def fromXML(cls, att, **kwargs):
-        return cls(server=att.get('server', unicode), path=att.get('path', unicode))
+        return cls(server=att.get('server'), path=att.get('path'))
 
     def __init__(self, server, path):
         Transport.__init__(self)
@@ -128,7 +133,7 @@ class HTTP(Transport):
         params = {'job':jobid, 'description':description}
         headers = {'Content-type':'application/x-www-form-urlencoded', 'Accept':'text/plain'}
         conn = httplib.HTTPConnection(self.server)
-        conn.request('POST', self.path+'startrun.php', urllib.urlencode(params), headers)
+        conn.request('POST', self.path+'startrun.php', urllib_parse.urlencode(params), headers)
         response = conn.getresponse()
         resp = response.read()
         if response.status != httplib.OK:
@@ -140,7 +145,7 @@ class HTTP(Transport):
     def reportResults(self, runid, results, timeout=5):
         # Create POST parameters and header
         strpars, strlnls = [], []
-        for values, lnlikelihood in results:
+        for values, lnlikelihood, extra_outputs in results:
             curpars = ';'.join('%.12e' % v for v in values)
             if lnlikelihood is None:
                 curlnl = ''
@@ -158,7 +163,7 @@ class HTTP(Transport):
         try:
             # Connect and post results to HTTP server.
             conn = httplib.HTTPConnection(self.server)
-            conn.request('POST', self.path+'submit.php', urllib.urlencode(params), headers)
+            conn.request('POST', self.path+'submit.php', urllib_parse.urlencode(params), headers)
 
             # Interpret server response.
             response = conn.getresponse()
@@ -190,6 +195,11 @@ class SQLite(Transport):
     def connect(self):
         return sqlite3.connect(self.path)
 
+    def getColumnNames(self, db, tablename):
+        c = db.cursor()
+        c.execute('PRAGMA table_info(%s);' % tablename)
+        return [row[1] for row in c]
+
     def initialize(self, jobid, description):
         import platform
         create = not os.path.isfile(self.path)
@@ -197,7 +207,11 @@ class SQLite(Transport):
         c = db.cursor()
         if create:
             c.execute('CREATE TABLE `runs`    (`id` INTEGER PRIMARY KEY,`source` VARCHAR(50) NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`job` TEXT NOT NULL,`description` TEXT);')
-            c.execute('CREATE TABLE `results` (`id` INTEGER PRIMARY KEY,`run` INTEGER UNSIGNED NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`parameters` VARCHAR(500) NOT NULL,`lnlikelihood` DOUBLE);')
+            c.execute('CREATE TABLE `results` (`id` INTEGER PRIMARY KEY,`run` INTEGER UNSIGNED NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`parameters` TEXT NOT NULL,`lnlikelihood` DOUBLE,`extra_outputs` TEXT);')
+        else:
+            column_names = self.getColumnNames(db, 'results')
+            if 'extra_outputs' not in column_names:
+                c.execute('ALTER TABLE `results` ADD COLUMN `extra_outputs` TEXT;')
         c.execute("INSERT INTO `runs` (`source`,`job`,`description`) values(?,?,?);",(platform.node(), jobid, description))
         runid = c.lastrowid
         db.commit()
@@ -210,9 +224,11 @@ class SQLite(Transport):
         c = db.cursor()
 
         # Enumerate over results and insert them in the database.
-        for values, lnlikelihood in results:
+        for values, lnlikelihood, extra_outputs in results:
             strpars = ';'.join('%.15e' % v for v in values)
-            c.execute("INSERT INTO `results` (`run`,`parameters`,`lnlikelihood`) values(?,?,?);", (runid, strpars, lnlikelihood))
+            if extra_outputs is not None:
+                extra_outputs = json.dumps(extra_outputs)
+            c.execute("INSERT INTO `results` (`run`,`parameters`,`lnlikelihood`,`extra_outputs`) values(?,?,?,?);", (runid, strpars, lnlikelihood, extra_outputs))
 
         # Commit and close database connection.
         db.commit()

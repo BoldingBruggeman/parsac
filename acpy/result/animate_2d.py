@@ -62,7 +62,7 @@ def main(args):
 
         marg1_func, marg2_func = None, None 
         if isinstance(result.job, acpy.job.idealized.Job) and not args.scatter:
-            zs = result.job.evaluateFitness((xs_c[:, numpy.newaxis], ys_c[numpy.newaxis, :]))
+            zs = result.job.evaluate((xs_c[:, numpy.newaxis], ys_c[numpy.newaxis, :]))
             marg1_func = lambda x: numpy.exp(-0.5*(x**2))
             marg2_func = lambda x: numpy.exp(-0.5*(x**2))
             pc = pylab.contourf(xs_c, ys_c, zs, 100)
