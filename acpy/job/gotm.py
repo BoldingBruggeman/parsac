@@ -35,7 +35,7 @@ class Job(program.Job):
             else:
                 # Using namelist configuration
                 gotmrun_path = os.path.join(self.scenariodir, 'gotmrun.nml')
-                nmls, order = program.parseNamelistFile(gotmrun_path)
+                nmls, _ = program.parseNamelistFile(gotmrun_path)
                 assert 'time' in nmls, 'Cannot find namelist named "time" in "%s".' % gotmrun_path
                 start_time = nmls['time']['start'][1:-1]
                 stop_time = nmls['time']['stop'][1:-1]

@@ -181,12 +181,12 @@ class YamlParameter(shared.Parameter):
             raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, self.name, '/'.join(path_comps[:-1])))
 
     def initialize(self):
-        # Update path to namelist file to match temporary scenario directory.
+        # Update path to yaml file to match temporary scenario directory.
         self.path = os.path.join(self.job.scenariodir, self.file)
 
-        # If we already read this yaml file for some other parameter, just continue.
+        # If we take charge of reading/writing the yaml file (i.e., we are the first yaml parameter referencing this file),
+        # create a backup of it now.
         if self.own_file:
-            # Backup current namelist file
             icopy = 0
             while os.path.isfile(self.path+'.backup%02i' % icopy):
                 icopy += 1
@@ -210,7 +210,7 @@ def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=num
                 continue
             datematch = datetimere.match(line)
             if datematch is None:
-                raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline+1, line))
+                raise Exception('Line %i does not start with time (yyyy-mm-dd hh:mm:ss). Line contents: %s' % (iline + 1, line))
             refvals = map(int, datematch.group(1, 2, 3, 4, 5, 6)) # Convert matched strings into integers
             curtime = datetime.datetime(*refvals)
             data = line[datematch.end():].rstrip('\n').split()
@@ -239,7 +239,6 @@ def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=num
     return times, zs, values
 
 def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf):
-    assert format != 0, 'Only time series can currently be read from NetCDF'
     with netCDF4.Dataset(path) as nc:
         ncvar = nc.variables[name]
         assert ncvar.ndim == 1
