@@ -101,16 +101,21 @@ class Reporter:
             self.reportingthread = ReportingThread(self)
             self.reportingthread.start()
 
-    def reportResult(self, values, lnlikelihood, error=None):
+    def reportResult(self, values, result, error=None):
         if self.queuelock is None:
             self.createReportingThread()
+
+        if isinstance(result, tuple):
+            lnlikelihood, extra_outputs = result
+        else:
+            lnlikelihood, extra_outputs = result, None
 
         if not numpy.isfinite(lnlikelihood):
             lnlikelihood = None
 
         # Append result to queue
         self.queuelock.acquire()
-        self.resultqueue.append((values, lnlikelihood))
+        self.resultqueue.append((values, lnlikelihood, extra_outputs))
         self.queuelock.release()
 
         if not self.separate_thread:

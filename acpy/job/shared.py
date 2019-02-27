@@ -209,7 +209,9 @@ class Job(optimize.OptimizationProblem):
             self.started = True
 
     def evaluateFitness(self, parameter_values):
-        return self.evaluate(parameter_values)
+        extra_outputs = {}
+        lnl = self.evaluate2(parameter_values, extra_outputs)
+        return lnl if not extra_outputs else lnl, extra_outputs
 
     # optionally to be implemented by derived classes
     def on_start(self):
@@ -218,6 +220,9 @@ class Job(optimize.OptimizationProblem):
     # to be implemented by derived classes
     def evaluate(self, parameter_values):
         raise NotImplementedError('Classes deriving from Job must implement "evaluate"')
+
+    def evaluate2(self, parameter_values, extra_outputs={}):
+        return self.evaluate(parameter_values)
 
     def evaluate_ensemble(self, ensemble, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False):
         results = []
@@ -308,3 +313,10 @@ class Job(optimize.OptimizationProblem):
                              'minimum':minval,
                              'maximum':maxval,
                              'logscale':haslogscale})
+
+class Job2(Job):
+    def evaluate(self, parameter_values):
+        return self.evaluate2(parameter_values)
+
+    def evaluate2(self, parameter_values, info=None):
+        raise NotImplementedError('Classes deriving from Job2 must implement "evaluate2"')

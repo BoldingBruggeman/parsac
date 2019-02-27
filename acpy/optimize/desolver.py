@@ -43,7 +43,7 @@ def processTrial(newjobid, newjob, trial):
         newjob.start()
 
     # Evaluate the fitness function (*more is better*)
-    fitness = job.evaluateFitness(trial)
+    fitness = job.evaluateAndUnpack(trial)
 
     return trial, fitness
 

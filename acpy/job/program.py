@@ -248,7 +248,7 @@ def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxd
         zs = None if depth_name is None else nc.variables[depth_name][:]
     return times, zs, values
 
-class Job(shared.Job):
+class Job(shared.Job2):
     verbose = True
 
     def __init__(self, job_id, xml_tree, root, copyexe=False, tempdir=None, simulationdir=None):
@@ -302,6 +302,12 @@ class Job(shared.Job):
                 self.targets.append((att.get('expression'), att.get('path')))
         if self.targets:
             return
+
+        # Look for additional statistics to save with result.
+        self.statistics = []
+        for istatistic, element in enumerate(xml_tree.findall('extra_outputs/statistic')):
+            with shared.XMLAttributes(element, 'statistic %i' % (istatistic + 1,)) as att:
+                self.statistics.append((att.get('name'), att.get('expression')))
 
         # Array to hold observation datasets
         self.observations = []
@@ -364,12 +370,15 @@ class Job(shared.Job):
         if cache and os.path.isfile(cache_path):
             # Retrieve cached copy of the observations
             with open(cache_path, 'rb') as f:
-                oldmd5 = pickle.load(f)
-                if oldmd5 != md5:
-                    print('Cached copy of %s is out of date - file will be reparsed.' % sourcepath)
-                else:
-                    print('Loading cached copy of %s...' % sourcepath)
-                    observeddata = pickle.load(f)
+                try:
+                    oldmd5 = pickle.load(f)
+                    if oldmd5 != md5:
+                        print('Cached copy of %s is out of date - file will be reparsed.' % sourcepath)
+                    else:
+                        print('Loading cached copy of %s...' % sourcepath)
+                        observeddata = pickle.load(f)
+                except:
+                    print('Failed to load cached copy of %s - file will be reparsed.' % sourcepath)
 
         if not isinstance(observeddata, tuple):
             # Parse ASCII file and store observations as matrix.
@@ -489,6 +498,7 @@ class Job(shared.Job):
             parameter.initialize()
 
         self.targets = [(compile(expression, '<string>', 'eval'), os.path.join(self.scenariodir, ncpath)) for (expression, ncpath) in self.targets]
+        self.statistics = [(name, compile(statistic, '<string>', 'eval')) for name, statistic in self.statistics]
 
     def prepareDirectory(self, values):
         assert self.started
@@ -512,7 +522,7 @@ class Job(shared.Job):
         for parameter in self.parameters:
             parameter.store()
 
-    def evaluate(self, values, return_model_values=False, show_output=False):
+    def evaluate2(self, values, extra_outputs=None, return_model_values=False, show_output=False):
         assert self.started
 
         print('Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values]))
@@ -572,8 +582,8 @@ class Job(shared.Job):
                         iright = time_vals.searchsorted(numtime)
                         if iright == 0 or iright >= len(time_vals): continue
                         valid[i] = True
-                        itimes_left.append(iright-1)
-                        iweights_left.append((numtime-time_vals[iright-1])/(time_vals[iright]-time_vals[iright-1]))
+                        itimes_left.append(iright - 1)
+                        iweights_left.append((time_vals[iright] - numtime) / (time_vals[iright] - time_vals[iright - 1]))
                     obsinfo['times'] = [t for t, v in zip(obsinfo['times'], valid) if v]
                     obsinfo['numtimes'] = numtimes[valid]
                     obsinfo['itimes'] = numpy.array(itimes_left, dtype=int)
@@ -736,6 +746,13 @@ class Job(shared.Job):
 
             # Note: assuming normally distributed errors, and omitting constant terms in the log likelihood = -n*ln(2*pi)/2
             lnlikelihood += -n*numpy.log(sd)-ssq/2/sd/sd
+
+            if extra_outputs is not None:
+                namespace = dict([(name, getattr(numpy, name)) for name in dir(numpy)])
+                stats = {}
+                for name, fn in self.statistics:
+                    stats[name] = eval(fn, {'x': obsvals, 'y': modelvals}, namespace)
+                extra_outputs.setdefault('statistics', []).append(stats)
 
         print('ln Likelihood = %.6g.' % lnlikelihood)
 

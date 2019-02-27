@@ -27,10 +27,14 @@ class OptimizationProblem:
     def evaluateFitness(self, parameters):
         raise NotImplementedError('Classes deriving from OptimizationProblem must implement evaluateFitness.')
 
+    def evaluateAndUnpack(self, parameters):
+        result = self.evaluateFitness(parameters)
+        return result if not isinstance(result, tuple) else result[0]
+
     def start(self):
         pass
 
-class TransformedProblem:
+class TransformedProblem(OptimizationProblem):
     """Filter that transforms one or more parameters."""
     def __init__(self, problem, transforms=()):
         self.problem = problem
@@ -103,7 +107,7 @@ class TransformedProblem:
     def start(self):
         self.problem.start()
 
-class ReducedProblem:
+class ReducedProblem(OptimizationProblem):
     """Filter that sets one parameter to a constant value."""
     def __init__(self, problem, ipar, value):
         self.problem = problem
@@ -126,7 +130,7 @@ class ReducedProblem:
     def start(self):
         self.problem.start()
 
-class ReportingProblem:
+class ReportingProblem(OptimizationProblem):
     """Filter that sends all results to a reporting function."""
     def __init__(self, problem, reportfunction):
         self.problem = problem
@@ -170,11 +174,11 @@ class Optimizer:
 
         if method == SIMPLEX:
             assert par_ini is not None, 'Simplex method requires an initial estimate.'
-            p_final = scipy.optimize.fmin(lambda p: -problem.evaluateFitness(p), par_ini, maxiter=maxiter, maxfun=maxfun, disp=verbose)
+            p_final = scipy.optimize.fmin(lambda p: -problem.evaluateAndUnpack(p), par_ini, maxiter=maxiter, maxfun=maxfun, disp=verbose)
         elif method == BFGS:
             assert par_ini is not None, 'BFGS method requires an initial estimate.'
-            p_final = bfgs.fmin_bfgs(lambda p: -problem.evaluateFitness(p), par_ini, disp=False)
-            #p_final = scipy.optimize.fmin_bfgs(lambda p: -problem.evaluateFitness(p),par_ini,disp=False)
+            p_final = bfgs.fmin_bfgs(lambda p: -problem.evaluateAndUnpack(p), par_ini, disp=False)
+            #p_final = scipy.optimize.fmin_bfgs(lambda p: -problem.evaluateAndUnpack(p),par_ini,disp=False)
         else:
             assert par_min is not None, 'Differential Evolution method requires lower parameter bounds.'
             assert par_max is not None, 'Differential Evolution method requires upper parameter bounds.'
@@ -204,11 +208,11 @@ class Optimizer:
 
     def calculateP(self, best, ipar, altvalue):
         self.problem.start()
-        bestfitness = self.problem.evaluateFitness(best)
+        bestfitness = self.problem.evaluateAndUnpack(best)
         problem = ReportingProblem(self.problem, self.reportfunction)
         problem = ReducedProblem(problem, ipar, altvalue)
-        est = scipy.optimize.fmin(lambda p: -problem.evaluateFitness(p), problem.reduce(best), disp=False)
-        altfitness = problem.evaluateFitness(est)
+        est = scipy.optimize.fmin(lambda p: -problem.evaluateAndUnpack(p), problem.reduce(best), disp=False)
+        altfitness = problem.evaluateAndUnpack(est)
 
         chi2_crit = 2.*(bestfitness-altfitness)
         chi2_p = 1. - scipy.stats.chi2.cdf(chi2_crit, 1)
@@ -227,7 +231,7 @@ class Optimizer:
         problem = TransformedProblem(problem, transform=transform)
 
         start = problem.transform(start)
-        startfitness = problem.evaluateFitness(start)
+        startfitness = problem.evaluateAndUnpack(start)
         target = startfitness-targetdelta
 
         def run(ipar, x, step, target):
@@ -236,7 +240,7 @@ class Optimizer:
                 def ev(p):
                     p = list(p)
                     p.insert(ipar, x[ipar])
-                    fitness = problem.evaluateFitness(p)
+                    fitness = problem.evaluateAndUnpack(p)
                     return -fitness
                 x_ini = list(x)
                 del x_ini[ipar]
@@ -260,9 +264,9 @@ class Optimizer:
                 pert = list(start)
                 pertstep = max(abs(start[ipar]*1e-6), 1e-6)
                 pert[ipar] = start[ipar]+pertstep
-                pertfitness_h = problem.evaluateFitness(pert)
+                pertfitness_h = problem.evaluateAndUnpack(pert)
                 pert[ipar] = start[ipar]-pertstep
-                pertfitness_l = problem.evaluateFitness(pert)
+                pertfitness_l = problem.evaluateAndUnpack(pert)
                 ddfddpar = (pertfitness_h+pertfitness_l-2*startfitness)/pertstep/pertstep
                 curmaxstep = numpy.sqrt(targetdelta/abs(ddfddpar))/5.
                 print('   auto-selected initial step size of %s' % curmaxstep)

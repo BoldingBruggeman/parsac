@@ -1,4 +1,5 @@
 import os.path
+import json
 
 try:
     import MySQLdb
@@ -96,7 +97,7 @@ class MySQL(Transport):
         c = db.cursor()
 
         # Enumerate over results and insert them in the database.
-        for values, lnlikelihood in results:
+        for values, lnlikelihood, extra_outputs in results:
             strpars = ';'.join('%.12e' % v for v in values)
             if lnlikelihood is None:
                 lnlikelihood = 'NULL'
@@ -140,7 +141,7 @@ class HTTP(Transport):
     def reportResults(self, runid, results, timeout=5):
         # Create POST parameters and header
         strpars, strlnls = [], []
-        for values, lnlikelihood in results:
+        for values, lnlikelihood, extra_outputs in results:
             curpars = ';'.join('%.12e' % v for v in values)
             if lnlikelihood is None:
                 curlnl = ''
@@ -190,6 +191,11 @@ class SQLite(Transport):
     def connect(self):
         return sqlite3.connect(self.path)
 
+    def getColumnNames(self, db, tablename):
+        c = db.cursor()
+        c.execute('PRAGMA table_info(%s);' % tablename)
+        return [row[1] for row in c]
+
     def initialize(self, jobid, description):
         import platform
         create = not os.path.isfile(self.path)
@@ -197,7 +203,11 @@ class SQLite(Transport):
         c = db.cursor()
         if create:
             c.execute('CREATE TABLE `runs`    (`id` INTEGER PRIMARY KEY,`source` VARCHAR(50) NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`job` TEXT NOT NULL,`description` TEXT);')
-            c.execute('CREATE TABLE `results` (`id` INTEGER PRIMARY KEY,`run` INTEGER UNSIGNED NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`parameters` VARCHAR(500) NOT NULL,`lnlikelihood` DOUBLE);')
+            c.execute('CREATE TABLE `results` (`id` INTEGER PRIMARY KEY,`run` INTEGER UNSIGNED NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`parameters` TEXT NOT NULL,`lnlikelihood` DOUBLE,`extra_outputs` TEXT);')
+        else:
+            column_names = self.getColumnNames(db, 'results')
+            if 'extra_outputs' not in column_names:
+                c.execute('ALTER TABLE `results` ADD COLUMN `extra_outputs` TEXT;')
         c.execute("INSERT INTO `runs` (`source`,`job`,`description`) values(?,?,?);",(platform.node(), jobid, description))
         runid = c.lastrowid
         db.commit()
@@ -210,9 +220,11 @@ class SQLite(Transport):
         c = db.cursor()
 
         # Enumerate over results and insert them in the database.
-        for values, lnlikelihood in results:
+        for values, lnlikelihood, extra_outputs in results:
             strpars = ';'.join('%.15e' % v for v in values)
-            c.execute("INSERT INTO `results` (`run`,`parameters`,`lnlikelihood`) values(?,?,?);", (runid, strpars, lnlikelihood))
+            if extra_outputs is not None:
+                extra_outputs = json.dumps(extra_outputs)
+            c.execute("INSERT INTO `results` (`run`,`parameters`,`lnlikelihood`,`extra_outputs`) values(?,?,?,?);", (runid, strpars, lnlikelihood, extra_outputs))
 
         # Commit and close database connection.
         db.commit()
