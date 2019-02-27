@@ -13,10 +13,14 @@ except ImportError:
 
 try:
     import httplib
-    import urllib
     import socket
 except ImportError:
     httplib = None
+
+try:
+    from urllib import parse as urllib_parse
+except ImportError:
+    import urllib as urllib_parse
 
 def getClass(transport_type):
     if transport_type not in type2class:
@@ -50,11 +54,11 @@ class Dummy(Transport):
 class MySQL(Transport):
     @classmethod
     def fromXML(cls, att, **kwargs):
-        defaultfile = att.get('defaultfile', unicode, required=False)
-        return cls(server=att.get('server', unicode, required=(defaultfile is None)),
-                   user=att.get('user', unicode, required=(defaultfile is None)),
-                   password=att.get('password', unicode, required=(defaultfile is None)),
-                   database=att.get('database', unicode, required=(defaultfile is None)),
+        defaultfile = att.get('defaultfile', required=False)
+        return cls(server=att.get('server', required=(defaultfile is None)),
+                   user=att.get('user', required=(defaultfile is None)),
+                   password=att.get('password', required=(defaultfile is None)),
+                   database=att.get('database', required=(defaultfile is None)),
                    defaultfile = defaultfile)
 
     def __init__(self, server, user, password, database, timeout=30, defaultfile=None):
@@ -112,7 +116,7 @@ class MySQL(Transport):
 class HTTP(Transport):
     @classmethod
     def fromXML(cls, att, **kwargs):
-        return cls(server=att.get('server', unicode), path=att.get('path', unicode))
+        return cls(server=att.get('server'), path=att.get('path'))
 
     def __init__(self, server, path):
         Transport.__init__(self)
@@ -129,7 +133,7 @@ class HTTP(Transport):
         params = {'job':jobid, 'description':description}
         headers = {'Content-type':'application/x-www-form-urlencoded', 'Accept':'text/plain'}
         conn = httplib.HTTPConnection(self.server)
-        conn.request('POST', self.path+'startrun.php', urllib.urlencode(params), headers)
+        conn.request('POST', self.path+'startrun.php', urllib_parse.urlencode(params), headers)
         response = conn.getresponse()
         resp = response.read()
         if response.status != httplib.OK:
@@ -159,7 +163,7 @@ class HTTP(Transport):
         try:
             # Connect and post results to HTTP server.
             conn = httplib.HTTPConnection(self.server)
-            conn.request('POST', self.path+'submit.php', urllib.urlencode(params), headers)
+            conn.request('POST', self.path+'submit.php', urllib_parse.urlencode(params), headers)
 
             # Interpret server response.
             response = conn.getresponse()
