@@ -43,7 +43,7 @@ def processTrial(newjobid, newjob, trial):
         newjob.start()
 
     # Evaluate the fitness function (*more is better*)
-    fitness = job.evaluateAndUnpack(trial)
+    fitness = job.evaluateFitness(trial)
 
     return trial, fitness
 
@@ -219,6 +219,8 @@ class DESolver:
                         # This job returns the tested parameter vector, together with its fitness.
                         # Reporting of the result is already done by the callback routine provided to submit.
                         trial, trialfitness = trial()
+                    if isinstance(trialfitness, tuple):
+                        trialfitness = trialfitness[0]
 
                     # Determine whether trial vector is better than target vector.
                     # If so, replace target with trial.

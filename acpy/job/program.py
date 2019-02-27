@@ -617,6 +617,8 @@ class Job(shared.Job2):
         # Enumerate over the sets of observations.
         if return_model_values:
             model_values = []
+        if extra_outputs is not None:
+            namespace = dict([(name, getattr(numpy, name)) for name in dir(numpy)])
         for obsinfo in self.observations:
             obsvar, outputpath, obsvals = obsinfo['outputvariable'], obsinfo['outputpath'], obsinfo['values']
             wrappednc = outputpath2nc[outputpath]
@@ -748,11 +750,9 @@ class Job(shared.Job2):
             lnlikelihood += -n*numpy.log(sd)-ssq/2/sd/sd
 
             if extra_outputs is not None:
-                namespace = dict([(name, getattr(numpy, name)) for name in dir(numpy)])
-                stats = {}
                 for name, fn in self.statistics:
-                    stats[name] = eval(fn, {'x': obsvals, 'y': modelvals}, namespace)
-                extra_outputs.setdefault('statistics', []).append(stats)
+                    value = eval(fn, {'x': obsvals, 'y': modelvals}, namespace)
+                    extra_outputs.setdefault(name, []).append(value)
 
         print('ln Likelihood = %.6g.' % lnlikelihood)
 

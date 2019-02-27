@@ -193,9 +193,9 @@ class Optimizer:
                 def __init__(self, reportfunction, transform):
                     self.transform = transform
                     self.reportfunction = reportfunction
-                def reportResult(self, pars, fitness):
+                def reportResult(self, pars, result):
                     if self.reportfunction is not None:
-                        self.reportfunction(self.transform(pars), fitness)
+                        self.reportfunction(self.transform(pars), result)
 
             solver = desolver.DESolver(problem, popsize, maxgen,
                                        par_min, par_max, F=F, CR=CR, initialpopulation=initialpopulation,
