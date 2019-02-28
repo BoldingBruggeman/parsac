@@ -171,14 +171,14 @@ class YamlParameter(shared.Parameter):
                 job.yamlfiles[self.file] = yaml.load(f)
 
         path_comps = self.variable.split('/')
-        self.name = path_comps.pop()
+        name = path_comps.pop()
         self.target_dict = job.yamlfiles[self.file]
         for i, comp in enumerate(path_comps):
             if comp not in self.target_dict:
                 raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, comp, '/'.join(path_comps[:i])))
             self.target_dict = self.target_dict[comp]
-        if self.name not in self.target_dict:
-            raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, self.name, '/'.join(path_comps[:-1])))
+        if name not in self.target_dict:
+            raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, name, '/'.join(path_comps[:-1])))
 
     def initialize(self):
         # Update path to yaml file to match temporary scenario directory.
