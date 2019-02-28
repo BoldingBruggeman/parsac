@@ -246,6 +246,12 @@ def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxd
         times = netCDF4.num2date(nctime[:], nctime.units)
         values = nc.variables[name][:]
         zs = None if depth_name is None else nc.variables[depth_name][:]
+        mask = numpy.ma.getmask(values)
+        if mask is not numpy.ma.nomask:
+            valid = ~mask
+            times, values = times[valid], values[valid]
+            if zs is not None:
+                zs = zs[valid]
     return times, zs, values
 
 class Job(shared.Job2):
