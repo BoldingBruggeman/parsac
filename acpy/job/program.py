@@ -171,14 +171,14 @@ class YamlParameter(shared.Parameter):
                 job.yamlfiles[self.file] = yaml.load(f)
 
         path_comps = self.variable.split('/')
-        self.name = path_comps.pop()
+        self.key = path_comps.pop()
         self.target_dict = job.yamlfiles[self.file]
         for i, comp in enumerate(path_comps):
             if comp not in self.target_dict:
                 raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, comp, '/'.join(path_comps[:i])))
             self.target_dict = self.target_dict[comp]
-        if self.name not in self.target_dict:
-            raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, self.name, '/'.join(path_comps[:-1])))
+        if self.key not in self.target_dict:
+            raise Exception('Variable "%s" not found in "%s" (key "%s" not found below /%s)' % (self.variable, self.file, self.key, '/'.join(path_comps[:-1])))
 
     def initialize(self):
         # Update path to yaml file to match temporary scenario directory.
@@ -193,7 +193,7 @@ class YamlParameter(shared.Parameter):
             shutil.copy(self.path, self.path+'.backup%02i' % icopy)
 
     def setValue(self, value):
-        self.target_dict[self.name] = float(value)
+        self.target_dict[self.key] = float(value)
 
     def store(self):
         if self.own_file:
@@ -246,6 +246,12 @@ def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxd
         times = netCDF4.num2date(nctime[:], nctime.units)
         values = nc.variables[name][:]
         zs = None if depth_name is None else nc.variables[depth_name][:]
+        mask = numpy.ma.getmask(values)
+        if mask is not numpy.ma.nomask:
+            valid = ~mask
+            times, values = times[valid], values[valid]
+            if zs is not None:
+                zs = zs[valid]
     return times, zs, values
 
 class Job(shared.Job2):

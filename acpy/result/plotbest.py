@@ -60,7 +60,7 @@ def main(args):
     #nc = NetCDFFile(ncpath,'r')
     #res = result.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
     #nc.close()
-    likelihood, model_values = result.job.evaluate(parameters, return_model_values=True, show_output=True)
+    likelihood, model_values = result.job.evaluate2(parameters, return_model_values=True, show_output=True)
     print('Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood, lnl))
 
     # # Copy NetCDF file
