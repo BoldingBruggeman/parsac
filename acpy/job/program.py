@@ -107,6 +107,8 @@ class NcDict(object):
 
     def eval(self, expression, no_trailing_singletons=True):
         namespace = {'filter_by_time': lambda values, months: filter_by_time(values, self['time'], self.nc.variables['time'].units, months)}
+        for n in dir(numpy):
+            namespace[n] = getattr(numpy, n)
         data = eval(expression, namespace, self)
         if no_trailing_singletons and data.ndim > 0:
             while data.shape[-1] == 1:
@@ -238,20 +240,20 @@ def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=num
     values = numpy.array(values)
     return times, zs, values
 
-def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf):
-    with netCDF4.Dataset(path) as nc:
-        ncvar = nc.variables[name]
-        assert ncvar.ndim == 1
-        nctime = nc.variables[ncvar.dimensions[0]]
-        times = netCDF4.num2date(nctime[:], nctime.units)
-        values = nc.variables[name][:]
-        zs = None if depth_name is None else nc.variables[depth_name][:]
-        mask = numpy.ma.getmask(values)
-        if mask is not numpy.ma.nomask:
-            valid = ~mask
-            times, values = times[valid], values[valid]
-            if zs is not None:
-                zs = zs[valid]
+def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf, time_name='time'):
+    wrapped_nc = NcDict(path)
+    nctime = wrapped_nc.nc.variables[time_name]
+    times = netCDF4.num2date(nctime[:], nctime.units)
+    values = wrapped_nc.eval(name)[...]
+    assert values.ndim == 1
+    zs = None if depth_name is None else wrapped_nc[depth_name][:]
+    wrapped_nc.finalize()
+    mask = numpy.ma.getmask(values)
+    if mask is not numpy.ma.nomask:
+        valid = ~mask
+        times, values = times[valid], values[valid]
+        if zs is not None:
+            zs = zs[valid]
     return times, zs, values
 
 class Job(shared.Job2):
@@ -418,7 +420,8 @@ class Job(shared.Job2):
             start = self.getSimulationStart()
             obsstart = datetime.datetime(start.year+spinupyears, start.month, start.day)
             valid = numpy.array([t >= obsstart for t in times], dtype=bool)
-            zs = zs[valid]
+            if zs is not None:
+                zs = zs[valid]
             values = values[valid]
             times = [t for t, v in zip(times, valid) if v]
 
