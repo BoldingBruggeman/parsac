@@ -207,11 +207,11 @@ class SQLite(Transport):
         c = db.cursor()
         if create:
             c.execute('CREATE TABLE `runs`    (`id` INTEGER PRIMARY KEY,`source` VARCHAR(50) NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`job` TEXT NOT NULL,`description` TEXT);')
-            c.execute('CREATE TABLE `results` (`id` INTEGER PRIMARY KEY,`run` INTEGER UNSIGNED NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`parameters` TEXT NOT NULL,`lnlikelihood` DOUBLE,`extra_outputs` TEXT);')
+            c.execute('CREATE TABLE `results` (`id` INTEGER PRIMARY KEY,`run` INTEGER UNSIGNED NOT NULL,`time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,`parameters` TEXT NOT NULL,`lnlikelihood` DOUBLE,`extra_outputs` JSON);')
         else:
             column_names = self.getColumnNames(db, 'results')
             if 'extra_outputs' not in column_names:
-                c.execute('ALTER TABLE `results` ADD COLUMN `extra_outputs` TEXT;')
+                c.execute('ALTER TABLE `results` ADD COLUMN `extra_outputs` JSON;')
         c.execute("INSERT INTO `runs` (`source`,`job`,`description`) values(?,?,?);",(platform.node(), jobid, description))
         runid = c.lastrowid
         db.commit()
