@@ -170,7 +170,7 @@ class YamlParameter(shared.Parameter):
         if self.own_file:
             # Read all namelist in the file, and store their data and order.
             with io.open(os.path.join(job.scenariodir, self.file), 'rU', encoding='utf-8') as f:
-                job.yamlfiles[self.file] = yaml.load(f)
+                job.yamlfiles[self.file] = yaml.safe_load(f)
 
         path_comps = self.variable.split('/')
         self.key = path_comps.pop()

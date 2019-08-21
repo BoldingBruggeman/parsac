@@ -28,7 +28,7 @@ class Job(program.Job):
             if os.path.isfile(gotmyaml_path):
                 # Using yaml configuration
                 with io.open(gotmyaml_path, 'rU') as f:
-                    gotmyaml = yaml.load(f)
+                    gotmyaml = yaml.safe_load(f)
                 period = gotmyaml['period']
                 self.start_time = period['start']
                 self.stop_time = period['stop']
