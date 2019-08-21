@@ -299,6 +299,8 @@ class Job(shared.Job2):
         # Rejection means returning a ln likelihood of negative infinity.
         self.checkparameterranges = True
 
+        self.statistics = []
+
         # If the XML contains a "target" element at root level, we will use that rather than compute a likelihood.
         self.targets = []
         for itarget, element in enumerate(xml_tree.findall('targets/target')):
@@ -312,7 +314,6 @@ class Job(shared.Job2):
             return
 
         # Look for additional statistics to save with result.
-        self.statistics = []
         for istatistic, element in enumerate(xml_tree.findall('extra_outputs/statistic')):
             with shared.XMLAttributes(element, 'statistic %i' % (istatistic + 1,)) as att:
                 self.statistics.append((att.get('name'), att.get('expression')))
