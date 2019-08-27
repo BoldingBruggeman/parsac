@@ -224,7 +224,7 @@ class Job(optimize.OptimizationProblem):
     def evaluate2(self, parameter_values, extra_outputs={}):
         return self.evaluate(parameter_values)
 
-    def evaluate_ensemble(self, ensemble, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False):
+    def evaluate_ensemble(self, ensemble, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False, stop_on_bad_result=False):
         results = []
         try:
             import pp
@@ -274,11 +274,18 @@ class Job(optimize.OptimizationProblem):
                 ppjobs.append(ppjob)
             for ppjob in ppjobs:
                 member, result = ppjob()
+                if stop_on_bad_result and result == -numpy.Inf:
+                    print('Ensemble member returned invalid result. Cancelling ensemble run...')
+                    job_server.destroy()
+                    return
                 results.append(result)
         else:
             self.start()
             for member in ensemble:
                 result = self.evaluate(member)
+                if stop_on_bad_result and result == -numpy.Inf:
+                    print('Ensemble member returned invalid result. Cancelling ensemble run...')
+                    return
                 results.append(result)
         return results
 

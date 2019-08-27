@@ -217,7 +217,10 @@ def main(args):
                 wrappednc.finalize()
         else:
             # We run the model ourselves.
-            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])])
+            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=True)
+            if Y is None:
+                print('Ensemble evaluation failed. Exiting...')
+                return
             Y = numpy.array(Y)
         job_info['Y'] = Y
         print('Updating acpy/sa info in %s...' % args.info)
