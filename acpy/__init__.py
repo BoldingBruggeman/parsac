@@ -8,9 +8,20 @@ from . import autocalibration
 from . import sensitivity
 from . import ensemble
 
+__version__ = 'running from source - so not available'
+
+from pkg_resources import get_distribution, DistributionNotFound
+try:
+    __version__ = get_distribution(__name__).version
+except DistributionNotFound:
+    # package is not installed
+    pass
+
+
 def main():
     parser = argparse.ArgumentParser(description='AutoCalibration Python - acpy')
-    parser.add_argument('--version', '-v', action='version')
+#    parser.add_argument('--help', action='help')
+    parser.add_argument('--version', action='version', version=__version__)
     subparsers = parser.add_subparsers()
 
     parser_sa = subparsers.add_parser('sensitivity', help='Sensitivity analysis')

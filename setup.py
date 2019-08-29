@@ -1,13 +1,12 @@
 from setuptools import setup, find_packages
 
-#KBimport site; site.getsitepackages()
-
 def readme():
     with open('README.md') as f:
         return f.read()
 
 setup(name='acpy',
-      version='0.3',
+      use_scm_version=True,
+      setup_requires=['setuptools_scm'],
       description='AutoCalibration tool written in Python',
       long_description=readme(),
       url='http://github.com/BoldingBruggeman/acpy',
