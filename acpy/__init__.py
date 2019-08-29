@@ -1,5 +1,6 @@
 import subprocess
 import argparse
+import sys
 
 from . import service
 service.read()
@@ -28,4 +29,7 @@ def main():
     parser_service.set_defaults(func=service.main)
 
     args = parser.parse_args()
+    if getattr(args, 'func', None) is None:
+        print('acpy must be called with a subcommand. Use -h to see options')
+        sys.exit(2)
     args.func(args)
