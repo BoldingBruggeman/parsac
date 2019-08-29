@@ -29,7 +29,7 @@ class Job(program.Job):
                 # Using yaml configuration
                 with io.open(gotmyaml_path, 'rU') as f:
                     gotmyaml = yaml.safe_load(f)
-                period = gotmyaml['period']
+                period = gotmyaml['time']
                 self.start_time = period['start']
                 self.stop_time = period['stop']
             else:
