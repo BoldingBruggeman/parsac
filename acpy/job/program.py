@@ -826,9 +826,9 @@ def run_program(exe, rundir, use_shell=False, show_output=True):
     if sys.platform == 'win32':
         # We start the process with low priority
         IDLE_PRIORITY_CLASS = 0x00000040
-        proc = subprocess.Popen(args, cwd=rundir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS, shell=use_shell)
+        proc = subprocess.Popen(args, cwd=rundir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=IDLE_PRIORITY_CLASS, shell=use_shell, universal_newlines=True)
     else:
-        proc = subprocess.Popen(args, cwd=rundir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=use_shell)
+        proc = subprocess.Popen(args, cwd=rundir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=use_shell, universal_newlines=True)
 
     # Simulation is now running
     if show_output:
