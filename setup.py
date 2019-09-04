@@ -14,11 +14,11 @@ setup(name='acpy',
       author_email='jorn@bolding-bruggeman.com',
       license='GPL',
       install_requires=['netCDF4'],
-      classifiers=[
+      classifiers=[ # Note: classifiers MUST match options on https://pypi.org/classifiers/ for PyPI submission
           'Development Status :: 4 - Beta',
-          'Intended Audience :: Developers',
-          'Topic :: Numerical Models :: Calibration Tools',
-          'License :: OSI Approved :: GPL License',
+          'Intended Audience :: Science/Research',
+          'Topic :: Scientific/Engineering',
+          'License :: OSI Approved :: GNU General Public License (GPL)',
           'Programming Language :: Python',
       ],
       entry_points={
