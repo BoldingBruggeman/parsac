@@ -15,11 +15,11 @@ setup(name='acpy',
       license='GPL',
       install_requires=['netCDF4'],
       classifiers=[
-          'Development Status :: 3 - Beta',
+          'Development Status :: 4 - Beta',
           'Intended Audience :: Developers',
           'Topic :: Numerical Models :: Calibration Tools',
           'License :: OSI Approved :: GPL License',
-          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python',
       ],
       entry_points={
           'console_scripts': [
