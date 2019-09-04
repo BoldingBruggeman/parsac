@@ -27,6 +27,6 @@ setup(name='acpy',
           ]
       },
       packages=find_packages(exclude=['need_updates']),
-      package_data={'acpy': ['examples/*']},
+      package_data={'acpy': ['service.txt', 'examples/*']},
       include_package_data=True,
       zip_safe=False)
