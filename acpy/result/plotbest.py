@@ -194,7 +194,7 @@ def main(args):
         n, bins, patches = pylab.hist(diff, 100, normed=True)
         pylab.xlabel('model - observation')
         print('%s:\n- bias: %.4g\n- mean absolute error = %.4g\n- rmse = %.4g\n- cor = %.4g\n- s.d. mod = %.4g\n- s.d. obs = %.4g' % (oi['outputvariable'], bias, mae, rmse, cor, numpy.sqrt(var_mod), numpy.sqrt(var_obs)))
-        y = pylab.normpdf(bins, 0., rmse)
+        y = (1. / numpy.sqrt(2 * numpy.pi) / rmse) * numpy.exp((-0.5 / rmse**2) * bins**2)
         l = pylab.plot(bins, y, 'r--', linewidth=2)
 
     if len(extravars) > 0:
