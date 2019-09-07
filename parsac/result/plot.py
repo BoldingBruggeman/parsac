@@ -17,6 +17,8 @@ def configure_argument_parser(parser):
     parser.set_defaults(range=None, bincount=25, orderby='count', maxcount=None, groupby='run', constraints=[], limit=-1, run=None, update=False)
 
 def main(args):
+    global lastcount
+    lastcount = -1
     import sys
     import warnings
 
@@ -24,15 +26,14 @@ def main(args):
     import numpy
 
     # Try importing MatPlotLib
-    mpl_error = None
     try:
         import matplotlib
-        if args.update:
-            matplotlib.use('TkAgg')
-        from matplotlib import pyplot
+        from matplotlib import pyplot, animation
     except ImportError as e:
-        mpl_error = e
-        pyplot = None
+        print('One or more MatPlotLib modules not found - skipping plotting. Detailed error: %s' % e)
+        if args.update:
+            print('-u/--update is disabled.')
+            args.update = False
 
     # Import custom modules
     from .. import result
@@ -49,7 +50,17 @@ def main(args):
     parlog = current_result.job.getParameterLogScale()
     npar = len(parnames)
 
-    def update(fig=None):
+    def update(frame=None):
+        global lastcount
+        count = current_result.count()
+        if count == lastcount:
+            return
+
+        if lastcount != -1:
+            print('  %i found.' % (count - lastcount))
+            for ax in axes:
+                ax.cla()
+
         res, source2history = current_result.get(groupby=args.groupby, constraints=parbounds, run_id=args.run, limit=args.limit, lnlrange=args.range)
         run2source = current_result.get_sources()
 
@@ -113,28 +124,9 @@ def main(args):
                 print('  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source]))
 
         if pyplot is None:
-            print('One or more MatPlotLib modules not found - skipping plotting. Detailed error: %s' % mpl_error)
             return
 
-        nrow = int(numpy.ceil(numpy.sqrt(0.5*npar)))
-        ncol = int(numpy.ceil(float(npar)/nrow))
-
-        # Create the figure
-        if fig is not None:
-            for ipar in range(npar):
-                ax = fig.add_subplot(nrow, ncol, ipar+1)
-                ax.cla()
-        else:
-            fig = pyplot.figure(figsize=(12, 8))
-            fig.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=.3)
-            if args.update:
-                fig.canvas.mpl_connect('close_event', lambda evt: sys.exit(0))
-
-        # Create subplots
-        for ipar in range(npar):
-            ax = fig.add_subplot(nrow, ncol, ipar+1)
-
-        # Approximate marginal by estimsting upper contour of cloud.
+        # Approximate marginal by estimating upper contour of cloud.
         marginals = []
         for ipar, (minimum, maximum, logscale) in enumerate(zip(parmin, parmax, parlog)):
             values = res[:, ipar]
@@ -168,9 +160,8 @@ def main(args):
             if args.groupby == 'run':
                 label = '%s (%s)' % (source, run2source[source])
 
-            for ipar in range(npar):
+            for ipar, ax in enumerate(axes):
                 # Plot results for current source.
-                ax = fig.add_subplot(nrow, ncol, ipar+1)
                 ax.plot(curres[:, ipar], curres[:, -1], '.', label=label)
 
                 # Update histogram based on current source results.
@@ -179,8 +170,7 @@ def main(args):
                     parbins[ipar, ibin] = max(parbins[ipar, ibin], curres[i, -1])
 
         # Put finishing touches on subplots
-        for ipar, (name, minimum, maximum, logscale, lbound, rbound, marginal) in enumerate(zip(parnames, parmin, parmax, parlog, lbounds, rbounds, marginals)):
-            ax = fig.add_subplot(nrow, ncol, ipar+1)
+        for ipar, (name, minimum, maximum, logscale, lbound, rbound, marginal, ax) in enumerate(zip(parnames, parmin, parmax, parlog, lbounds, rbounds, marginals, axes)):
             #ax.legend(sources,numpoints=1)
 
             # Add title
@@ -209,35 +199,32 @@ def main(args):
                 ax.set_xscale('log')
 
         #ax.legend(numpoints=1)
-        if not args.update:
-            fig.savefig('estimates.png', dpi=300)
 
-        # Show figure and wait until the user closes it.
-        pyplot.show()
+        lastcount = count
+        if args.update:
+            print('Waiting for new results...')
 
-        return fig
+    if pyplot is not None:
+        fig = pyplot.figure(figsize=(12, 8))
+        fig.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=.3)
+        nrow = int(numpy.ceil(numpy.sqrt(0.5*npar)))
+        ncol = int(numpy.ceil(float(npar)/nrow))
+
+        # Create/clear subplots
+        axes = []
+        for ipar in range(npar):
+            axes.append(fig.add_subplot(nrow, ncol, ipar+1))
 
     if args.update:
-        if pyplot is None:
-            print('One or more MatPlotLib modules not found - cannot run in continuous update mode (-u/--update). Detailed error: %s' % mpl_error)
-            sys.exit(1)
-        fig = None
-        pyplot.ion()
-        count = current_result.count()
-        while 1:
-            fig = update(fig)
-            print('Waiting for new results...', end='')
-            while 1:
-                with warnings.catch_warnings():
-                    warnings.simplefilter('ignore')
-                    pyplot.pause(5.)
-                newcount = current_result.count()
-                if newcount != count:
-                    print('%i found.' % (newcount-count))
-                    count = newcount
-                    break
+        ani = animation.FuncAnimation(fig, update, interval=5000)
     else:
         update()
+        if pyplot is not None:
+            fig.savefig('estimates.png', dpi=300)
+
+    # Show figure and wait until the user closes it.
+    if pyplot is not None:
+        pyplot.show()
 
 if __name__ == '__main__':
     import argparse
