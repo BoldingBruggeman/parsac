@@ -165,7 +165,7 @@ def save_info(path, info):
 
 def main(args):
     if args.subcommand != 'sample':
-        print('Reading acpy/sa info from %s...' % args.info)
+        print('Reading sensitity samples from %s...' % args.info)
         with open(args.info, 'rb') as f:
             job_info = pickle.load(f)
         args.xmlfile = job_info['sample_args'].xmlfile
@@ -223,7 +223,7 @@ def main(args):
                 return
             Y = numpy.array(Y)
         job_info['Y'] = Y
-        print('Updating acpy/sa info in %s...' % args.info)
+        print('Updating sensitivity info in %s with model results...' % args.info)
         save_info(args.info, job_info)
     elif args.subcommand == 'analyze':
         if 'Y' not in job_info:

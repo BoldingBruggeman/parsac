@@ -21,18 +21,18 @@ def main(args):
     import pylab
 
     # Import custom modules
-    import acpy.result
-    import acpy.job.idealized
+    from .. import result
+    from .. import job
 
     marginal = True
 
     parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in args.constraints])
 
-    result = acpy.result.Result(args.xmlfile)
+    current_result = result.Result(args.xmlfile)
 
-    parnames = result.job.getParameterNames()
-    parmin, parmax = result.job.getParameterBounds()
-    parlog = result.job.getParameterLogScale()
+    parnames = current_result.job.getParameterNames()
+    parmin, parmax = current_result.job.getParameterBounds()
+    parlog = current_result.job.getParameterLogScale()
     parrange = parmax-parmin
 
     ix = parnames.index(args.x)
@@ -41,7 +41,7 @@ def main(args):
     print('y axis: %s (parameter %i)' % (args.y, iy))
 
     def update(fig=None):
-        res = result.get(constraints=parbounds, run_id=args.run, limit=args.limit)
+        res = current_result.get(constraints=parbounds, run_id=args.run, limit=args.limit)
 
         maxlnl = res[:, -1].max()
         res[:, -1] -= maxlnl
@@ -61,8 +61,8 @@ def main(args):
         ys_c = 0.5*(ys[:-1]+ys[1:])
 
         marg1_func, marg2_func = None, None 
-        if isinstance(result.job, acpy.job.idealized.Job) and not args.scatter:
-            zs = result.job.evaluate((xs_c[:, numpy.newaxis], ys_c[numpy.newaxis, :]))
+        if isinstance(current_result.job, job.idealized.Job) and not args.scatter:
+            zs = current_result.job.evaluate((xs_c[:, numpy.newaxis], ys_c[numpy.newaxis, :]))
             marg1_func = lambda x: numpy.exp(-0.5*(x**2))
             marg2_func = lambda x: numpy.exp(-0.5*(x**2))
             pc = pylab.contourf(xs_c, ys_c, zs, 100)

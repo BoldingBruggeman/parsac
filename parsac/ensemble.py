@@ -15,8 +15,8 @@ import numpy
 import numpy.random
 
 # Import personal custom stuff
-import acpy.result
-import acpy.job
+from . import result
+from . import job
 
 def configure_argument_parser(parser):
     subparsers = parser.add_subparsers(dest='subcommand')
@@ -34,12 +34,12 @@ def configure_argument_parser(parser):
     parser_sample.add_argument('xmlfile', type=str, help='XML formatted configuration file')
     parser_sample.add_argument('dirs', nargs='+', help='Directories to run in (may contain wildcards)')
 
-def get_weights_grid(job, results, gridsize):
+def get_weights_grid(current_job, results, gridsize):
     # Build parameter grid (one dimension per parameter)
     # We will use this to normalize a parameetr set's probability of beign selected
     # by the number of other parameter sets that fall within the same grid point.
-    minpar, maxpar = job.getParameterBounds()
-    logscale = job.getParameterLogScale()
+    minpar, maxpar = current_job.getParameterBounds()
+    logscale = current_job.getParameterLogScale()
     pargrid = numpy.empty((len(minpar), gridsize))
     for ipar, (left, right, log) in enumerate(zip(minpar, maxpar, logscale)):
         if log:
@@ -62,12 +62,12 @@ def get_weights_grid(job, results, gridsize):
         weights[iresult] /= index2count[ind]
     return weights
 
-def get_weights_radius(job, results, M=10):
+def get_weights_radius(current_job, results, M=10):
     # From each parameter set, find out the radius of the hypershere that includes the nearest
     # M parameter sets. The volume associated with that hypershere is an approximation of the
     # sampling density around that parameter set, and will be used to weight the associated PDF [likelihood] value.
-    minpar, maxpar = job.getParameterBounds()
-    logscale = job.getParameterLogScale()
+    minpar, maxpar = current_job.getParameterBounds()
+    logscale = current_job.getParameterLogScale()
     relparvalues = numpy.empty_like(results[:, :-1])
     for ipar, (minval, maxval, log) in enumerate(zip(minpar, maxpar, logscale)):
         values = results[:, ipar]
@@ -86,12 +86,12 @@ def main(args):
         dirs = []
         for d in args.dirs:
             dirs.extend(glob.glob(d))
-        current_job = acpy.job.fromConfigurationFile(args.xmlfile)
+        current_job = job.fromConfigurationFile(args.xmlfile)
         current_job.runEnsemble(dirs)
         return
 
-    result = acpy.result.Result(args.xmlfile)
-    results = result.get()
+    current_result = result.Result(args.xmlfile)
+    results = current_result.get()
     if results.shape[0] < args.N:
         print('An ensemble of %i members was requested, but only %i results were found.' % (args.N, results.shape[0]))
         sys.exit(1)
@@ -99,8 +99,8 @@ def main(args):
     # Calculate probability-of-being-chosen for each original parameter set,
     # based on log-likelihood and the proximity of other results (i..e, their co-occurence in the same grid cell)
     rel_likelihood = numpy.exp(results[:, -1] - results[:, -1].max())
-    #weights2 = get_weights_grid(result.job, results, args.gridsize)
-    weights = get_weights_radius(result.job, results)
+    #weights2 = get_weights_grid(current_result.job, results, args.gridsize)
+    weights = get_weights_radius(current_result.job, results)
     p = rel_likelihood*weights
     p /= p.sum()
 
@@ -111,14 +111,14 @@ def main(args):
         print(ensemble[i, :])
 
     if args.dir:
-        assert isinstance(result.job, acpy.job.program.Job)
+        assert isinstance(current_result.job, job.program.Job)
         if args.scenario is not None:
-            result.job.scenariodir = args.scenario
-        result.job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
+            current_result.job.scenariodir = args.scenario
+        current_result.job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
 
     if args.plot:
         # Show histogram of ensemble members
-        names = result.job.getParameterNames()
+        names = current_result.job.getParameterNames()
         from matplotlib import pyplot
         fig = pyplot.figure()
         npar = results.shape[1] - 1

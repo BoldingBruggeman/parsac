@@ -1,26 +1,21 @@
-# AutoCalibration Python
+# Parallel Sensitivity Analysis and Calibration
 
-Python-based auto-calibration tool. Expect configuration of model parameters through namelist or yaml files and model output in the form of NetCDF files.
+Python-based tool for sensitvity analysis and auto-calibration in Parallel.
+This tool is designed for analysis of models that take significant time to run.
+For that reason, it focuses on storing and exploiting every single model result,
+and performing model runs in parallel on either a single machine or
+on computer clusters. It works with models that are run by calling one binary,
+that use text-based configuration files based on YAML or Fortran namelists,
+and that write their output to NetCDF.
 
-Pronounced - A-C-Py
+### To install
 
+pip install <--upgrade> --user parsac
 
-## Howto wheel
-
-### To make a wheel
-
-pip wheel .
-
-
-### To install a wheel
-
-pip install <--upgrade> acpy-0.1-py2-none-any.whl
-
-Add options -v -v -v to see where files are installed
-
-Add --user to install in default *user* directory
-
+Remove --user to install in the system's shared Python directory.
+Some systems have multiple versions of pip, e.g., pip for Python 2, pip3 for Python 3.
+Make sure you use the command that corresponds to the Python version you want to install into.
 
 ### To work with a wheel in edit mode
 
-pip2 install -e . --user --upgrade
+pip install -e . --user --upgrade

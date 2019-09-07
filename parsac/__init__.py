@@ -19,7 +19,7 @@ except DistributionNotFound:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='AutoCalibration Python - acpy')
+    parser = argparse.ArgumentParser(description='parsac - Parallel Sensitivity Analysis and Calibration')
 #    parser.add_argument('--help', action='help')
     parser.add_argument('--version', action='version', version=__version__)
     subparsers = parser.add_subparsers()
@@ -41,6 +41,6 @@ def main():
 
     args = parser.parse_args()
     if getattr(args, 'func', None) is None:
-        print('acpy must be called with a subcommand. Use -h to see options')
+        print('parsac must be called with a subcommand. Use -h to see options')
         sys.exit(2)
     args.func(args)

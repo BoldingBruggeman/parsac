@@ -9,12 +9,12 @@ def configure_argument_parser(parser):
 
 def main(args):
     # Import custom modules
-    import acpy.result
+    from .. import result
 
-    result = acpy.result.Result(args.xmlfile)
+    current_result = result.Result(args.xmlfile)
 
-    res, source2history = result.get(groupby=args.groupby, constraints={}, run_id=None, limit=-1)
-    run2source = result.get_sources()
+    res, source2history = current_result.get(groupby=args.groupby, constraints={}, run_id=None, limit=-1)
+    run2source = current_result.get_sources()
 
     group2maxlnl = dict([(s,curres[:, -1].max()) for s, curres in source2history.items()])
 

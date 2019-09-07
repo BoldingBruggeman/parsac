@@ -24,31 +24,34 @@ def main(args):
     import numpy
 
     # Try importing MatPlotLib
+    mpl_error = None
     try:
         import matplotlib
-        matplotlib.use('TkAgg')
+        if args.update:
+            matplotlib.use('TkAgg')
         from matplotlib import pyplot
-    except ImportError:
+    except ImportError as e:
+        mpl_error = e
         pyplot = None
 
     # Import custom modules
-    import acpy.result
+    from .. import result
 
     if args.range is not None and args.range > 0:
         args.range = -args.range
 
     parbounds = dict([(name, (minimum, maximum)) for name, minimum, maximum in args.constraints])
 
-    result = acpy.result.Result(args.xmlfile)
+    current_result = result.Result(args.xmlfile)
 
-    parnames = result.job.getParameterNames()
-    parmin, parmax = result.job.getParameterBounds()
-    parlog = result.job.getParameterLogScale()
+    parnames = current_result.job.getParameterNames()
+    parmin, parmax = current_result.job.getParameterBounds()
+    parlog = current_result.job.getParameterLogScale()
     npar = len(parnames)
 
     def update(fig=None):
-        res, source2history = result.get(groupby=args.groupby, constraints=parbounds, run_id=args.run, limit=args.limit, lnlrange=args.range)
-        run2source = result.get_sources()
+        res, source2history = current_result.get(groupby=args.groupby, constraints=parbounds, run_id=args.run, limit=args.limit, lnlrange=args.range)
+        run2source = current_result.get_sources()
 
         # Sort by likelihood
         indices = res[:, -1].argsort()
@@ -110,7 +113,7 @@ def main(args):
                 print('  %s: %i points, best lnl = %.8g.' % (label, len(dat), group2maxlnl[source]))
 
         if pyplot is None:
-            print('MatPlotLib not found - skipping plotting.')
+            print('One or more MatPlotLib modules not found - skipping plotting. Detailed error: %s' % mpl_error)
             return
 
         nrow = int(numpy.ceil(numpy.sqrt(0.5*npar)))
@@ -216,11 +219,11 @@ def main(args):
 
     if args.update:
         if pyplot is None:
-            print('MatPlotLib not found - cannot run in continuous update mode (-u/--update).')
+            print('One or more MatPlotLib modules not found - cannot run in continuous update mode (-u/--update). Detailed error: %s' % mpl_error)
             sys.exit(1)
         fig = None
         pyplot.ion()
-        count = result.count()
+        count = current_result.count()
         while 1:
             fig = update(fig)
             print('Waiting for new results...', end='')
@@ -228,7 +231,7 @@ def main(args):
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore')
                     pyplot.pause(5.)
-                newcount = result.count()
+                newcount = current_result.count()
                 if newcount != count:
                     print('%i found.' % (newcount-count))
                     count = newcount

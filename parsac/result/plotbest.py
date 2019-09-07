@@ -19,7 +19,7 @@ def main(args):
     import matplotlib.gridspec
     import matplotlib.colorbar
 
-    import acpy.result
+    from .. import result
 
     if args.depth is not None and args.depth < 0:
         print('Depth argument must be positive, but is %.6g.' % args.depth)
@@ -30,21 +30,21 @@ def main(args):
     #extravars = [('mean_1',False),('mean_2',False),('var_1_1',False),('var_2_2',False),('cor_2_1',False)]
     #extravars = (('phytosize_mean_om',False),('phytosize_var_om',False))
 
-    result = acpy.result.Result(args.xmlfile, simulationdir=args.simulationdir)
+    current_result = result.Result(args.xmlfile, simulationdir=args.simulationdir)
 
-    parameters, lnl = result.get_best(args.rank)
+    parameters, lnl = current_result.get_best(args.rank)
 
     # Show best parameter set
     print('%ith best parameter set:' % args.rank)
-    for name, value in zip(result.job.getParameterNames(), parameters):
+    for name, value in zip(current_result.job.getParameterNames(), parameters):
         print('  %s = %.6g' % (name, value))
     print('Original ln likelihood = %.8g' % lnl)
 
     # Initialize the job (needed to load observations)
-    result.job.start()
+    current_result.job.start()
 
     # Build a list of all NetCDF variables that we want model results for.
-    obsinfo = result.job.observations
+    obsinfo = current_result.job.observations
     outputvars = [oi['outputvariable'] for oi in obsinfo]
     for vardata in extravars:
         if isinstance(vardata, (str, u''.__class__)):
@@ -53,14 +53,14 @@ def main(args):
             outputvars.append(vardata[0])
 
     # Run and retrieve results.
-    #returncode = result.job.controller.run(parameters,showoutput=True)
+    #returncode = current_result.job.controller.run(parameters,showoutput=True)
     #if returncode!=0:
     #    print('GOTM run failed - exiting.')
     #    sys.exit(1)
     #nc = NetCDFFile(ncpath,'r')
-    #res = result.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
+    #res = current_result.job.controller.getNetCDFVariables(nc,outputvars,addcoordinates=True)
     #nc.close()
-    likelihood, model_values = result.job.evaluate2(parameters, return_model_values=True, show_output=True)
+    likelihood, model_values = current_result.job.evaluate2(parameters, return_model_values=True, show_output=True)
     print('Newly calculated ln likelihood = %.8g. Original value was %.8g.' % (likelihood, lnl))
 
     # # Copy NetCDF file
@@ -68,11 +68,11 @@ def main(args):
     #     print('Saving NetCDF output to %s...' % args.savenc, end='')
     #     shutil.copyfile(ncpath,args.savenc)
     #     fout = open('%s.info' % args.savenc,'w')
-    #     fout.write('job %i, %ith best parameter set\n' % (result.job.id,args.rank))
+    #     fout.write('job %i, %ith best parameter set\n' % (current_result.job.id,args.rank))
     #     fout.write('%s\n' % datetime.datetime.today().isoformat())
     #     fout.write('parameter values:\n')
     #     for i,val in enumerate(parameters_utf):
-    #         pi = result.job.controller.externalparameters[i]
+    #         pi = current_result.job.controller.externalparameters[i]
     #         fout.write('  %s = %.6g\n' % (pi['name'],val))
     #     fout.write('ln likelihood = %.8g\n' % lnl)
     #     fout.close()

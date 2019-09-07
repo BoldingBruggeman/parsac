@@ -4,12 +4,12 @@ def readme():
     with open('README.md') as f:
         return f.read()
 
-setup(name='acpy',
+setup(name='parsac',
       use_scm_version=True,
       setup_requires=['setuptools_scm'],
       description='AutoCalibration tool written in Python',
       long_description=readme(),
-      url='http://github.com/BoldingBruggeman/acpy',
+      url='https://github.com/BoldingBruggeman/parsac',
       author='Jorn Bruggeman',
       author_email='jorn@bolding-bruggeman.com',
       license='GPL',
@@ -23,10 +23,10 @@ setup(name='acpy',
       ],
       entry_points={
           'console_scripts': [
-                'acpy=acpy.acpy_run:main',
+                'parsac=parsac.parsac_run:main',
           ]
       },
       packages=find_packages(exclude=['need_updates']),
-      package_data={'acpy': ['service.txt', 'examples/*']},
+      package_data={'parsac': ['service.txt', 'examples/*']},
       include_package_data=True,
       zip_safe=False)
