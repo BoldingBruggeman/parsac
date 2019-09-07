@@ -1,5 +1,5 @@
 #
-# The service file must be in the 'ACPy' package directory and named 
+# The service file must be in the 'parsac' package directory and named 
 # 'service.txt'
 #
 
