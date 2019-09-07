@@ -21,7 +21,7 @@ except DistributionNotFound:
 def main():
     parser = argparse.ArgumentParser(description='parsac - Parallel Sensitivity Analysis and Calibration')
 #    parser.add_argument('--help', action='help')
-    parser.add_argument('--version', action='version', version=__version__)
+    parser.add_argument('-v', '--version', action='version', version=__version__)
     subparsers = parser.add_subparsers()
 
     parser_sa = subparsers.add_parser('sensitivity', help='Sensitivity analysis')
