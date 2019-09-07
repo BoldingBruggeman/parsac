@@ -213,7 +213,7 @@ def main(args):
         # Create/clear subplots
         axes = []
         for ipar in range(npar):
-            axes.append(fig.add_subplot(nrow, ncol, ipar+1))
+            axes.append(fig.add_subplot(nrow, ncol, ipar+1, sharey=None if len(axes) == 0 else axes[0]))
 
     if args.update:
         ani = animation.FuncAnimation(fig, update, interval=5000)
