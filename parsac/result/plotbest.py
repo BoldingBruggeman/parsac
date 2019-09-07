@@ -21,6 +21,13 @@ def main(args):
 
     from .. import result
 
+    if args.grid:
+        try:
+            import scipy.interpolate
+        except ImportError as e:
+            print('Failed to import scipy.interpolate needed for --grid/-g. Error: %s' % e)
+            sys.exit(1)
+
     if args.depth is not None and args.depth < 0:
         print('Depth argument must be positive, but is %.6g.' % args.depth)
         sys.exit(2)
@@ -125,7 +132,7 @@ def main(args):
             valid_obs = zs > zmin
             valid_mod = z_centers > zmin
             varrange = (min(all_model_data[valid_mod].min(), observed_values[valid_obs].min()), max(all_model_data[valid_mod].max(), observed_values[valid_obs].max()))
-            print(varrange)
+            #print(varrange)
 
             t_interfaces = pylab.date2num(t_interfaces)
             ax = pylab.subplot(gs[i, 0:5])
@@ -143,8 +150,7 @@ def main(args):
             ax = pylab.subplot(gs[i, 5:-1])
             numtimes = pylab.date2num(times)
             if args.grid:
-                from matplotlib.mlab import griddata
-                gridded_observed_values = griddata(numtimes, zs, observed_values, t_interfaces, z_interfaces, 'linear')
+                gridded_observed_values = scipy.interpolate.griddata((numtimes, zs), observed_values, (t_interfaces, z_interfaces), 'linear')
                 pylab.pcolormesh(t_interfaces, z_interfaces, gridded_observed_values, vmin=varrange[0], vmax=varrange[1])
             else:
                 pylab.scatter(numtimes, zs, s=10, c=observed_values, vmin=varrange[0], vmax=varrange[1], edgecolors='none')
