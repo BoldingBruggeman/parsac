@@ -8,15 +8,17 @@ from . import autocalibration
 from . import sensitivity
 from . import ensemble
 
-__version__ = 'running from source - so not available'
+__version__ = 'version not available'
 
 from pkg_resources import get_distribution, DistributionNotFound
 try:
     __version__ = get_distribution(__name__).version
 except DistributionNotFound:
-    # package is not installed
-    pass
-
+    try:
+        from setuptools_scm import get_version
+        __version__ = get_version(root='..', relative_to=__file__)
+    except ImportError:
+        pass
 
 def main():
     parser = argparse.ArgumentParser(description='parsac - Parallel Sensitivity Analysis and Calibration')
