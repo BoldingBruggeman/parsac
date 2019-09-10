@@ -39,7 +39,7 @@ except ImportError:
 from . import namelist
 from . import shared
 
-# Regular expression for GOTM datetimes
+# Regular expression for ISO 8601 datetimes
 datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
 
 def writeNamelistFile(path, nmls, nmlorder):
@@ -464,7 +464,7 @@ class Job(shared.Job2):
         return pickle.dumps({'parameters':parameter_info, 'observations':obs})
 
     def on_start(self):
-        # Check for presence of GOTM executable.
+        # Check for presence of executable.
         if not self.use_shell:
             if not os.path.isfile(self.exe):
                 raise Exception('Cannot locate executable at "%s".' % self.exe)
@@ -480,7 +480,7 @@ class Job(shared.Job2):
                 os.mkdir(tempscenariodir)
         else:
             # Create a temporary directory for the scenario on disk
-            # (decreases runtime compared to network because GOTM can access observations faster)
+            # (decreases runtime compared to network because executable can access observations faster)
             tempscenariodir = tempfile.mkdtemp(prefix='gotmopt', dir=self.tempdir)
             atexit.register(shutil.rmtree, tempscenariodir, True)
 
@@ -839,7 +839,7 @@ def run_program(exe, rundir, use_shell=False, show_output=True):
             print(line, end='')
     proc.communicate()
 
-    # Calculate and show elapsed time. Report error if GOTM did not complete gracefully.
+    # Calculate and show elapsed time. Report error if executable did not complete gracefully.
     elapsed = time.time() - time_start
     print('Model run took %.1f s.' % elapsed)
     if proc.returncode != 0:

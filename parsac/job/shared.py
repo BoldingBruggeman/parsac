@@ -253,14 +253,14 @@ class Job(optimize.OptimizationProblem):
                 if verbose:
                     print('Running on:')
                     for node, ncpu in job_server.get_active_nodes().items():
-                        print('   %s: %i cpus' % (node, ncpu))
+                        print('   %s: %i compute cores' % (node, ncpu))
 
             # Make sure the population size is a multiple of the number of workers
             nworkers = sum(job_server.get_active_nodes().values())
             if verbose:
-                print('Total number of cpus: %i' % nworkers)
+                print('Total number of compute cores: %i' % nworkers)
             if nworkers == 0:
-                raise Exception('No cpus available; exiting.')
+                raise Exception('No compute cores available; exiting.')
 
             jobpath = os.path.abspath('%s.ppjob' % uuid.uuid4())
             with open(jobpath, 'wb') as f:
@@ -268,7 +268,7 @@ class Job(optimize.OptimizationProblem):
             atexit.register(os.remove, jobpath)
 
             ppjobs = []
-            print('Submitting %i jobs for parallel processing...' % len(ensemble))
+            print('Submitting %i jobs for parallel processing on %i cores...' % (len(ensemble),  nworkers))
             for member in ensemble:
                 ppjob = job_server.submit(run_ensemble_member, (jobpath, member))
                 ppjobs.append(ppjob)
