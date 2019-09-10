@@ -3,6 +3,7 @@
 *.db
 *.pyc
 *.whl
-parsac.egg-info/
+*.egg-info/
 Licenses/
 *.ppjob
+build/
