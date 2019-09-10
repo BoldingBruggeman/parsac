@@ -18,7 +18,7 @@ Make sure you use the command that corresponds to the Python version you want to
 
 parsac supports parallel simulations through [Parallel Python](https://www.parallelpython.com).
 This package supports Python 2 out of the box (`pip install pp --user`), but its Python 3 version
-is currently in beta. To install in Python 3, [download the zip file with the Python 3 port](https://www.parallelpython.com/content/view/18/32), extract its contents, go to the contained directory and open a command prompt there, then run `python setup.py install`.
+is currently in beta. To install in Python 3, [download the zip file with the Python 3 port of Parallel Python](https://www.parallelpython.com/content/view/18/32), extract its contents, go to the contained directory and open a command prompt there, then run `python setup.py install`.
 
 parsac uses [SALib](https://github.com/SALib/SALib) for sensitivity analysis. Typically, this can be installed with `pip install SALib --user`. If you are using [the Anaconda Python distribution](https://www.anaconda.com), you can instead do `conda install SALib` (you may need to add `-c conda-forge`).
 
