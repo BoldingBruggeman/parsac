@@ -10,7 +10,7 @@ and that write their output to NetCDF.
 
 ## Installation
 
-`pip install --user parsac`
+`pip install parsac --user`
 
 Remove `--user` to install in the system's shared Python directory (not recommended).
 Some systems have multiple versions of pip, e.g., pip for Python 2, pip3 for Python 3.
