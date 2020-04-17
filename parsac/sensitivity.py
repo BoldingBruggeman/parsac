@@ -68,7 +68,7 @@ def configure_argument_parser(parser):
     subparser_analyze_rbd_fast.add_argument('--M', type=int, help='The interference parameter, i.e., the number of harmonics to sum in the Fourier series decomposition', default=10)
 
     subparser_analyze_morris = subparsers_analyze.add_parser('morris')
-    subparser_analyze_morris.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=1000)
+    subparser_analyze_morris.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=100)
     subparser_analyze_morris.add_argument('--conf_level', type=float, help='The confidence interval level', default=0.95)
 
     subparser_analyze_sobol = subparsers_analyze.add_parser('sobol')
@@ -77,11 +77,11 @@ def configure_argument_parser(parser):
 #   two extra parameters to Sobol - parallel=False, n_processors=Non
 
     subparser_analyze_delta = subparsers_analyze.add_parser('delta')
-    subparser_analyze_delta.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=10)
+    subparser_analyze_delta.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=100)
     subparser_analyze_delta.add_argument('--conf_level', type=float, help='The confidence interval level', default=0.95)
 
     subparser_analyze_dgsm = subparsers_analyze.add_parser('dgsm')
-    subparser_analyze_dgsm.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=1000)
+    subparser_analyze_dgsm.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=100)
     subparser_analyze_dgsm.add_argument('--conf_level', type=float, help='The confidence interval level', default=0.95)
 
     subparser_analyze_ff = subparsers_analyze.add_parser('ff')
