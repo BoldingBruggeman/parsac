@@ -154,7 +154,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
     if verbose:
         for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), key=lambda x: x[1], reverse=True):
             print('%s: %s' % (name, sensitivity))
-    return sensitivities
+    return sensitivities, analysis
 
 def undoLogTransform(values, logscale):
     return numpy.array([v if not log else 10.**v for log, v in zip(logscale, values)])
@@ -238,8 +238,15 @@ def main(args):
         else:
             target_names = ['Target %i' % i for i in range(Y.shape[1])]
         mean_rank = numpy.zeros((X.shape[1],), dtype=int)
+        
+        # create empty dict to append analysis results
+        all_sa_results = {}
+        
         for itarget, target_name in enumerate(target_names):
-            sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
+            sensitivities, analysis = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
+            # append parameter names and SA results with targetname as key
+            analysis['Parameter'] = numpy.array(SAlib_problem['names'], dtype=str)
+            all_sa_results[target_name] = analysis
             isort = numpy.argsort(sensitivities)[::-1]
             for irank, ipar in enumerate(isort):
                 mean_rank[ipar] += irank
@@ -248,6 +255,10 @@ def main(args):
                 print('  - %s (%s)' % (names[i], sensitivities[i]))
         mean_rank = 1 + mean_rank / float(Y.shape[1])
 
+        # create pkl file with all SA results
+        f = open("SA_results.pkl","wb")
+        pickle.dump(all_sa_results,f)
+        
         if args.select is not None:
             n, path = args.select
             n = int(n)
