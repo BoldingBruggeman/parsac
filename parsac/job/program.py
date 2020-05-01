@@ -202,7 +202,7 @@ class YamlParameter(shared.Parameter):
             with io.open(self.path, 'w', encoding='utf-8') as f:
                 yaml.dump(self.job.yamlfiles[self.file], f, default_flow_style=False)
 
-def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf):
+def readVariableFromTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf):
     times, zs, values = [], [], []
     with open(path, 'rU') as f:
         for iline, line in enumerate(f):
@@ -217,6 +217,7 @@ def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=num
             curtime = datetime.datetime(*refvals)
             data = line[datematch.end():].rstrip('\n').split()
             if format == 0:
+                # Depth-explicit variable (on each line: time, depth, value)
                 if len(data) != 2:
                     raise Exception('Line %i does not contain two values (depth, observation) after the date + time, but %i values.' % (iline + 1, len(data)))
                 z = float(data[0])
@@ -226,6 +227,7 @@ def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=num
                     continue
                 zs.append(z)
             else:
+                # Depth-independent variable (on each line: time, value)
                 if len(data) != 1:
                     raise Exception('Line %i does not contain one value (observation) after the date + time, but %i values.' % (iline + 1, len(data)))
             times.append(curtime)
@@ -240,10 +242,10 @@ def parseTextFile(path, format, verbose=False, mindepth=-numpy.inf, maxdepth=num
     values = numpy.array(values)
     return times, zs, values
 
-def parseNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf, time_name='time'):
+def readVariableFromNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf, time_name='time'):
     wrapped_nc = NcDict(path)
     nctime = wrapped_nc.nc.variables[time_name]
-    times = netCDF4.num2date(nctime[:], nctime.units)
+    times = netCDF4.num2date(nctime[:], nctime.units, only_use_cftime_datetimes=False)
     values = wrapped_nc.eval(name)[...]
     assert values.ndim == 1
     zs = None if depth_name is None else wrapped_nc[depth_name][:]
@@ -398,9 +400,9 @@ class Job(shared.Job2):
             if sourcepath.endswith('.nc'):
                 if variable is None:
                     raise Exception('"variable" attribute must be provided since "%s" is a NetCDF file.' % sourcepath)
-                times, zs, values = parseNcFile(sourcepath, variable, depth_variable, self.verbose, mindepth, maxdepth)
+                times, zs, values = readVariableFromNcFile(sourcepath, variable, depth_variable, self.verbose, mindepth, maxdepth)
             else:
-                times, zs, values = parseTextFile(sourcepath, file_format, self.verbose, mindepth, maxdepth)
+                times, zs, values = readVariableFromTextFile(sourcepath, file_format, self.verbose, mindepth, maxdepth)
 
             # Try to store cached copy of observations
             if cache:
@@ -681,20 +683,20 @@ class Job(shared.Job2):
                         # Interfaces (all except bottom)
                         zs_model = h_cumsum-h_cumsum[:, -1, numpy.newaxis]
                     z_interfaces2 = numpy.empty((z_interfaces.shape[0]+1, z_interfaces.shape[1]))
-                    delta_z_interfaces = numpy.diff(z_interfaces, axis=0)/2
+                    delta_z_interfaces = numpy.diff(z_interfaces, axis=0) / 2
                     z_interfaces2[0,   :] = z_interfaces[0,  :] - delta_z_interfaces[0,:]
                     z_interfaces2[1:-1,:] = z_interfaces[:-1,:] + delta_z_interfaces
                     z_interfaces2[-1,  :] = z_interfaces[-1, :] + delta_z_interfaces[-1,:]
 
-                    half_delta_time = numpy.diff(t_centers)/2
-                    tim_stag = numpy.zeros((len(t_centers)+1,))
+                    half_delta_time = numpy.diff(t_centers) / 2
+                    tim_stag = numpy.zeros((len(t_centers) + 1,))
                     tim_stag[0 ] = t_centers[0] - half_delta_time[0]
                     tim_stag[1:-1] = t_centers[:-1] + half_delta_time
                     tim_stag[-1] = t_centers[-1] + half_delta_time[-1]
-                    t_interfaces = numpy.repeat(netCDF4.num2date(tim_stag, time_units)[:, numpy.newaxis], z_interfaces2.shape[1], axis=1)
+                    t_interfaces = numpy.repeat(netCDF4.num2date(tim_stag, time_units, only_use_cftime_datetimes=False)[:, numpy.newaxis], z_interfaces2.shape[1], axis=1)
                     model_values.append((t_interfaces, z_interfaces2, all_values_model, modelvals))
                 else:
-                    model_values.append((netCDF4.num2date(t_centers, time_units), all_values_model, modelvals))
+                    model_values.append((netCDF4.num2date(t_centers, time_units, only_use_cftime_datetimes=False), all_values_model, modelvals))
 
             if obsinfo['logscale']:
                 modelvals = numpy.log10(numpy.maximum(modelvals, obsinfo['minimum']))
