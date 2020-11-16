@@ -532,7 +532,7 @@ class Job(shared.Job2):
         for parameter in self.parameters:
             parameter.store()
 
-    def evaluate2(self, values, extra_outputs=None, return_model_values=False, show_output=False, verbose=False):
+    def evaluate2(self, values, extra_outputs=None, return_model_values=False, show_output=False, verbose=True):
         assert self.started
         
         if verbose:
