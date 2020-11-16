@@ -60,6 +60,7 @@ def configure_argument_parser(parser):
     parser_analyze.add_argument('info', type=str, help='Path to output of the "sample" step')
     parser_analyze.add_argument('--print_to_console', action='store_true', help='Print results directly to console')
     parser_analyze.add_argument('--select', nargs=2, help='This requires two values: N OUTPUTXML. Selects the N most sensitive parameters for a calibation run and save it to OUTPUTXML')
+    parser_analyze.add_argument('--pickle', help='Path of pickle file to write with analysis results', default=None)
     subparsers_analyze = parser_analyze.add_subparsers(dest='method')
 
     subparser_analyze_fast = subparsers_analyze.add_parser('fast')
@@ -240,13 +241,15 @@ def main(args):
         mean_rank = numpy.zeros((X.shape[1],), dtype=int)
         
         # create empty dict to append analysis results
-        all_sa_results = {}
+        if args.pickle is not None:
+            all_sa_results = {}
         
         for itarget, target_name in enumerate(target_names):
             sensitivities, analysis = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
             # append parameter names and SA results with targetname as key
-            analysis['names'] = list(SAlib_problem['names'])
-            all_sa_results[target_name] = analysis
+            if args.pickle is not None:
+                analysis['names'] = list(SAlib_problem['names'])
+                all_sa_results[target_name] = analysis
             isort = numpy.argsort(sensitivities)[::-1]
             for irank, ipar in enumerate(isort):
                 mean_rank[ipar] += irank
@@ -256,8 +259,9 @@ def main(args):
         mean_rank = 1 + mean_rank / float(Y.shape[1])
 
         # create pkl file with all SA results
-        f = open("SA_results.pkl","wb")
-        pickle.dump(all_sa_results,f)
+        if args.pickle is not None:
+            f = open("SA_results.pkl","wb")
+            pickle.dump(all_sa_results,f)
         
         if args.select is not None:
             n, path = args.select
