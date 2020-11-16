@@ -153,6 +153,8 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         assert sample_args.method == 'ff'
         import SALib.analyze.ff
         analysis = SALib.analyze.ff.analyze(SAlib_problem, X, Y, second_order=args.second_order, print_to_console=args.print_to_console)
+    else:
+        raise Exception('Unknown analysis method "%s" specified.' % args.method)
     if verbose:
         for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), key=lambda x: x[1], reverse=True):
             print('%s: %s' % (name, sensitivity))
@@ -240,16 +242,13 @@ def main(args):
         else:
             target_names = ['Target %i' % i for i in range(Y.shape[1])]
         mean_rank = numpy.zeros((X.shape[1],), dtype=int)
-        
-        # create empty dict to append analysis results
-        if args.pickle is not None:
-            all_sa_results = {}
-        
+
+        all_sa_results = {}
         for itarget, target_name in enumerate(target_names):
             sensitivities, analysis = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
-            # append parameter names and SA results with targetname as key
             if args.pickle is not None:
-                analysis['names'] = list(SAlib_problem['names'])
+                # Append parameter names and SA results with targetname as key
+                analysis['names'] = names
                 all_sa_results[target_name] = analysis
             isort = numpy.argsort(sensitivities)[::-1]
             for irank, ipar in enumerate(isort):
@@ -259,11 +258,12 @@ def main(args):
                 print('  - %s (%s)' % (names[i], sensitivities[i]))
         mean_rank = 1 + mean_rank / float(Y.shape[1])
 
-        # create pkl file with all SA results
+        # Create pickle file with all SA results
         if args.pickle is not None:
-            f = open(args.pickle,"wb")
-            pickle.dump(all_sa_results,f)
-        
+            print('Writing analysis result to pickle %s.' % args.pickle)
+            with open(args.pickle, 'wb') as f:
+                pickle.dump(all_sa_results, f)
+
         if args.select is not None:
             n, path = args.select
             n = int(n)
