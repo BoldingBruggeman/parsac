@@ -245,7 +245,7 @@ def main(args):
         for itarget, target_name in enumerate(target_names):
             sensitivities, analysis = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
             # append parameter names and SA results with targetname as key
-            analysis['Parameter'] = numpy.array(SAlib_problem['names'], dtype=str)
+            analysis['names'] = list(SAlib_problem['names'])
             all_sa_results[target_name] = analysis
             isort = numpy.argsort(sensitivities)[::-1]
             for irank, ipar in enumerate(isort):
