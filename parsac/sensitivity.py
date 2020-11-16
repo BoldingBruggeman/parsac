@@ -145,6 +145,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         assert sample_args.method == 'latin'
         import SALib.analyze.delta
         analysis = SALib.analyze.delta.analyze(SAlib_problem, X, Y, num_resamples=args.num_resamples, conf_level=args.conf_level, print_to_console=args.print_to_console)
+        sensitivities = analysis['delta']
     elif args.method == 'dgsm':
         import SALib.analyze.dgsm
         analysis = SALib.analyze.dgsm.analyze(SAlib_problem, X, Y, num_resamples=args.num_resamples, conf_level=args.conf_level, print_to_console=args.print_to_console)
