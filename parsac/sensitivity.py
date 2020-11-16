@@ -260,7 +260,7 @@ def main(args):
 
         # create pkl file with all SA results
         if args.pickle is not None:
-            f = open(args.pickle+"SA_results.pkl","wb")
+            f = open(args.pickle,"wb")
             pickle.dump(all_sa_results,f)
         
         if args.select is not None:
