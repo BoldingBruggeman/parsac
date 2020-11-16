@@ -60,6 +60,7 @@ def configure_argument_parser(parser):
     parser_analyze.add_argument('info', type=str, help='Path to output of the "sample" step')
     parser_analyze.add_argument('--print_to_console', action='store_true', help='Print results directly to console')
     parser_analyze.add_argument('--select', nargs=2, help='This requires two values: N OUTPUTXML. Selects the N most sensitive parameters for a calibation run and save it to OUTPUTXML')
+    parser_analyze.add_argument('--pickle', help='Path of pickle file to write with analysis results', default=None)
     subparsers_analyze = parser_analyze.add_subparsers(dest='method')
 
     subparser_analyze_fast = subparsers_analyze.add_parser('fast')
@@ -144,6 +145,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         assert sample_args.method == 'latin'
         import SALib.analyze.delta
         analysis = SALib.analyze.delta.analyze(SAlib_problem, X, Y, num_resamples=args.num_resamples, conf_level=args.conf_level, print_to_console=args.print_to_console)
+        sensitivities = analysis['delta']
     elif args.method == 'dgsm':
         import SALib.analyze.dgsm
         analysis = SALib.analyze.dgsm.analyze(SAlib_problem, X, Y, num_resamples=args.num_resamples, conf_level=args.conf_level, print_to_console=args.print_to_console)
@@ -154,7 +156,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
     if verbose:
         for name, sensitivity in sorted(zip(SAlib_problem['names'], sensitivities), key=lambda x: x[1], reverse=True):
             print('%s: %s' % (name, sensitivity))
-    return sensitivities
+    return sensitivities, analysis
 
 def undoLogTransform(values, logscale):
     return numpy.array([v if not log else 10.**v for log, v in zip(logscale, values)])
@@ -238,8 +240,17 @@ def main(args):
         else:
             target_names = ['Target %i' % i for i in range(Y.shape[1])]
         mean_rank = numpy.zeros((X.shape[1],), dtype=int)
+        
+        # create empty dict to append analysis results
+        if args.pickle is not None:
+            all_sa_results = {}
+        
         for itarget, target_name in enumerate(target_names):
-            sensitivities = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
+            sensitivities, analysis = analyze(SAlib_problem, args, job_info['sample_args'], X, Y[:, itarget])
+            # append parameter names and SA results with targetname as key
+            if args.pickle is not None:
+                analysis['names'] = list(SAlib_problem['names'])
+                all_sa_results[target_name] = analysis
             isort = numpy.argsort(sensitivities)[::-1]
             for irank, ipar in enumerate(isort):
                 mean_rank[ipar] += irank
@@ -248,6 +259,11 @@ def main(args):
                 print('  - %s (%s)' % (names[i], sensitivities[i]))
         mean_rank = 1 + mean_rank / float(Y.shape[1])
 
+        # create pkl file with all SA results
+        if args.pickle is not None:
+            f = open(args.pickle,"wb")
+            pickle.dump(all_sa_results,f)
+        
         if args.select is not None:
             n, path = args.select
             n = int(n)
