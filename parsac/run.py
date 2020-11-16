@@ -22,6 +22,7 @@ def configure_argument_parser(parser):
     parser.add_argument('-t', '--transport',      type=str, choices=('http', 'mysql'), help='Transport to use for server communication: http or mysql')
     parser.add_argument('-r', '--reportinterval', type=int, help='Time between result reports (seconds).')
     parser.add_argument('-i', '--interactive',    action='store_true', help='Whether to allow for user interaction (input from stdin) when making decisions')
+    parser.add_argument('-q', '--quiet',          action='store_true', help='Suppress diagnostic messages')
     parser.add_argument('--tempdir',              type=str, help='Temporary directory to use for setups when using a parallelized optimization method (default: %s).' % tempfile.gettempdir())
     parser.add_argument('--maxfun',               type=int, help='Maximum number of function evaluations (or simulations) to perform (default: unlimited).')
     parser.add_argument('--maxiter',              type=int, help='Maximum number of iterations (Nelder-Mead simplex) or generations (Differential Evolution) to perform (default: unlimited).', default=sys.maxsize)
@@ -38,7 +39,7 @@ def configure_argument_parser(parser):
 
 def main(args):
     print('Reading configuration from %s...' % args.xmlfile)
-    current_job = job.fromConfigurationFile(args.xmlfile, tempdir=args.tempdir)
+    current_job = job.fromConfigurationFile(args.xmlfile, tempdir=args.tempdir, verbose=not args.quiet)
 
     with open(args.xmlfile) as f:
         xml = f.read()

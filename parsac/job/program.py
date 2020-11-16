@@ -259,9 +259,7 @@ def readVariableFromNcFile(path, name, depth_name, verbose=False, mindepth=-nump
     return times, zs, values
 
 class Job(shared.Job2):
-    verbose = True
-
-    def __init__(self, job_id, xml_tree, root, copyexe=False, tempdir=None, simulationdir=None):
+    def __init__(self, job_id, xml_tree, root, copyexe=False, tempdir=None, simulationdir=None, verbose=True):
         # Allow overwrite of setup directory (default: directory with xml configuration file)
         element = xml_tree.find('setup')
         if element is not None:
@@ -291,6 +289,8 @@ class Job(shared.Job2):
         if copyexe is None:
             copyexe = not hasattr(sys, 'frozen')
         self.copyexe = copyexe
+
+        self.verbose = verbose
 
         #self.controller = gotmcontroller.Controller(scenariodir, path_exe, copyexe=not hasattr(sys, 'frozen'), tempdir=tempdir, simulationdir=simulationdir)
 
@@ -534,10 +534,10 @@ class Job(shared.Job2):
         for parameter in self.parameters:
             parameter.store()
 
-    def evaluate2(self, values, extra_outputs=None, return_model_values=False, show_output=False, verbose=True):
+    def evaluate2(self, values, extra_outputs=None, return_model_values=False, show_output=False):
         assert self.started
-        
-        if verbose:
+
+        if self.verbose:
             print('Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values]))
 
         # If required, check whether all parameters are within their respective range.
@@ -789,23 +789,23 @@ class Job(shared.Job2):
             self.targets = targets
         return dir_paths
 
-    def runEnsemble(self, directories, ncpus=None, ppservers=(), socket_timeout=600, secret=None, verbose=False):
+    def runEnsemble(self, directories, ncpus=None, ppservers=(), socket_timeout=600, secret=None):
         import pp
-        if verbose:
+        if self.verbose:
             print('Starting Parallel Python server...')
         if ncpus is None:
             ncpus = 'autodetect'
         job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
         if ppservers:
-            if verbose:
+            if self.verbose:
                 print('Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers)))
             time.sleep(10)
-            if verbose:
+            if self.verbose:
                 print('Running on:')
                 for node, ncpu in job_server.get_active_nodes().items():
                     print('   %s: %i cpus' % (node, ncpu))
         nworkers = sum(job_server.get_active_nodes().values())
-        if verbose:
+        if self.verbose:
             print('Total number of cpus: %i' % nworkers)
         if nworkers == 0:
             raise Exception('No cpus available; exiting.')

@@ -8,10 +8,10 @@ from . import program
 
 class Job(program.Job):
 
-    def __init__(self, job_id, xml_tree, root, copyexe=False, tempdir=None, simulationdir=None):
+    def __init__(self, job_id, xml_tree, root, **kwargs):
         self.start_time = None
         self.stop_time = None
-        program.Job.__init__(self, job_id, xml_tree, root, copyexe, tempdir, simulationdir)
+        program.Job.__init__(self, job_id, xml_tree, root, **kwargs)
 
     def getSimulationStart(self):
         if self.start_time is None:

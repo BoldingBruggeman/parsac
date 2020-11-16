@@ -55,6 +55,7 @@ def configure_argument_parser(parser):
 
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('info', type=str, help='Path to output of the "sample" step')
+    parser_run.add_argument('-q', '--quiet', action='store_true', help='Suppress diagnostic messages')
 
     parser_analyze = subparsers.add_parser('analyze')
     parser_analyze.add_argument('info', type=str, help='Path to output of the "sample" step')
@@ -175,7 +176,7 @@ def main(args):
         args.xmlfile = job_info['sample_args'].xmlfile
 
     print('Reading configuration from %s...' % args.xmlfile)
-    current_job = job.fromConfigurationFile(args.xmlfile)
+    current_job = job.fromConfigurationFile(args.xmlfile, verbose=not args.quiet)
 
     names = current_job.getParameterNames()
     minpar, maxpar = current_job.getParameterBounds()
