@@ -549,7 +549,7 @@ class Job(shared.Job2):
 
         self.prepareDirectory(values)
 
-        returncode = run_program(self.exe, self.scenariodir, use_shell=self.use_shell, show_output=show_output)
+        returncode = run_program(self.exe, self.scenariodir, use_shell=self.use_shell, show_output=show_output, verbose=self.verbose)
 
         if returncode != 0:
             # Run failed
@@ -819,9 +819,10 @@ class Job(shared.Job2):
             job()
             print('Processed %s...' % rundir)
 
-def run_program(exe, rundir, use_shell=False, show_output=True):
+def run_program(exe, rundir, use_shell=False, show_output=True, verbose=True):
     time_start = time.time()
-    print('Starting model run...')
+    if verbose:
+        print('Starting model run...')
     args = [exe]
     if exe.endswith('.py'):
         args = [sys.executable] + args
@@ -843,8 +844,9 @@ def run_program(exe, rundir, use_shell=False, show_output=True):
     proc.communicate()
 
     # Calculate and show elapsed time. Report error if executable did not complete gracefully.
-    elapsed = time.time() - time_start
-    print('Model run took %.1f s.' % elapsed)
-    if proc.returncode != 0:
-        print('WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode )
+    if verbose:
+        elapsed = time.time() - time_start
+        print('Model run took %.1f s.' % elapsed)
+        if proc.returncode != 0:
+            print('WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode )
     return proc.returncode
