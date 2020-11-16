@@ -532,10 +532,10 @@ class Job(shared.Job2):
         for parameter in self.parameters:
             parameter.store()
 
-    def evaluate2(self, values, extra_outputs=None, return_model_values=False, show_output=False, print_verbose=True):
+    def evaluate2(self, values, extra_outputs=None, return_model_values=False, show_output=False, verbose=True):
         assert self.started
         
-        if print_verbose:
+        if verbose:
             print('Evaluating fitness with parameter set [%s].' % ','.join(['%.6g' % v for v in values]))
 
         # If required, check whether all parameters are within their respective range.
