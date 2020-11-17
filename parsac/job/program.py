@@ -842,12 +842,13 @@ def run_program(exe, rundir, use_shell=False, show_output=True, verbose=True):
             if line == '':
                 break
             print(line, end='')
-    proc.communicate()
+    stdout_data, _ = proc.communicate()
 
     # Calculate and show elapsed time. Report error if executable did not complete gracefully.
     if verbose:
         elapsed = time.time() - time_start
         print('Model run took %.1f s.' % elapsed)
     if proc.returncode != 0:
-        print('WARNING: %s returned non-zero code %i - an error must have occured.' % (os.path.basename(exe), proc.returncode))
+        last_output = '\n'.join(['> %s' % l for l in stdout_data.rsplit('\n', 5)[-5:]])
+        print('WARNING: %s returned non-zero code %i - an error must have occured. Last output:\n%s' % (os.path.basename(exe), proc.returncode, last_output))
     return proc.returncode
