@@ -820,9 +820,10 @@ class Job(shared.Job2):
             print('Processed %s...' % rundir)
 
 def run_program(exe, rundir, use_shell=False, show_output=True, verbose=True):
-    time_start = time.time()
     if verbose:
+        time_start = time.time()
         print('Starting model run...')
+
     args = [exe]
     if exe.endswith('.py'):
         args = [sys.executable] + args
@@ -847,6 +848,6 @@ def run_program(exe, rundir, use_shell=False, show_output=True, verbose=True):
     if verbose:
         elapsed = time.time() - time_start
         print('Model run took %.1f s.' % elapsed)
-        if proc.returncode != 0:
-            print('WARNING: model returned non-zero code %i - an error must have occured.' % proc.returncode )
+    if proc.returncode != 0:
+        print('WARNING: %s returned non-zero code %i - an error must have occured.' % (os.path.basename(exe), proc.returncode))
     return proc.returncode
