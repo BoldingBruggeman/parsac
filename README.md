@@ -1,12 +1,14 @@
 # parsac
 
-parsac (formerly acpy) is a Python-based tool for sensitvity analysis and auto-calibration in parallel.
+parsac (formerly acpy) is a Python-based tool for sensitivity analysis and auto-calibration in parallel.
 It is designed for analysis of models that take significant time to run.
 For that reason, it focuses on storing and exploiting every single model result,
 and performing model runs in parallel on either a single machine or
 on computer clusters. It works with models that are run by calling one binary,
 that use text-based configuration files based on YAML or Fortran namelists,
 and that write their output to NetCDF.
+
+[![DOI](https://zenodo.org/badge/206791023.svg)](https://zenodo.org/badge/latestdoi/206791023)
 
 ## Installation
 
