@@ -15,7 +15,7 @@ branches:
   - master
 script:
   - pwd
-  - cd examples
+  - cd parsac/examples
   - ls
   - ls ../
   - python ../parsac_run.py calibration run idealized.xml
