@@ -1,14 +1,20 @@
 from __future__ import print_function
 import os.path
+import importlib
 import xml.etree.ElementTree
 
 from . import shared
-from . import program
-from . import gotm
-from . import idealized
-from . import function
 
-name2class = {'gotm': gotm.Job, 'program': program.Job, 'idealized': idealized.Job, 'function': function.Job}
+job_modules = ['idealized', 'function', 'program', 'gotm']
+
+name2class = {}
+for name in job_modules:
+    try:
+        mod = importlib.import_module('.%s' % name, __package__)
+        name2class[name] = getattr(mod, 'Job')
+    except ImportError as e:
+        print('Import failure: %s\nSupport for jobs of type "%s" is disabled.' % (e, name))
+        pass
 
 def fromConfigurationFile(path, **kwargs):
     if not os.path.isfile(path):
