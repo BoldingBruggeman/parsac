@@ -11,6 +11,8 @@ python:
   - '3.7'
   - '3.8'
 branches:
+install:
+  - pip install netCDF4
   only:
   - master
 script:
@@ -18,4 +20,4 @@ script:
   - cd parsac/examples
   - ls
   - ls ../
-  - python ../parsac_run.py calibration run idealized.xml
+#  - python -m ../parsac_run.py calibration run idealized.xml
