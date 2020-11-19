@@ -7,7 +7,7 @@ def readme():
 setup(name='parsac',
       use_scm_version=True,
       setup_requires=['setuptools_scm'],
-      description='AutoCalibration tool written in Python',
+      description='Parallel Sensitivity Analysis and Calibration',
       long_description=readme(),
       url='https://github.com/BoldingBruggeman/parsac',
       author='Jorn Bruggeman',

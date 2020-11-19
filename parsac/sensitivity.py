@@ -176,7 +176,7 @@ def main(args):
         args.xmlfile = job_info['sample_args'].xmlfile
 
     print('Reading configuration from %s...' % args.xmlfile)
-    current_job = job.fromConfigurationFile(args.xmlfile, verbose=not args.quiet)
+    current_job = job.fromConfigurationFile(args.xmlfile, verbose=not getattr(args, 'quiet', False))
 
     names = current_job.getParameterNames()
     minpar, maxpar = current_job.getParameterBounds()
