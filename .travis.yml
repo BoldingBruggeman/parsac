@@ -1,0 +1,18 @@
+# https://travis-ci.org/dashboard
+# https://config.travis-ci.com/explore
+
+os: linux
+dist: bionic
+language: python
+arch:
+  - amd64
+python:
+  - '3.6'
+  - '3.7'
+  - '3.8'
+branches:
+  only:
+  - master
+script:
+  - cd examples
+  - python ../parsac_run.py calibration run idealized.xml
