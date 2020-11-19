@@ -18,4 +18,4 @@ install:
 script:
   - cd parsac/examples
   - pwd
-  - python -m ../parsac_run.py calibration run idealized.xml
+  - python ../parsac_run.py calibration run idealized.xml
