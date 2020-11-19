@@ -16,8 +16,6 @@ branches:
 install:
   - pip install netCDF4
 script:
-  - pwd
   - cd parsac/examples
-  - ls
-  - ls ../
-#  - python -m ../parsac_run.py calibration run idealized.xml
+  - pwd
+  - python -m ../parsac_run.py calibration run idealized.xml
