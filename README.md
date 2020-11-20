@@ -8,7 +8,7 @@ on computer clusters. It works with models that are run by calling one binary,
 that use text-based configuration files based on YAML or Fortran namelists,
 and that write their output to NetCDF.
 
-[![DOI](https://zenodo.org/badge/206791023.svg)](https://zenodo.org/badge/latestdoi/206791023)
+[![DOI](https://zenodo.org/badge/206791023.svg)](https://zenodo.org/badge/latestdoi/206791023) [![Build Status](https://travis-ci.com/BoldingBruggeman/parsac.svg?branch=master)](https://travis-ci.com/BoldingBruggeman/parsac)
 
 ## Installation
 
