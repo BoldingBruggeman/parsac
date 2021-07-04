@@ -29,6 +29,8 @@ try:
         return collections.OrderedDict(loader.construct_pairs(node))
     def none_representer(self, _):
         return self.represent_scalar('tag:yaml.org,2002:null', '')
+    del yaml.loader.Loader.yaml_implicit_resolvers['o']
+    del yaml.loader.Loader.yaml_implicit_resolvers['O']
     yaml.add_representer(collections.OrderedDict, dict_representer)
     yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, dict_constructor)
     yaml.add_representer(type(None), none_representer)
