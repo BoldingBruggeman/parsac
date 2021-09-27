@@ -30,13 +30,16 @@ def configure_argument_parser(parser):
     parser_sample.add_argument('--scenario', type=str, help='Scenario directory to use as template for ensemble-member-specific setups (only in combination with --dir).')
     parser_sample.add_argument('--format', type=str, help='Format for subdirectory name (only in combination with --dir).', default='%04i')
 
-    parser_sample = subparsers.add_parser('run')
-    parser_sample.add_argument('xmlfile', type=str, help='XML formatted configuration file')
-    parser_sample.add_argument('dirs', nargs='+', help='Directories to run in (may contain wildcards)')
+    parser_run = subparsers.add_parser('run')
+    parser_run.add_argument('xmlfile', type=str, help='XML formatted configuration file')
+    parser_run.add_argument('dirs', nargs='+', help='Directories to run in (may contain wildcards)')
+    parser_run.add_argument('-n', '--ncpus', type=int, help='Number of cores to use (default: use all available on the local machine).')
+    parser_run.add_argument('--ppservers',   type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on.')
+    parser_run.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only used in combination with ppservers argument).')
 
 def get_weights_grid(current_job, results, gridsize):
     # Build parameter grid (one dimension per parameter)
-    # We will use this to normalize a parameetr set's probability of beign selected
+    # We will use this to normalize a parameter set's probability of being selected
     # by the number of other parameter sets that fall within the same grid point.
     minpar, maxpar = current_job.getParameterBounds()
     logscale = current_job.getParameterLogScale()
@@ -87,7 +90,7 @@ def main(args):
         for d in args.dirs:
             dirs.extend(glob.glob(d))
         current_job = job.fromConfigurationFile(args.xmlfile)
-        current_job.runEnsemble(dirs)
+        current_job.runEnsemble(dirs, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
         return
 
     current_result = result.Result(args.xmlfile)

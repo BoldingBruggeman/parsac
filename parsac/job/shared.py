@@ -8,6 +8,29 @@ try:
 except ValueError:
     import optimize
 
+def parse_ppservers(ppservers):
+    if isinstance(ppservers, tuple):
+        return ppservers
+    elif isinstance(ppservers, (str, u''.__class__)):
+        match = re.match(r'(.*)\[(.*)\](.*)', ppservers)
+        if match is not None:
+            # Hostnames in PBS/SLURM notation, e.g., node[01-06]
+            ppservers = []
+            left, middle, right = match.groups()
+            for item in middle.split(','):
+                if '-' in item:
+                    start, stop = item.split('-')
+                    for i in range(int(start), int(stop)+1):
+                        ppservers.append('%s%s%s' % (left, str(i).zfill(len(start)), right))
+                else:
+                    ppservers.append('%s%s%s' % (left, item, right))
+        else:
+            # Comma-separated hostnames
+            ppservers = ppservers.split(',')
+        return tuple(ppservers)
+    assert ppservers is None
+    return ()
+
 job_path = None
 def run_ensemble_member(new_job_path, parameter_values):
     global job_path, job
@@ -246,6 +269,7 @@ class Job(optimize.OptimizationProblem):
             if ncpus is None:
                 ncpus = 'autodetect'
             job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
+            ppservers = parse_ppservers(ppservers)
             if ppservers:
                 if verbose:
                     print('Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers)))

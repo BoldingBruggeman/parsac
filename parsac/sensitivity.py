@@ -55,6 +55,9 @@ def configure_argument_parser(parser):
 
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('info', type=str, help='Path to output of the "sample" step')
+    parser_run.add_argument('-n', '--ncpus', type=int, help='Number of cores to use (default: use all available on the local machine).')
+    parser_run.add_argument('--ppservers',   type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on.')
+    parser_run.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only used in combination with ppservers argument).')
     parser_run.add_argument('-q', '--quiet', action='store_true', help='Suppress diagnostic messages')
 
     parser_analyze = subparsers.add_parser('analyze')
@@ -222,7 +225,7 @@ def main(args):
                 wrappednc.finalize()
         else:
             # We run the model ourselves.
-            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=True)
+            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
             if Y is None:
                 print('Ensemble evaluation failed. Exiting...')
                 return
