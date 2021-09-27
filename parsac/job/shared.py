@@ -13,22 +13,7 @@ def parse_ppservers(ppservers):
     if isinstance(ppservers, tuple):
         return ppservers
     elif isinstance(ppservers, (str, u''.__class__)):
-        match = re.match(r'(.*)\[(.*)\](.*)', ppservers)
-        if match is not None:
-            # Hostnames in PBS/SLURM notation, e.g., node[01-06]
-            ppservers = []
-            left, middle, right = match.groups()
-            for item in middle.split(','):
-                if '-' in item:
-                    start, stop = item.split('-')
-                    for i in range(int(start), int(stop)+1):
-                        ppservers.append('%s%s%s' % (left, str(i).zfill(len(start)), right))
-                else:
-                    ppservers.append('%s%s%s' % (left, item, right))
-        else:
-            # Comma-separated hostnames
-            ppservers = ppservers.split(',')
-        return tuple(ppservers)
+        return tuple([name for name in ppservers.split(',') if name != ''])
     assert ppservers is None
     return ()
 

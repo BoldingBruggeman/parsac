@@ -225,7 +225,7 @@ def main(args):
                 wrappednc.finalize()
         else:
             # We run the model ourselves.
-            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
+            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret, verbose=True)
             if Y is None:
                 print('Ensemble evaluation failed. Exiting...')
                 return
