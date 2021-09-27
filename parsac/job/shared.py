@@ -268,8 +268,8 @@ class Job(optimize.OptimizationProblem):
                 print('Starting Parallel Python server...')
             if ncpus is None:
                 ncpus = 'autodetect'
-            job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
             ppservers = parse_ppservers(ppservers)
+            job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
             if ppservers:
                 if verbose:
                     print('Giving Parallel Python 10 seconds to connect to: %s' % (', '.join(ppservers)))
