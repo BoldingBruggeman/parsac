@@ -34,27 +34,27 @@ def configure_argument_parser(parser):
 
     subparsers_sample = parser_sample.add_subparsers(dest='method')
 
-    subparser_sample_fast = subparsers_sample.add_parser('fast')
+    subparser_sample_fast = subparsers_sample.add_parser('fast', help='extended Fourier Amplitude Sensitivity Test (eFAST)')
     subparser_sample_fast.add_argument('N', type=int, help='The number of samples to generate')
     subparser_sample_fast.add_argument('--M', type=int, help='The interference parameter, i.e., the number of harmonics to sum in the Fourier series decomposition', default=4)
 
-    subparser_sample_latin = subparsers_sample.add_parser('latin')
+    subparser_sample_latin = subparsers_sample.add_parser('latin', help='Latin hypercube sampling')
     subparser_sample_latin.add_argument('N', type=int, help='The number of samples to generate')
 
-    subparser_sample_morris = subparsers_sample.add_parser('morris')
+    subparser_sample_morris = subparsers_sample.add_parser('morris', help='Method of Morris')
     subparser_sample_morris.add_argument('N', type=int, help='The number of trajectories to generate')
     subparser_sample_morris.add_argument('--num_levels', type=int, help='The number of grid levels', default=4)
     subparser_sample_morris.add_argument('--grid_jump', type=int, help='The grid jump size', default=2)
     subparser_sample_morris.add_argument('--optimal_trajectories', type=int, help='The number of optimal trajectories to sample (between 2 and N)', default=None)
     subparser_sample_morris.add_argument('--no_local_optimization', dest='local_optimization', action='store_false', help='Disable local optimization according to Ruano et al. (2012) Local optimization speeds up the process tremendously for bigger N and num_levels.')
 
-    subparser_sample_saltelli = subparsers_sample.add_parser('saltelli')
+    subparser_sample_saltelli = subparsers_sample.add_parser('saltelli', help='Saltelli\'s extension of the Sobol\' sequence')
     subparser_sample_saltelli.add_argument('N', type=int, help='The number of samples to generate')
     subparser_sample_saltelli.add_argument('--no_calc_second_order', dest='calc_second_order', action='store_false', help='Disable calculation of second-order sensitivities')
 
-    subparser_sample_ff = subparsers_sample.add_parser('ff')
+    subparser_sample_ff = subparsers_sample.add_parser('ff', help='fractional factorial sample')
 
-    subparser_sample_random = subparsers_sample.add_parser('random')
+    subparser_sample_random = subparsers_sample.add_parser('random', help='random sampling from uniform distribution per parameter')
     subparser_sample_random.add_argument('N', type=int, help='The number of samples to generate')
 
     parser_run = subparsers.add_parser('run')
@@ -71,30 +71,32 @@ def configure_argument_parser(parser):
     parser_analyze.add_argument('--pickle', help='Path of pickle file to write with analysis results', default=None)
     subparsers_analyze = parser_analyze.add_subparsers(dest='method')
 
-    subparser_analyze_fast = subparsers_analyze.add_parser('fast')
+    subparser_analyze_fast = subparsers_analyze.add_parser('fast', help='extended Fourier Amplitude Sensitivity Test')
 
-    subparser_analyze_rbd_fast = subparsers_analyze.add_parser('rbd_fast')
+    subparser_analyze_rbd_fast = subparsers_analyze.add_parser('rbd_fast', help='Random Balance Designs Fourier Amplitude Sensitivity Test')
     subparser_analyze_rbd_fast.add_argument('--M', type=int, help='The interference parameter, i.e., the number of harmonics to sum in the Fourier series decomposition', default=10)
 
-    subparser_analyze_morris = subparsers_analyze.add_parser('morris')
+    subparser_analyze_morris = subparsers_analyze.add_parser('morris', help='Morris Analysis')
     subparser_analyze_morris.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=100)
     subparser_analyze_morris.add_argument('--conf_level', type=float, help='The confidence interval level', default=0.95)
 
-    subparser_analyze_sobol = subparsers_analyze.add_parser('sobol')
+    subparser_analyze_sobol = subparsers_analyze.add_parser('sobol', help='Sobol\' Sensitivity Analysis')
     subparser_analyze_sobol.add_argument('--num_resamples', type=int, help='The number of resamples', default=100)
     subparser_analyze_sobol.add_argument('--conf_level', type=float, help='The confidence interval level', default=0.95)
 #   two extra parameters to Sobol - parallel=False, n_processors=Non
 
-    subparser_analyze_delta = subparsers_analyze.add_parser('delta')
+    subparser_analyze_delta = subparsers_analyze.add_parser('delta', help='Delta Moment-Independent Analysis')
     subparser_analyze_delta.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=100)
     subparser_analyze_delta.add_argument('--conf_level', type=float, help='The confidence interval level', default=0.95)
 
-    subparser_analyze_dgsm = subparsers_analyze.add_parser('dgsm')
+    subparser_analyze_dgsm = subparsers_analyze.add_parser('dgsm', help='Derivative-based Global Sensitivity Measure')
     subparser_analyze_dgsm.add_argument('--num_resamples', type=int, help='The number of resamples when computing confidence intervals', default=100)
     subparser_analyze_dgsm.add_argument('--conf_level', type=float, help='The confidence interval level', default=0.95)
 
-    subparser_analyze_ff = subparsers_analyze.add_parser('ff')
+    subparser_analyze_ff = subparsers_analyze.add_parser('ff', help='fractional factorial analysis')
     subparser_analyze_ff.add_argument('--second_order', action='store_true', help='Include interaction effects')
+
+    subparser_analyze_mvr = subparsers_analyze.add_parser('mvr', help='multivariate linear regression')
 
 def sample(SAlib_problem, args):
     if args.method == 'fast':
@@ -122,6 +124,46 @@ def sample(SAlib_problem, args):
         raise Exception('Unknown sampler "%s" specified.' % args.method)
     print('Generated an ensemble with %i members' % (X.shape[0],))
     return X
+
+def mvr(A, y):
+    """Multiple linear regression based on numpy.linalg.lstsq,
+    with additional statistics to describe significance of overall model and parameter slopes."""
+    import numpy.linalg
+    import scipy.stats
+
+    assert A.ndim == 2
+    assert A.shape[0] == y.shape[0]
+    beta, SS_residuals, rank, s = numpy.linalg.lstsq(A, y, rcond=None)
+
+    # Equivalent expressions for sum of squares.
+    #y_hat = numpy.dot(A, beta)
+    #SS_residuals = ((y-y_hat)**2).sum(axis=0)
+    #SS_residuals = numpy.dot(y.T, y - y_hat)
+    #SS_total = numpy.dot(y.T, y -  y.mean(axis=0))
+    #SS_explained = numpy.dot(y.T, y_hat - y.mean(axis=0))
+
+    # number of ensemble members, number of parameters
+    n, k = A.shape
+
+    # total sum of squares, will equal n if observations are z-score transformed.
+    SS_total = ((y -  y.mean(axis=0))**2).sum()
+
+    R2 = 1. - SS_residuals/SS_total
+
+    # Compute F statistic to describe significance of overall model
+    SS_explained = SS_total - SS_residuals
+    MS_explained = SS_explained/k
+    MS_residuals = SS_residuals/(n-k-1)
+    F = MS_explained/MS_residuals
+
+    # t test on slopes of individual parameters (testing whether each is different from 0)
+    se_scaled = numpy.sqrt(numpy.diag(numpy.linalg.inv(A.T.dot(A))))
+    se_beta = se_scaled[:, numpy.newaxis]*numpy.sqrt(MS_residuals)
+    t = beta/se_beta
+    P = scipy.stats.t.cdf(abs(t), n-k-1)
+    p = 2*(1-P)
+
+    return beta, se_beta, t, p, R2, F
 
 def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
     if args.method == 'fast':
@@ -167,6 +209,14 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         assert sample_args.method == 'ff'
         import SALib.analyze.ff
         analysis = SALib.analyze.ff.analyze(SAlib_problem, X, Y, second_order=args.second_order, print_to_console=args.print_to_console)
+    elif args.method == 'mvr':
+        X_mean = numpy.mean(X, axis=0)
+        X_sd = numpy.std(X, axis=0)
+        Y_mean = numpy.mean(Y, axis=0)
+        Y_sd = numpy.std(Y, axis=0)
+        beta, se_beta, t, p, R2, F = mvr((X - X_mean) / X_sd, (Y - Y_mean) / Y_sd)
+        sensitivities = numpy.abs(beta)
+        analysis = (beta, se_beta, t, p, R2, F)
     else:
         raise Exception('Unknown analysis method "%s" specified.' % args.method)
     if verbose:
