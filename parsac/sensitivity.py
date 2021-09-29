@@ -15,6 +15,7 @@ import xml.etree.ElementTree
 
 # Import third party libraries
 import numpy
+import numpy.random
 
 # Import custom stuff
 from . import service
@@ -52,6 +53,9 @@ def configure_argument_parser(parser):
     subparser_sample_saltelli.add_argument('--no_calc_second_order', dest='calc_second_order', action='store_false', help='Disable calculation of second-order sensitivities')
 
     subparser_sample_ff = subparsers_sample.add_parser('ff')
+
+    subparser_sample_random = subparsers_sample.add_parser('random')
+    subparser_sample_random.add_argument('N', type=int, help='The number of samples to generate')
 
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('info', type=str, help='Path to output of the "sample" step')
@@ -108,6 +112,12 @@ def sample(SAlib_problem, args):
     elif args.method == 'ff':
         from SALib.sample.ff import sample
         X = sample(SAlib_problem)
+    elif args.method == 'random':
+        bounds = numpy.array(SAlib_problem['bounds'])
+        assert bounds.shape[1] == 2, 'Expected two columns: minimum and maximum'
+        assert bounds.shape[0] == SAlib_problem['num_vars']
+        minbound, maxbound = bounds[:, 0], bounds[:, 1]
+        X = numpy.random.uniform(minbound, maxbound, (args.N, minbound.size))
     else:
         raise Exception('Unknown sampler "%s" specified.' % args.method)
     print('Generated an ensemble with %i members' % (X.shape[0],))
@@ -200,6 +210,7 @@ def main(args):
     if args.subcommand == 'sample':
         # Only create setup directories
         X = sample(SAlib_problem, args)
+        assert X.shape[1] == SAlib_problem['num_vars']
         job_info = {'sample_args': args, 'X': X}
 
         if args.dir is not None:
