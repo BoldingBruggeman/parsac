@@ -15,6 +15,7 @@ try:
 except ImportError:
     import pickle
 import hashlib
+import fnmatch
 
 # Import third-party modules
 import numpy
@@ -266,9 +267,15 @@ class Job(shared.Job2):
         element = xml_tree.find('setup')
         if element is not None:
             with shared.XMLAttributes(element, 'the setup element') as att:
-                self.scenariodir = os.path.join(root, att.get('path'))
+                self.scenariodir = os.path.join(root, att.get('path', default='.'))
+                self.ignore_files = att.get('ignore_files', default='*.nc')
+                self.ignore_dirs = att.get('ignore_dirs', default='*')
         else:
             self.scenariodir = root
+            self.ignore_files = '*.nc'
+            self.ignore_dirs = '*'
+        self.ignore_files = self.ignore_files.split(':')
+        self.ignore_dirs = self.ignore_dirs.split(':')
 
         # Get executable path
         element = xml_tree.find('executable')
@@ -490,15 +497,19 @@ class Job(shared.Job2):
 
         print('Copying files for model setup to %s...' % tempscenariodir)
         for name in os.listdir(self.scenariodir):
-            if name.endswith('.nc'):
-                print('   skipping %s because it is a NetCDF file' % name)
-                continue
             srcname = os.path.join(self.scenariodir, name)
-            if os.path.isdir(srcname):
-                print('   skipping %s because it is a directory' % name)
-                continue
-            dstname = os.path.join(tempscenariodir, name)
-            shutil.copy(srcname, dstname)
+            isdir = os.path.isdir(srcname)
+            ignore_patterns = self.ignore_dirs if isdir else self.ignore_files
+            for pattern in ignore_patterns:
+                if fnmatch.fnmatch(name, pattern):
+                    print('   skipping %s because it matches one of the patterns in ignore_%s (%s)' % (name, 'dirs' if isdir else 'files', ':'.join(ignore_patterns)))
+                    break
+            else:
+                dstname = os.path.join(tempscenariodir, name)
+                if isdir:
+                    shutil.copytree(srcname, dstname)
+                else:
+                    shutil.copy(srcname, dstname)
         self.scenariodir = tempscenariodir
 
         if not self.use_shell:
