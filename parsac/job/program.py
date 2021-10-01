@@ -268,14 +268,14 @@ class Job(shared.Job2):
         if element is not None:
             with shared.XMLAttributes(element, 'the setup element') as att:
                 self.scenariodir = os.path.join(root, att.get('path', default='.'))
-                self.ignore_files = att.get('ignore_files', default='*.nc')
-                self.ignore_dirs = att.get('ignore_dirs', default='*')
+                self.exclude_files = att.get('exclude_files', default='*.nc')
+                self.exclude_dirs = att.get('exclude_dirs', default='*')
         else:
             self.scenariodir = root
-            self.ignore_files = '*.nc'
-            self.ignore_dirs = '*'
-        self.ignore_files = self.ignore_files.split(':')
-        self.ignore_dirs = self.ignore_dirs.split(':')
+            self.exclude_files = '*.nc'
+            self.exclude_dirs = '*'
+        self.exclude_files = self.exclude_files.split(':')
+        self.exclude_dirs = self.exclude_dirs.split(':')
 
         # Get executable path
         element = xml_tree.find('executable')
@@ -499,10 +499,10 @@ class Job(shared.Job2):
         for name in os.listdir(self.scenariodir):
             srcname = os.path.join(self.scenariodir, name)
             isdir = os.path.isdir(srcname)
-            ignore_patterns = self.ignore_dirs if isdir else self.ignore_files
-            for pattern in ignore_patterns:
+            exclude_patterns = self.exclude_dirs if isdir else self.exclude_files
+            for pattern in exclude_patterns:
                 if fnmatch.fnmatch(name, pattern):
-                    print('   skipping %s because it matches one of the patterns in ignore_%s (%s)' % (name, 'dirs' if isdir else 'files', ':'.join(ignore_patterns)))
+                    print('   skipping %s because it matches one of the patterns in exclude_%s (%s)' % (name, 'dirs' if isdir else 'files', ':'.join(exclude_patterns)))
                     break
             else:
                 dstname = os.path.join(tempscenariodir, name)
