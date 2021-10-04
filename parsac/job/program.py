@@ -151,6 +151,9 @@ class NamelistParameter(shared.Parameter):
                 icopy += 1
             shutil.copy(self.path, self.path+'.backup%02i' % icopy)
 
+    def getValue(self):
+        return self.namelist_data[self.variable]
+
     def setValue(self, value):
         self.namelist_data[self.variable] = '%.15g' % value
 
@@ -196,6 +199,9 @@ class YamlParameter(shared.Parameter):
             while os.path.isfile(self.path+'.backup%02i' % icopy):
                 icopy += 1
             shutil.copy(self.path, self.path+'.backup%02i' % icopy)
+
+    def getValue(self):
+        return self.target_dict[self.key]
 
     def setValue(self, value):
         self.target_dict[self.key] = float(value)
@@ -365,7 +371,9 @@ class Job(shared.Job2):
         if att.get('dummy', bool, default=False):
             return shared.DummyParameter(self, att)
         strfile = att.get('file', required=False)
-        if strfile.endswith('.yaml'):
+        if strfile is None:
+            return shared.Parameter(self, att)
+        elif strfile.endswith('.yaml'):
             return YamlParameter(self, att)
         return NamelistParameter(self, att)
 
@@ -522,6 +530,9 @@ class Job(shared.Job2):
         for parameter in self.parameters:
             parameter.initialize()
 
+        for function in self.functions:
+            function.initialize()
+
         self.targets = [(compile(expression, '<string>', 'eval'), os.path.join(self.scenariodir, ncpath)) for (expression, ncpath) in self.targets]
         self.statistics = [(name, compile(statistic, '<string>', 'eval')) for name, statistic in self.statistics]
 
@@ -531,6 +542,10 @@ class Job(shared.Job2):
         # Update the value of all untransformed parameters
         for parameter, value in zip(self.parameters, values):
             parameter.setValue(value)
+
+        # Apply any custom functions
+        for fnc in self.functions:
+            fnc.apply()
 
         # Update namelist parameters that are governed by transforms
         #ipar = len(self.parameters)
@@ -802,12 +817,13 @@ class Job(shared.Job2):
             self.targets = targets
         return dir_paths
 
-    def runEnsemble(self, directories, ncpus=None, ppservers=(), socket_timeout=600, secret=None):
+    def runEnsemble(self, directories, ncpus=None, ppservers=(), socket_timeout=600, secret=None, show_output=False):
         import pp
         if self.verbose:
             print('Starting Parallel Python server...')
         if ncpus is None:
             ncpus = 'autodetect'
+        ppservers = shared.parse_ppservers(ppservers)
         job_server = pp.Server(ncpus=ncpus, ppservers=ppservers, socket_timeout=socket_timeout, secret=secret)
         if ppservers:
             if self.verbose:
@@ -826,7 +842,7 @@ class Job(shared.Job2):
         for rundir in directories:
             localexe = os.path.join(self.scenariodir, os.path.basename(self.exe))
             exe = localexe if os.path.isfile(localexe) else self.exe
-            job = job_server.submit(run_program, (exe, rundir), modules=('time', 'subprocess'))
+            job = job_server.submit(run_program, (exe, rundir, self.use_shell, show_output), modules=('time', 'subprocess'))
             jobs.append(job)
         for job, rundir in zip(jobs, directories):
             job()
@@ -862,6 +878,6 @@ def run_program(exe, rundir, use_shell=False, show_output=True, verbose=True):
         elapsed = time.time() - time_start
         print('Model run took %.1f s.' % elapsed)
     if proc.returncode != 0:
-        last_output = '\n'.join(['> %s' % l for l in stdout_data.rsplit('\n', 5)[-5:]])
+        last_output = '\n'.join(['> %s' % l for l in stdout_data.rsplit('\n', 10)[-10:]])
         print('WARNING: %s returned non-zero code %i - an error must have occured. Last output:\n%s' % (os.path.basename(exe), proc.returncode, last_output))
     return proc.returncode

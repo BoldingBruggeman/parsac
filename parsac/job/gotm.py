@@ -1,10 +1,48 @@
 import os
 import datetime
 import io
+import shutil
+import fnmatch
 
 import yaml
+import numpy
+import netCDF4
 
+from . import shared
 from . import program
+
+class BackupRestart(shared.Function):
+    def initialize(self):
+        restart = os.path.join(self.job.scenariodir, 'restart.nc')
+        self.active = os.path.isfile(restart)
+        if self.active:
+            print('Backing up restart.nc')
+            shutil.copy(restart, os.path.join(self.job.scenariodir, 'restart.nc.bck'))
+
+    def apply(self):
+        if self.active:
+            print('Copying in clean restart')
+            shutil.copy(os.path.join(self.job.scenariodir, 'restart.nc.bck'), os.path.join(self.job.scenariodir, 'restart.nc'))
+
+class ChangeRestart(shared.Function):
+    def __init__(self, job, att):
+        shared.Function.__init__(self, job)
+        self.variable = att.get('variable', str)
+        self.expression = att.get('expression', str)
+        self.mindepth = att.get('mindepth', float, -numpy.inf)
+        self.maxdepth = att.get('maxdepth', float, numpy.inf)
+
+    def apply(self):
+        with netCDF4.Dataset(os.path.join(self.job.scenariodir, 'restart.nc'), 'r+') as nc:
+            for name in fnmatch.filter(nc.variables.keys(), self.variable):
+                z = nc.variables['z'][0, :, 0, 0]   # GOTM depth is NEGATIVE
+                kstart, kstop = z.searchsorted((-self.maxdepth, -self.mindepth))
+                ncvar = nc.variables[name]
+                values = ncvar[0, kstart:kstop, 0, 0]
+                m = self.getParameterMapping({'variable': values})
+                newvalues = eval(self.expression, {}, m)
+                print('Setting %s = %s (%i values, mean=%s)' % (name, self.expression, newvalues.size, numpy.mean(newvalues)))
+                ncvar[0, kstart:kstop, 0, 0] = newvalues
 
 class Job(program.Job):
 
@@ -12,6 +50,7 @@ class Job(program.Job):
         self.start_time = None
         self.stop_time = None
         program.Job.__init__(self, job_id, xml_tree, root, **kwargs)
+        self.functions.insert(0, BackupRestart(self))
 
     def getSimulationStart(self):
         if self.start_time is None:

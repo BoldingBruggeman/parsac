@@ -63,6 +63,7 @@ def configure_argument_parser(parser):
     parser_run.add_argument('--ppservers',   type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on.')
     parser_run.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only used in combination with ppservers argument).')
     parser_run.add_argument('-q', '--quiet', action='store_true', help='Suppress diagnostic messages')
+    parser_run.add_argument('--model_ready', action='store_true', help='Assume model has already been run in all setup directories [only if --dir was used in sample step]')
 
     parser_analyze = subparsers.add_parser('analyze')
     parser_analyze.add_argument('info', type=str, help='Path to output of the "sample" step')
@@ -97,6 +98,7 @@ def configure_argument_parser(parser):
     subparser_analyze_ff.add_argument('--second_order', action='store_true', help='Include interaction effects')
 
     subparser_analyze_mvr = subparsers_analyze.add_parser('mvr', help='multivariate linear regression')
+    subparser_analyze_mvr.add_argument('--print_to_console', action='store_true', help='Print results directly to console')
 
 def sample(SAlib_problem, args):
     if args.method == 'fast':
@@ -125,7 +127,7 @@ def sample(SAlib_problem, args):
     print('Generated an ensemble with %i members' % (X.shape[0],))
     return X
 
-def mvr(A, y):
+def mvr(names, A, y, verbose=False):
     """Multiple linear regression based on numpy.linalg.lstsq,
     with additional statistics to describe significance of overall model and parameter slopes."""
     import numpy.linalg
@@ -158,10 +160,18 @@ def mvr(A, y):
 
     # t test on slopes of individual parameters (testing whether each is different from 0)
     se_scaled = numpy.sqrt(numpy.diag(numpy.linalg.inv(A.T.dot(A))))
-    se_beta = se_scaled[:, numpy.newaxis]*numpy.sqrt(MS_residuals)
+    se_beta = se_scaled[:]*numpy.sqrt(MS_residuals)
     t = beta/se_beta
     P = scipy.stats.t.cdf(abs(t), n-k-1)
     p = 2*(1-P)
+
+    if verbose:
+        print('-' * 80)
+        print('Multiple Linear Regression model fit: R2 = %.5f, F = %.5g' % (R2, F))
+        print('Regression coefficients:')
+        for curname, curbeta, curse_beta, curt, curp in sorted(zip(names, beta, se_beta, t, p), key=lambda x: -abs(x[1])):
+            print('- %s: beta = %.5g (s.e. %.5g), non-zero with p = %.5f (t = %.5g)' % (curname, curbeta, curse_beta, curp, curt))
+        print('-' * 80)
 
     return beta, se_beta, t, p, R2, F
 
@@ -210,11 +220,12 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         import SALib.analyze.ff
         analysis = SALib.analyze.ff.analyze(SAlib_problem, X, Y, second_order=args.second_order, print_to_console=args.print_to_console)
     elif args.method == 'mvr':
+        # https://dx.doi.org/10.1002/9780470725184, section 1.2.5
         X_mean = numpy.mean(X, axis=0)
         X_sd = numpy.std(X, axis=0)
         Y_mean = numpy.mean(Y, axis=0)
         Y_sd = numpy.std(Y, axis=0)
-        beta, se_beta, t, p, R2, F = mvr((X - X_mean) / X_sd, (Y - Y_mean) / Y_sd)
+        beta, se_beta, t, p, R2, F = mvr(SAlib_problem['names'], (X - X_mean) / X_sd, (Y - Y_mean) / Y_sd, verbose=args.print_to_console)
         sensitivities = numpy.abs(beta)
         analysis = (beta, se_beta, t, p, R2, F)
     else:
@@ -233,7 +244,7 @@ def save_info(path, info):
 
 def main(args):
     if args.subcommand != 'sample':
-        print('Reading sensitity samples from %s...' % args.info)
+        print('Reading sensitivity samples from %s...' % args.info)
         with open(args.info, 'rb') as f:
             job_info = pickle.load(f)
         args.xmlfile = job_info['sample_args'].xmlfile
@@ -274,6 +285,8 @@ def main(args):
     elif args.subcommand == 'run':
         X = job_info['X']
         if 'simulationdirs' in job_info:
+            if not args.model_ready:
+                current_job.runEnsemble(job_info['simulationdirs'], ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
             # We have created all setup directories during the sample setp. The user must have run to model in each.
             targets = [(compile(expression, '<string>', 'eval'), ncpath) for (expression, ncpath) in current_job.targets]
             Y = numpy.empty((len(job_info['simulationdirs']), len(targets)))

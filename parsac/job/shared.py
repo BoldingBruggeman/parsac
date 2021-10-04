@@ -1,6 +1,6 @@
 from __future__ import print_function
 import os.path
-import re
+import importlib
 
 import numpy
 
@@ -37,6 +37,29 @@ def run_ensemble_member(new_job_path, parameter_values):
         job.start()
     result = job.evaluate(parameter_values)
     return parameter_values, result
+
+class Function:
+    def __init__(self, job):
+        self.job = job
+
+    def getParameterMapping(self, overrides):
+        class Map:
+            def __init__(self, job, overrides={}):
+                self.job = job
+                self.overrides = overrides
+            def __getitem__(self, key):
+                if key in self.overrides:
+                    return self.overrides[key]
+                for parameter in self.job.parameters:
+                    if parameter.name == key:
+                        return parameter.getValue()
+        return Map(self.job, overrides)
+
+    def initialize(self):
+        pass
+
+    def apply(self):
+        pass
 
 class ParameterTransform:
     def __init__(self, bounds=None, logscale=None):
@@ -165,12 +188,16 @@ class Parameter(object):
             raise Exception('Minimum for "%s" = %.6g, but should be positive as this parameter is configured to vary on a log scale.' % (self.name, self.minimum))
         if self.maximum < self.minimum:
             raise Exception('Maximum value (%.6g) for "%s" < minimum value (%.6g).' % (self.maximum, self.name, self.minimum))
+        self._value = None
 
     def initialize(self):
         pass
 
+    def getValue(self):
+        return self._value
+
     def setValue(self, value):
-        pass
+        self._value = value
 
     def store(self):
         pass
@@ -191,6 +218,18 @@ class Job(optimize.OptimizationProblem):
         for ipar, element in enumerate(xml_tree.findall('parameters/parameter')):
             with XMLAttributes(element, 'parameter %i' % (ipar+1)) as att:
                 self.parameters.append(self.getParameter(att))
+
+        self.functions = []
+        for ifnc, element in enumerate(xml_tree.findall('functions/function')):
+            with XMLAttributes(element, 'function %i' % (ifnc+1)) as att:
+                scls = att.get('class')
+                smod, scls = scls.rsplit('.', 1)
+                try:
+                    mod = importlib.import_module(smod)
+                except ImportError as e:
+                    raise Exception('Unable to import module %s specified in "class" attribute of %s: %s' % (smod, att.description, e))
+                cls = getattr(mod, scls)
+                self.functions.append(cls(self, att))
 
         # Parse transforms
         for ipar, element in enumerate(xml_tree.findall('parameters/transform')):
