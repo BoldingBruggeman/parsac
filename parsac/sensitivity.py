@@ -63,7 +63,7 @@ def configure_argument_parser(parser):
     parser_run.add_argument('--ppservers',   type=str, help='Comma-separated list of names/IPs of Parallel Python servers to run on.')
     parser_run.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only used in combination with ppservers argument).')
     parser_run.add_argument('-q', '--quiet', action='store_true', help='Suppress diagnostic messages')
-    parser_run.add_argument('--model_ready', action='store_true', help='Assume model has already been run in all setup directories [only if --dir was used in sample step]')
+    parser_run.add_argument('--model', action='store_true', help='Assume model has already been run in all setup directories [only if --dir was used in sample step]')
 
     parser_analyze = subparsers.add_parser('analyze')
     parser_analyze.add_argument('info', type=str, help='Path to output of the "sample" step')
@@ -285,7 +285,7 @@ def main(args):
     elif args.subcommand == 'run':
         X = job_info['X']
         if 'simulationdirs' in job_info:
-            if not args.model_ready:
+            if args.model:
                 current_job.runEnsemble(job_info['simulationdirs'], ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
             # We have created all setup directories during the sample setp. The user must have run to model in each.
             targets = [(compile(expression, '<string>', 'eval'), ncpath) for (expression, ncpath) in current_job.targets]

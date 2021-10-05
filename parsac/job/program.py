@@ -113,8 +113,8 @@ class NcDict(object):
         for n in dir(numpy):
             namespace[n] = getattr(numpy, n)
         data = eval(expression, namespace, self)
-        if no_trailing_singletons and data.ndim > 0:
-            while data.shape[-1] == 1:
+        if no_trailing_singletons:
+            while data.ndim > 0 and data.shape[-1] == 1:
                 data = data[..., 0]
         return data
 
@@ -322,6 +322,7 @@ class Job(shared.Job2):
         self.targets = []
         for itarget, element in enumerate(xml_tree.findall('targets/target')):
             with shared.XMLAttributes(element, 'target %i' % (itarget + 1,)) as att:
+                att.get('name', required=False)
                 self.targets.append((att.get('expression'), att.get('path')))
         element = xml_tree.find('target')
         if element is not None:
