@@ -64,6 +64,7 @@ def configure_argument_parser(parser):
     parser_run.add_argument('--secret',      type=str, help='Parallel Python secret for authentication (only used in combination with ppservers argument).')
     parser_run.add_argument('-q', '--quiet', action='store_true', help='Suppress diagnostic messages')
     parser_run.add_argument('--model', action='store_true', help='Assume model has already been run in all setup directories [only if --dir was used in sample step]')
+    parser_run.add_argument('--continue', action='store_true', dest='cont', help='Continue if one or more ensemble members fail')
 
     parser_analyze = subparsers.add_parser('analyze')
     parser_analyze.add_argument('info', type=str, help='Path to output of the "sample" step')
@@ -308,11 +309,19 @@ def main(args):
                 print('  - %i: %s' % (i, Y[i, :]))
         else:
             # We run the model ourselves.
-            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret, verbose=True)
+            Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=not args.cont, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret, verbose=True)
             if Y is None:
                 print('Ensemble evaluation failed. Exiting...')
                 return
-            Y = numpy.array(Y)
+            X_filt, Y_filt = [], []
+            for i, y in enumerate(Y):
+                if y != -numpy.Inf:
+                    X_filt.append(X[i, :])
+                    Y_filt.append(y)
+            if len(Y_filt) != len(Y):
+                print('WARNING: %i ensemble members returned invalid result. Shrinking ensemble from %i to %i members. Analysis methods that require the original ensemble size may not work.' % (len(Y) - len(Y_filt), len(Y), len(Y_filt)))
+                job_info['X'] = numpy.array(X_filt)
+            Y = numpy.array(Y_filt)
         job_info['Y'] = Y
         print('Updating sensitivity info in %s with model results...' % args.info)
         save_info(args.info, job_info)
