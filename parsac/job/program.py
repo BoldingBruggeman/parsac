@@ -474,7 +474,7 @@ class Job(shared.Job2):
 
         print('Copying files for model setup to %s...' % tempscenariodir)
         for name in os.listdir(self.scenariodir):
-            srcname = os.path.join(self.scenariodir, name)
+            srcname = os.path.abspath(os.path.join(self.scenariodir, name))
             isdir = os.path.isdir(srcname)
             exclude_patterns = self.exclude_dirs if isdir else self.exclude_files
             for pattern in exclude_patterns:
