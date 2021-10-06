@@ -31,6 +31,7 @@ def configure_argument_parser(parser):
     parser_sample.add_argument('info', type=str, help='Path to save info to')
     parser_sample.add_argument('--dir', type=str, help='Directory under which setups per ensemble member are to be created/found. If this argument is not provided, the run step will creates temporary setup directories and run the model itself. If this argument is provided, the user is responsible for running the model in each of the created setup directories.')
     parser_sample.add_argument('--format', type=str, help='Format for subdirectory name (only in combination with --dir).', default='%04i')
+    parser_sample.add_argument('--symlink', action='store_true', help='Use symlinks instead of copying data to ensemble member directories')
 
     subparsers_sample = parser_sample.add_subparsers(dest='method')
 
@@ -291,7 +292,7 @@ def main(args):
             for i, log in enumerate(logscale):
                 if log:
                     ensemble[:, i] = 10.**ensemble[:, i]
-            job_info['simulationdirs'] = current_job.prepareEnsembleDirectories(ensemble, args.dir, args.format)
+            job_info['simulationdirs'] = current_job.prepareEnsembleDirectories(ensemble, args.dir, args.format, symlink=args.symlink)
         save_info(args.info, job_info)
     elif args.subcommand == 'run':
         X = job_info['X']

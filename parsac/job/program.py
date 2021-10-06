@@ -264,6 +264,7 @@ class Job(shared.Job2):
         if copyexe is None:
             copyexe = not hasattr(sys, 'frozen')
         self.copyexe = copyexe
+        self.symlink = False
 
         self.verbose = verbose
 
@@ -482,10 +483,11 @@ class Job(shared.Job2):
                     break
             else:
                 dstname = os.path.join(tempscenariodir, name)
+                copy_function = shutil.copy2 if not self.symlink else os.symlink
                 if isdir:
-                    shutil.copytree(srcname, dstname)
+                    shutil.copytree(srcname, dstname, copy_function=copy_function)
                 else:
-                    shutil.copy(srcname, dstname)
+                    copy_function(srcname, dstname)
         self.scenariodir = tempscenariodir
 
         if not self.use_shell:
@@ -771,10 +773,11 @@ class Job(shared.Job2):
             return lnlikelihood, model_values
         return lnlikelihood
 
-    def prepareEnsembleDirectories(self, ensemble, root, format='%04i'):
+    def prepareEnsembleDirectories(self, ensemble, root, format='%04i', symlink=False):
         ensemble = numpy.asarray(ensemble)
+        self.symlink = symlink
         if not os.path.isdir(root):
-            os.mkdir(root)
+            os.makedirs(root)
         scenariodir, targets = self.scenariodir, getattr(self, 'targets', [])
         dir_paths = [os.path.join(root, format % i) for i in range(ensemble.shape[0])]
         for i, simulationdir in enumerate(dir_paths):
