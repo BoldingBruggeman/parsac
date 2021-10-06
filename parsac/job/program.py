@@ -46,6 +46,8 @@ from . import shared
 datetimere = re.compile(r'(\d\d\d\d).(\d\d).(\d\d) (\d\d).(\d\d).(\d\d)\s*')
 
 def writeNamelistFile(path, nmls, nmlorder):
+    if os.path.isfile(path):
+        os.remove(path)
     with open(path, 'w') as f:
         for nml in nmlorder:
             f.write('&%s\n' % nml)
@@ -168,6 +170,8 @@ class YamlParameter(shared.Parameter):
 
     def store(self):
         if self.own_file:
+            if os.path.isfile(self.path):
+                os.remove(self.path)
             with io.open(self.path, 'w', encoding='utf-8') as f:
                 yaml.dump(self.job.yamlfiles[self.file], f, default_flow_style=False)
 

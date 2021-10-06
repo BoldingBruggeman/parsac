@@ -17,12 +17,18 @@ class BackupRestart(shared.Function):
         self.active = os.path.isfile(restart)
         if self.active:
             print('Backing up restart.nc')
-            shutil.copy(restart, os.path.join(self.job.scenariodir, 'restart.nc.bck'))
+            backup = os.path.join(self.job.scenariodir, 'restart.nc.bck')
+            if os.path.isfile(backup):
+                os.remove(backup)
+            shutil.copy(restart, backup)
 
     def apply(self):
         if self.active:
             print('Copying in clean restart')
-            shutil.copy(os.path.join(self.job.scenariodir, 'restart.nc.bck'), os.path.join(self.job.scenariodir, 'restart.nc'))
+            target = os.path.join(self.job.scenariodir, 'restart.nc')
+            if os.path.isfile(target):
+                os.remove(target)
+            shutil.copy(os.path.join(self.job.scenariodir, 'restart.nc.bck'), target)
 
 class ChangeRestart(shared.Function):
     def __init__(self, job, att):
