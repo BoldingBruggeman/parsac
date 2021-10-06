@@ -558,7 +558,7 @@ class Job(shared.Job2):
         if getattr(self, 'observations', None) is None:
             results = []
             for target in self.targets:
-                results.append(target.getValue())
+                results.append(target.getValue(self.scenariodir))
             return results[0] if len(results) == 1 else results
 
         outputpath2nc = {}
