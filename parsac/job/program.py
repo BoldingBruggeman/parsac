@@ -78,46 +78,6 @@ def getMD5(path):
             m.update(block)
     return m.digest()
 
-def filter_by_time(values, time, time_units, months=()):
-    dts = netCDF4.num2date(time, time_units)
-    current_months = numpy.array([dt.month for dt in dts], dtype=int)
-    valid = numpy.zeros(current_months.shape, dtype=bool)
-    for month in months:
-        valid |= current_months == month
-    return values[valid, ...]
-
-class NcDict(object):
-    def __init__(self, path):
-        self.nc = netCDF4.Dataset(path)
-        self.cache = {}
-        self.dimensions = None
-
-    def finalize(self):
-        self.nc.close()
-        self.cache = None
-        self.nc = None
-
-    def __getitem__(self, key):
-        if key not in self.cache:
-            ncvar = self.nc.variables[key]
-            if self.dimensions is not None:
-                self.dimensions.update(ncvar.dimensions)
-            self.cache[key] = ncvar[...]
-        return self.cache[key]
-
-    def __contains__(self, key):
-        return key in self.nc.variables
-
-    def eval(self, expression, no_trailing_singletons=True):
-        namespace = {'filter_by_time': lambda values, months: filter_by_time(values, self['time'], self.nc.variables['time'].units, months)}
-        for n in dir(numpy):
-            namespace[n] = getattr(numpy, n)
-        data = eval(expression, namespace, self)
-        if no_trailing_singletons:
-            while data.ndim > 0 and data.shape[-1] == 1:
-                data = data[..., 0]
-        return data
-
 class NamelistParameter(shared.Parameter):
     def __init__(self, job, att):
         self.file = os.path.normpath(att.get('file'))
@@ -252,7 +212,7 @@ def readVariableFromTextFile(path, format, verbose=False, mindepth=-numpy.inf, m
     return times, zs, values
 
 def readVariableFromNcFile(path, name, depth_name, verbose=False, mindepth=-numpy.inf, maxdepth=numpy.inf, time_name='time'):
-    wrapped_nc = NcDict(path)
+    wrapped_nc = shared.NcDict(path)
     nctime = wrapped_nc.nc.variables[time_name]
     times = netCDF4.num2date(nctime[:], nctime.units, only_use_cftime_datetimes=False)
     values = wrapped_nc.eval(name)[...]
@@ -322,12 +282,19 @@ class Job(shared.Job2):
         self.targets = []
         for itarget, element in enumerate(xml_tree.findall('targets/target')):
             with shared.XMLAttributes(element, 'target %i' % (itarget + 1,)) as att:
-                att.get('name', required=False)
-                self.targets.append((att.get('expression'), att.get('path')))
+                classname = att.get('class', required=False)
+                if classname:
+                    try:
+                        cls = self.get_class(classname)
+                    except ImportError as e:
+                        raise Exception('Unable to import %s specified in "class" attribute of %s: %s' % (classname, att.description, e))
+                else:
+                    cls = shared.ExpressionTarget
+                self.targets.append(cls(self, att))
         element = xml_tree.find('target')
         if element is not None:
             with shared.XMLAttributes(element, 'the target element') as att:
-                self.targets.append((att.get('expression'), att.get('path')))
+                self.targets.append(shared.ExpressionTarget(self, att))
         if self.targets:
             return
 
@@ -534,7 +501,9 @@ class Job(shared.Job2):
         for function in self.functions:
             function.initialize()
 
-        self.targets = [(compile(expression, '<string>', 'eval'), os.path.join(self.scenariodir, ncpath)) for (expression, ncpath) in self.targets]
+        for target in self.targets:
+            target.initialize()
+
         self.statistics = [(name, compile(statistic, '<string>', 'eval')) for name, statistic in self.statistics]
 
     def prepareDirectory(self, values):
@@ -588,10 +557,8 @@ class Job(shared.Job2):
 
         if getattr(self, 'observations', None) is None:
             results = []
-            for expression, ncpath in self.targets:
-                wrappednc = NcDict(ncpath)
-                results.append(wrappednc.eval(expression))
-                wrappednc.finalize()
+            for target in self.targets:
+                results.append(target.getValue())
             return results[0] if len(results) == 1 else results
 
         outputpath2nc = {}
@@ -599,7 +566,7 @@ class Job(shared.Job2):
             ncpath = os.path.join(self.scenariodir, obsinfo['outputpath'])
             if not os.path.isfile(ncpath):
                 raise Exception('Output file "%s" was not created.' % ncpath)
-            outputpath2nc[obsinfo['outputpath']] = NcDict(ncpath)
+            outputpath2nc[obsinfo['outputpath']] = shared.NcDict(ncpath)
 
         # Check if this is the first model run/evaluation of the likelihood.
         if not getattr(self, 'processed_expressions', False):
@@ -808,7 +775,7 @@ class Job(shared.Job2):
         ensemble = numpy.asarray(ensemble)
         if not os.path.isdir(root):
             os.mkdir(root)
-        scenariodir, targets = self.scenariodir, getattr(self, 'targets', None)
+        scenariodir, targets = self.scenariodir, getattr(self, 'targets', [])
         dir_paths = [os.path.join(root, format % i) for i in range(ensemble.shape[0])]
         for i, simulationdir in enumerate(dir_paths):
             self.simulationdir = simulationdir

@@ -100,6 +100,8 @@ def configure_argument_parser(parser):
     subparser_analyze_mvr = subparsers_analyze.add_parser('mvr', help='multivariate linear regression')
     subparser_analyze_mvr.add_argument('--print_to_console', action='store_true', help='Print results directly to console')
 
+    subparser_analyze_cv = subparsers_analyze.add_parser('cv', help='coefficient of variation')
+
 def sample(SAlib_problem, args):
     if args.method == 'fast':
         from SALib.sample.fast_sampler import sample
@@ -228,6 +230,14 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         beta, se_beta, t, p, R2, F = mvr(SAlib_problem['names'], (X - X_mean) / X_sd, (Y - Y_mean) / Y_sd, verbose=args.print_to_console)
         sensitivities = numpy.abs(beta)
         analysis = (beta, se_beta, t, p, R2, F)
+    elif args.method == 'cv':
+        X_mean = numpy.mean(X, axis=0)
+        X_sd = numpy.std(X, axis=0)
+        Y_mean = numpy.mean(Y, axis=0)
+        Y_sd = numpy.std(Y, axis=0)
+        cv = (Y_sd / Y_mean) / (X_sd / X_mean)
+        sensitivities = cv
+        analysis = (cv,)
     else:
         raise Exception('Unknown analysis method "%s" specified.' % args.method)
     if verbose:
@@ -287,16 +297,15 @@ def main(args):
         if 'simulationdirs' in job_info:
             if args.model:
                 current_job.runEnsemble(job_info['simulationdirs'], ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret)
-            # We have created all setup directories during the sample setp. The user must have run to model in each.
-            targets = [(compile(expression, '<string>', 'eval'), ncpath) for (expression, ncpath) in current_job.targets]
-            Y = numpy.empty((len(job_info['simulationdirs']), len(targets)))
+            # We have created all setup directories during the sample setup. The user must have run to model in each.
+            for target in current_job.targets:
+                target.initialize()
+            Y = numpy.empty((len(job_info['simulationdirs']), len(current_job.targets)))
             print('Retrieving value of target expression(s) for each ensemble member...')
             for i, simulationdir in enumerate(job_info['simulationdirs']):
-                for itarget, (expression, ncpath) in enumerate(targets):
-                    wrappednc = job.program.NcDict(os.path.join(simulationdir, ncpath))
-                    Y[i, itarget] = wrappednc.eval(expression)
+                for itarget, target in enumerate(current_job.targets):
+                    Y[i, itarget] = target.getValue(simulationdir)
                 print('  - %i: %s' % (i, Y[i, :]))
-                wrappednc.finalize()
         else:
             # We run the model ourselves.
             Y = current_job.evaluate_ensemble([undoLogTransform(X[i, :], logscale) for i in range(X.shape[0])], stop_on_bad_result=True, ncpus=args.ncpus, ppservers=args.ppservers, secret=args.secret, verbose=True)
@@ -314,9 +323,7 @@ def main(args):
         X, Y = job_info['X'], job_info['Y']
         Y.shape = (X.shape[0], -1)
         if hasattr(current_job, 'targets'):
-            target_names = ['Target %i (%s/%s)' % (i, path, expr) for i, (expr, path) in enumerate(current_job.targets)]
-        elif hasattr(current_job, 'target'):
-            target_names = ['Target %s/%s' % (current_job.target[1], current_job.target[0])]
+            target_names = [target.name for target in current_job.targets]
         else:
             target_names = ['Target %i' % i for i in range(Y.shape[1])]
         mean_rank = numpy.zeros((X.shape[1],), dtype=int)

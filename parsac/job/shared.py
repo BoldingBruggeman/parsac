@@ -3,6 +3,7 @@ import os.path
 import importlib
 
 import numpy
+import netCDF4
 
 try:
     from .. import optimize
@@ -60,6 +61,57 @@ class Function:
 
     def apply(self):
         pass
+
+class Target:
+    def __init__(self, job, att, default_name=None):
+        self.job = job
+        self.name = att.get('name', required=False, default=default_name)
+
+    def getParameterMapping(self, overrides):
+        class Map:
+            def __init__(self, job, overrides={}):
+                self.job = job
+                self.overrides = overrides
+            def __getitem__(self, key):
+                if key in self.overrides:
+                    return self.overrides[key]
+                for parameter in self.job.parameters:
+                    if parameter.name == key:
+                        return parameter.getValue()
+        return Map(self.job, overrides)
+
+    def initialize(self):
+        pass
+
+    def getValue(self, workdir):
+        pass
+
+class NetCDFTarget(Target):
+    def __init__(self, job, att, default_name=None):
+        self.path = att.get('path')
+        if default_name is not None:
+            default_name = '%s: %s' % (self.path, default_name)
+        Target.__init__(self, job, att, default_name=default_name)
+
+    def getValueFromNetCDF(self, ncdict):
+        pass
+
+    def getValue(self, workdir):
+        wrappednc = NcDict(os.path.join(workdir, self.path))
+        result = self.getValueFromNetCDF(wrappednc)
+        wrappednc.finalize()
+        return result
+
+class ExpressionTarget(NetCDFTarget):
+    def __init__(self, job, att):
+        self.expression = att.get('expression')
+        NetCDFTarget.__init__(self, job, att, default_name='%s' % (self.expression))
+
+    def initialize(self):
+        self.compiled_expression = compile(self.expression, '<string>', 'eval')
+
+    def getValueFromNetCDF(self, ncdict):
+        return ncdict.eval(self.compiled_expression)
 
 class ParameterTransform:
     def __init__(self, bounds=None, logscale=None):
@@ -222,13 +274,11 @@ class Job(optimize.OptimizationProblem):
         self.functions = []
         for ifnc, element in enumerate(xml_tree.findall('functions/function')):
             with XMLAttributes(element, 'function %i' % (ifnc+1)) as att:
-                scls = att.get('class')
-                smod, scls = scls.rsplit('.', 1)
+                cls = att.get('class')
                 try:
-                    mod = importlib.import_module(smod)
+                    cls = self.get_class(cls)
                 except ImportError as e:
-                    raise Exception('Unable to import module %s specified in "class" attribute of %s: %s' % (smod, att.description, e))
-                cls = getattr(mod, scls)
+                    raise Exception('Unable to import %s specified in "class" attribute of %s: %s' % (cls, att.description, e))
                 self.functions.append(cls(self, att))
 
         # Parse transforms
@@ -250,6 +300,11 @@ class Job(optimize.OptimizationProblem):
                     outs.append((infile, namelist, variable, att.get('value')))
             tf = RunTimeTransform(ins, outs)
             self.controller.addParameterTransform(tf)
+
+    def get_class(self, name):
+        smod, scls = name.rsplit('.', 1)
+        mod = importlib.import_module(smod)
+        return getattr(mod, scls)
 
     def start(self, force=False):
         if not self.started or force:
@@ -376,3 +431,43 @@ class Job2(Job):
 
     def evaluate2(self, parameter_values, info=None):
         raise NotImplementedError('Classes deriving from Job2 must implement "evaluate2"')
+
+class NcDict(object):
+    def __init__(self, path):
+        self.nc = netCDF4.Dataset(path)
+        self.cache = {}
+        self.dimensions = None
+
+    def finalize(self):
+        self.nc.close()
+        self.cache = None
+        self.nc = None
+
+    def __getitem__(self, key):
+        if key not in self.cache:
+            ncvar = self.nc.variables[key]
+            if self.dimensions is not None:
+                self.dimensions.update(ncvar.dimensions)
+            self.cache[key] = ncvar[...]
+        return self.cache[key]
+
+    def __contains__(self, key):
+        return key in self.nc.variables
+
+    def eval(self, expression, no_trailing_singletons=True):
+        namespace = {'filter_by_time': lambda values, months: filter_by_time(values, self['time'], self.nc.variables['time'].units, months)}
+        for n in dir(numpy):
+            namespace[n] = getattr(numpy, n)
+        data = eval(expression, namespace, self)
+        if no_trailing_singletons:
+            while data.ndim > 0 and data.shape[-1] == 1:
+                data = data[..., 0]
+        return data
+
+def filter_by_time(values, time, time_units, months=()):
+    dts = netCDF4.num2date(time, time_units)
+    current_months = numpy.array([dt.month for dt in dts], dtype=int)
+    valid = numpy.zeros(current_months.shape, dtype=bool)
+    for month in months:
+        valid |= current_months == month
+    return values[valid, ...]
