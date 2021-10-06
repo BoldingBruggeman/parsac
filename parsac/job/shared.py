@@ -108,6 +108,7 @@ class NetCDFTarget(Target):
 class ExpressionTarget(NetCDFTarget):
     def __init__(self, job, att):
         self.expression = att.get('expression')
+        compile(self.expression, '<string>', 'eval')   # early check on expression
         NetCDFTarget.__init__(self, job, att, default_name='%s' % (self.expression))
 
     def initialize(self):
