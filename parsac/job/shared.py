@@ -3,7 +3,10 @@ import os.path
 import importlib
 
 import numpy
-import netCDF4
+try:
+    import netCDF4
+except ImportError:
+    pass
 
 try:
     from .. import optimize
