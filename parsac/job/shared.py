@@ -1,6 +1,7 @@
 from __future__ import print_function
 import os.path
 import importlib
+import sys
 
 import numpy
 try:
@@ -269,6 +270,7 @@ class Job(optimize.OptimizationProblem):
     def __init__(self, job_id, xml_tree, root, **kwargs):
         self.started = False
         self.id = job_id
+        self.root = root
 
         self.parameters = []
         for ipar, element in enumerate(xml_tree.findall('parameters/parameter')):
@@ -278,11 +280,11 @@ class Job(optimize.OptimizationProblem):
         self.functions = []
         for ifnc, element in enumerate(xml_tree.findall('functions/function')):
             with XMLAttributes(element, 'function %i' % (ifnc+1)) as att:
-                cls = att.get('class')
+                classname = att.get('class')
                 try:
-                    cls = self.get_class(cls)
-                except ImportError as e:
-                    raise Exception('Unable to import %s specified in "class" attribute of %s: %s' % (cls, att.description, e))
+                    cls = self.get_class(classname, base=Function)
+                except Exception as e:
+                    raise Exception('Invalid class %s specified in "class" attribute of %s: %s' % (classname, att.description, e))
                 self.functions.append(cls(self, att))
 
         # Parse transforms
@@ -305,10 +307,15 @@ class Job(optimize.OptimizationProblem):
             tf = RunTimeTransform(ins, outs)
             self.controller.addParameterTransform(tf)
 
-    def get_class(self, name):
+    def get_class(self, name, base):
+        sys.path.insert(0, self.root)
         smod, scls = name.rsplit('.', 1)
         mod = importlib.import_module(smod)
-        return getattr(mod, scls)
+        cls = getattr(mod, scls)
+        sys.path.pop(0)
+        if not isinstance(cls, type) or not issubclass(cls, base):
+            raise Exception('%s is not a subclass of %s.%s' % (name, base.__module__, base.__name__))
+        return cls
 
     def start(self, force=False):
         if not self.started or force:

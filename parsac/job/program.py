@@ -288,11 +288,11 @@ class Job(shared.Job2):
         for itarget, element in enumerate(xml_tree.findall('targets/target')):
             with shared.XMLAttributes(element, 'target %i' % (itarget + 1,)) as att:
                 classname = att.get('class', required=False)
-                if classname:
+                if classname is not None:
                     try:
-                        cls = self.get_class(classname)
-                    except ImportError as e:
-                        raise Exception('Unable to import %s specified in "class" attribute of %s: %s' % (classname, att.description, e))
+                        cls = self.get_class(classname, base=shared.Target)
+                    except Exception as e:
+                        raise Exception('Invalid class %s specified in "class" attribute of %s: %s' % (classname, att.description, e))
                 else:
                     cls = shared.ExpressionTarget
                 self.targets.append(cls(self, att))
