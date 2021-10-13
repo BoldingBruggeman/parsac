@@ -231,7 +231,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         Y_sd = numpy.std(Y, axis=0)
         beta, se_beta, t, p, R2, F = mvr(SAlib_problem['names'], (X - X_mean) / X_sd, (Y - Y_mean) / Y_sd, verbose=args.print_to_console)
         sensitivities = numpy.abs(beta)
-        analysis = (beta, se_beta, t, p, R2, F)
+        analysis = {'beta': beta, 'se_beta': se_beta, 't': t, 'p': p, 'R2': R2, 'F': F}
     elif args.method == 'cv':
         X_mean = numpy.mean(X, axis=0)
         X_sd = numpy.std(X, axis=0)
@@ -239,7 +239,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         Y_sd = numpy.std(Y, axis=0)
         cv = (Y_sd / Y_mean) / (X_sd / X_mean)
         sensitivities = cv
-        analysis = (cv,)
+        analysis = {'cv': cv}
     else:
         raise Exception('Unknown analysis method "%s" specified.' % args.method)
     if verbose:
