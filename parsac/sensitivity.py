@@ -235,7 +235,7 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         Y_sd = numpy.where(Y_sd > 0., Y_sd, 1.)
         beta, se_beta, t, p, R2, F = mvr(SAlib_problem['names'], (X - X_mean) / X_sd, (Y - Y_mean) / Y_sd, verbose=args.print_to_console)
         sensitivities_squeezed = numpy.abs(beta)
-        sensitivities = numpy.full((numpy.size(keep),), numpy.nan, dtype=sensitivities_squeezed.dtype)
+        sensitivities = numpy.full((numpy.size(keep),), -1., dtype=sensitivities_squeezed.dtype)
         j = 0
         for i, k in enumerate(keep):
             if k:

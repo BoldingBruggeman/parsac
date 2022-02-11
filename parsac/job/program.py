@@ -413,6 +413,9 @@ class Job(shared.Job2):
             start = self.getSimulationStart()
             obsstart = datetime.datetime(start.year+spinupyears, start.month, start.day)
             valid = numpy.array([t >= obsstart for t in times], dtype=bool)
+            if not valid.any():
+                print('Skipping "%s" because it has no observations after %s.' % (obsstart.strftime('%Y-%m-%d'),))
+                return
             if zs is not None:
                 zs = zs[valid]
             values = values[valid]
