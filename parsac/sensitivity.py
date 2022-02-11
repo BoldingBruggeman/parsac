@@ -225,14 +225,22 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         analysis = SALib.analyze.ff.analyze(SAlib_problem, X, Y, second_order=args.second_order, print_to_console=args.print_to_console)
     elif args.method == 'mvr':
         # https://dx.doi.org/10.1002/9780470725184, section 1.2.5
+        keep = numpy.std(X, axis=0) > 0
+        X = X[:, keep]
         X_mean = numpy.mean(X, axis=0)
         X_sd = numpy.std(X, axis=0)
         Y_mean = numpy.mean(Y, axis=0)
-        Y_sd = numpy.std(Y, axis=0)
+        Y_sd = numpy.std(Y, axis=0)        
         X_sd = numpy.where(X_sd > 0., X_sd, 1.)
         Y_sd = numpy.where(Y_sd > 0., Y_sd, 1.)
         beta, se_beta, t, p, R2, F = mvr(SAlib_problem['names'], (X - X_mean) / X_sd, (Y - Y_mean) / Y_sd, verbose=args.print_to_console)
-        sensitivities = numpy.abs(beta)
+        sensitivities_squeezed = numpy.abs(beta)
+        sensitivities = numpy.full((numpy.size(keep),), numpy.nan, dtype=sensitivities_squeezed.dtype)
+        j = 0
+        for i, k in enumerate(keep):
+            if k:
+                sensitivities[i] = sensitivities_squeezed[j]
+                j += 1
         analysis = {'beta': beta, 'se_beta': se_beta, 't': t, 'p': p, 'R2': R2, 'F': F}
     elif args.method == 'cv':
         X_mean = numpy.mean(X, axis=0)
