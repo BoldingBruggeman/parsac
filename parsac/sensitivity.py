@@ -229,6 +229,8 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         X_sd = numpy.std(X, axis=0)
         Y_mean = numpy.mean(Y, axis=0)
         Y_sd = numpy.std(Y, axis=0)
+        X_sd[X_sd == 0.] = 1
+        Y_sd[Y_sd == 0.] = 1
         beta, se_beta, t, p, R2, F = mvr(SAlib_problem['names'], (X - X_mean) / X_sd, (Y - Y_mean) / Y_sd, verbose=args.print_to_console)
         sensitivities = numpy.abs(beta)
         analysis = {'beta': beta, 'se_beta': se_beta, 't': t, 'p': p, 'R2': R2, 'F': F}
