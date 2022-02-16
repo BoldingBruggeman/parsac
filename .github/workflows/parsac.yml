@@ -1,0 +1,21 @@
+name: Install and test
+on: push
+jobs:
+   test:
+      strategy:
+         matrix:
+            python-version: ['2.7', '3.7', '3.8', '3.9']
+      runs-on: ubuntu-latest
+      steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install parsac
+        run: pip install .
+      - name: Test calibration
+        run: |
+          cd parsac/examples
+          parsac calibration run idealized.xml
