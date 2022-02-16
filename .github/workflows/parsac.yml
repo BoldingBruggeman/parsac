@@ -7,7 +7,7 @@ jobs:
           python-version: ['2.7', '3.7', '3.8', '3.9']
           include:
             - python-version: '2.7'
-              python-dependencies: "'setuptools_scm<6.0.0' 'netCDF4==1.5.3'"
+              python-dependencies: "numpy 'setuptools_scm<6.0.0' 'netCDF4==1.5.3'"
         fail-fast: false
       runs-on: ubuntu-latest
       steps:
