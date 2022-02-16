@@ -17,8 +17,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install parsac
-        run: pip install ${{ matrix.python-dependencies }} .
+      - name: Install dependencies
+        run: pip install ${{ matrix.python-dependencies }} wheel
       - name: Install parsac
         run: pip install .
       - name: Test calibration
