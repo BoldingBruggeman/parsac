@@ -4,10 +4,7 @@ jobs:
    test:
       strategy:
         matrix:
-          python-version: ['2.7', '3.7', '3.8', '3.9']
-          include:
-            - python-version: '2.7'
-              python-dependencies: "numpy 'setuptools_scm<6.0.0' 'netCDF4==1.5.3'"
+          python-version: ['3.7', '3.8', '3.9']
         fail-fast: false
       runs-on: ubuntu-latest
       steps:
@@ -17,8 +14,6 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: pip install ${{ matrix.python-dependencies }} wheel
       - name: Install parsac
         run: pip install .
       - name: Test calibration
