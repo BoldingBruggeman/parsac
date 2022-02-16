@@ -5,10 +5,10 @@ jobs:
       strategy:
          matrix:
             python-version: ['2.7', '3.7', '3.8', '3.9']
-            python-dependencies: setuptool_scm
+            python-dependencies: ['setuptool_scm']
       include:
         - python-version: 2.7
-          python-dependencies: setuptool_scm<6.0.0
+          python-dependencies: ['setuptool_scm<6.0.0']
         fail-fast: false
       runs-on: ubuntu-latest
       steps:
