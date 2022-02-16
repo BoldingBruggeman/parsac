@@ -5,10 +5,9 @@ jobs:
       strategy:
         matrix:
           python-version: ['2.7', '3.7', '3.8', '3.9']
-          python-dependencies: ['setuptool_scm']
           include:
             - python-version: '2.7'
-              python-dependencies: 'setuptool_scm<6.0.0'
+              python-dependencies: 'setuptools_scm<6.0.0'
         fail-fast: false
       runs-on: ubuntu-latest
       steps:
@@ -18,10 +17,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: pip install ${{ matrix.python-dependencies }}
       - name: Install parsac
-        run: pip install .
+        run: pip install ${{ matrix.python-dependencies }} .
       - name: Install parsac
         run: pip install .
       - name: Test calibration
