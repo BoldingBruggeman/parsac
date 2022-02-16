@@ -227,10 +227,12 @@ def analyze(SAlib_problem, args, sample_args, X, Y, verbose=False):
         # https://dx.doi.org/10.1002/9780470725184, section 1.2.5
         keep = numpy.std(X, axis=0) > 0
         X = X[:, keep]
+        if X.shape[-1] > X.shape[0]:
+            raise Exception('This sample has only %i members, but %i free parameters. Analysis method "mvr" requires a sample size >= the number of free parameters.' % (X.shape[0], X.shape[-1]))
         X_mean = numpy.mean(X, axis=0)
         X_sd = numpy.std(X, axis=0)
         Y_mean = numpy.mean(Y, axis=0)
-        Y_sd = numpy.std(Y, axis=0)        
+        Y_sd = numpy.std(Y, axis=0)
         X_sd = numpy.where(X_sd > 0., X_sd, 1.)
         Y_sd = numpy.where(Y_sd > 0., Y_sd, 1.)
         beta, se_beta, t, p, R2, F = mvr(SAlib_problem['names'], (X - X_mean) / X_sd, (Y - Y_mean) / Y_sd, verbose=args.print_to_console)
