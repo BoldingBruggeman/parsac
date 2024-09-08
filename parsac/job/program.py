@@ -552,7 +552,7 @@ class Job(shared.Job2):
             for parameter, value in zip(self.parameters, values):
                 if value < parameter.minimum or value > parameter.maximum:
                     errors = 'Parameter %s with value %.6g out of range (%.6g - %.6g), returning ln likelihood of -infinity.' % (parameter.name, value, parameter.minimum, parameter.maximum)
-                    return -numpy.Inf
+                    return -numpy.inf
 
         self.prepareDirectory(values)
 
@@ -562,7 +562,7 @@ class Job(shared.Job2):
             # Run failed
             print('Returning ln likelihood = negative infinity to discourage use of this parameter set.')
             #self.reportResult(values, None, error='Run stopped prematurely')
-            return -numpy.Inf
+            return -numpy.inf
 
         if getattr(self, 'observations', None) is None:
             results = []
@@ -676,7 +676,7 @@ class Job(shared.Job2):
                 #self.reportResult(values,None,error='Some model values for %s are not finite' % obsvar)
                 for wrappednc in outputpath2nc.values():
                     wrappednc.finalize()
-                return -numpy.Inf
+                return -numpy.inf
 
             if return_model_values:
                 time_units = wrappednc.nc.variables['time'].units
@@ -722,7 +722,7 @@ class Job(shared.Job2):
                         for wrappednc in outputpath2nc.values():
                             wrappednc.finalize()
                         #self.reportResult(values, None, error='All model values for %s equal 0' % obsvar)
-                        return -numpy.Inf
+                        return -numpy.inf
                     scale = (obsvals*modelvals).sum()/(modelvals**2).sum()
                     if not numpy.isfinite(scale):
                         print('WARNING: optimal scaling factor for %s is not finite.' % obsvar)
@@ -730,7 +730,7 @@ class Job(shared.Job2):
                         #self.reportResult(values, None, error='Optimal scaling factor for %s is not finite' % obsvar)
                         for wrappednc in outputpath2nc.values():
                             wrappednc.finalize()
-                        return -numpy.Inf
+                        return -numpy.inf
 
                 # Report and check optimal scale factor.
                 print('Optimal model-to-observation scaling factor for %s = %.6g.' % (obsvar, scale))

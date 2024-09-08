@@ -266,7 +266,7 @@ def line_search(f, myfprime, xk, pk, gfk, old_fval, old_old_fval,
 
     return alpha_star, _ls_fc, _ls_gc, fval_star, old_fval, fprime_star
 
-def fmin_bfgs(f, x0, fprime=None, args=(), gtol=1e-5, norm=numpy.Inf,
+def fmin_bfgs(f, x0, fprime=None, args=(), gtol=1e-5, norm=numpy.inf,
               epsilon=_epsilon, maxiter=None, full_output=0, disp=1,
               retall=0, callback=None):
     """Minimize a function using the BFGS algorithm.

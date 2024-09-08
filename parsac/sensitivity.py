@@ -328,7 +328,7 @@ def main(args):
                 return
             X_filt, Y_filt = [], []
             for i, y in enumerate(Y):
-                if y != -numpy.Inf:
+                if y != -numpy.inf:
                     X_filt.append(X[i, :])
                     Y_filt.append(y)
             if len(Y_filt) != len(Y):

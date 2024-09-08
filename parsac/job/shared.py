@@ -389,7 +389,7 @@ class Job(optimize.OptimizationProblem):
                 ppjobs.append(ppjob)
             for ppjob in ppjobs:
                 member, result = ppjob()
-                if stop_on_bad_result and result == -numpy.Inf:
+                if stop_on_bad_result and result == -numpy.inf:
                     print('Ensemble member returned invalid result. Cancelling ensemble run...')
                     job_server.destroy()
                     return
@@ -398,7 +398,7 @@ class Job(optimize.OptimizationProblem):
             self.start()
             for member in ensemble:
                 result = self.evaluate(member)
-                if stop_on_bad_result and result == -numpy.Inf:
+                if stop_on_bad_result and result == -numpy.inf:
                     print('Ensemble member returned invalid result. Cancelling ensemble run...')
                     return
                 results.append(result)

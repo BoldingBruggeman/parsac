@@ -170,7 +170,7 @@ class DESolver:
         else:
             self.population = self.randomstate.uniform(self.minInitialValue, self.maxInitialValue, size=(self.populationSize, self.parameterCount))
         fitness = numpy.empty(self.population.shape[0])
-        fitness[:] = -numpy.Inf
+        fitness[:] = -numpy.inf
 
         ibest = None
 
