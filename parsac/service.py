@@ -3,10 +3,7 @@
 from __future__ import print_function
 import os
 import argparse
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+import configparser
 
 user = None
 email = None
@@ -17,7 +14,7 @@ have_service = False
 path = os.path.dirname(os.path.realpath(__file__))
 service_file  = os.path.join(path, 'service.txt')
 
-config = configparser.SafeConfigParser()
+config = configparser.ConfigParser()
 
 def read():
     global user
