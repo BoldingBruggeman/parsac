@@ -10,10 +10,10 @@ from . import ensemble
 
 __version__ = 'version not available'
 
-from pkg_resources import get_distribution, DistributionNotFound
+import importlib.metadata
 try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
+    __version__ = importlib.metadata.version("parsac")
+except importlib.metadata.PackageNotFoundError:
     try:
         from setuptools_scm import get_version
         __version__ = get_version(root='..', relative_to=__file__)
