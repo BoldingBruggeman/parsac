@@ -18,3 +18,12 @@ pip install .
 ## Usage
 
 Examples are included in the `examples` subdirectory.
+
+To view optimization results during or after optimization, you currently can use the following:
+
+```
+python -m parsac.optimize.plot <DBFILE>
+```
+
+Here, `<DBFILE>` is the result database created by the optimization.
+By default, it has the name of the run scirpt (minus `.py`) with `.results.db` appended.
