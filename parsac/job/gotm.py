@@ -215,7 +215,7 @@ class Simulation(core.Runner):
         self.parsed_yaml: dict[Path, util.YAMLFile] = {}
 
     def get_parameter(
-        self, file: Union[os.PathLike[str], str], variable_path: str
+        self, file: Union[os.PathLike[str], str], variable_path: str, default: Any = None
     ) -> core.InitializedParameter:
         """
         Get a parameter from a YAML file.
@@ -223,6 +223,7 @@ class Simulation(core.Runner):
         Args:
             file: path to the YAML file (relative to the setup directory)
             variable_path: path to the variable in the YAML file
+            default: default value if the variable is not found
         """
         file = Path(file)
         original = self.setup_dir / file
@@ -231,7 +232,10 @@ class Simulation(core.Runner):
         try:
             initial_value = util.YAMLFile(original)[variable_path]
         except KeyError:
-            raise Exception(f"Parameter {variable_path} not found in {file}.")
+            if default is not None:
+                initial_value = default
+            else:
+                raise Exception(f"Parameter {variable_path} not found in {file}.")
         parameter = core.InitializedParameter(
             f"{self.name}:{file}:{variable_path}", initial_value
         )
