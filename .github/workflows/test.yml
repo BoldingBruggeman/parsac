@@ -37,4 +37,4 @@ jobs:
           cmake --build gotm/build --target install
           cd examples
           export PATH="$PATH:$HOME/local/gotm/bin"
-          python demo.py
+          python optimize_gotm.py
