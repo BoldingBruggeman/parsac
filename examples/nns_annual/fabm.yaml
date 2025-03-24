@@ -1,0 +1,319 @@
+instances:
+  optics:
+    model: pisces/optics
+    parameters:
+      ln_varpar: false
+  no3:
+    long_name: nitrate
+    model: pisces/tracer
+    parameters:
+      has_nitrogen: true
+    initialization:
+      c: 0.0002356125
+  nh4:
+    long_name: ammonium
+    model: pisces/tracer
+    parameters:
+      has_nitrogen: true
+    initialization:
+      c: 1.e-8
+  po4:
+    long_name: phosphate
+    model: pisces/tracer
+    parameters:
+      has_phosphorus: true
+    initialization:
+      c: 0.00026413
+  sil:
+    long_name: silicate
+    model: pisces/tracer
+    parameters:
+      has_silicon: true
+    initialization:
+      si: 91.51e-6
+  fer:
+    long_name: iron
+    model: pisces/tracer
+    parameters:
+      has_iron: true
+    initialization:
+      fe: 6.e-10
+  dom:
+    long_name: dissolved organic matter
+    model: pisces/tracer
+    parameters:
+      has_carbon: true
+      has_nitrogen: true
+      has_phosphorus: true
+    initialization:
+      c: 1.e-8
+  pom:
+    long_name: small particulate organic matter
+    model: pisces/pom
+    parameters:
+      ws: 2
+      solgoc: 0
+      mlvar: true
+    initialization:
+      c: 1.e-8
+      fe: 5.e-14
+    coupling:
+      dom: dom
+      fer: fer/fe
+      sed: sed
+  gom:
+    long_name: large particulate organic matter
+    model: pisces/pom
+    parameters:
+      has_silicon: true
+      has_calcite: true
+      ws: 50
+    initialization:
+      c: 1.e-8
+      fe: 5.e-14
+      si: 5.e-14
+      cal: 1.e-8
+    coupling:
+      dom: dom
+      fer: fer/fe
+      spom: pom
+      sed: sed
+  phy:
+    long_name: nanophytoplankton
+    model: pisces/phytoplankton
+    parameters:
+      calcify: true
+      beta1: 1.85
+      beta2: 0.69
+      beta3: 0.46
+      concnh4: 1.e-7
+      concno3: 1.e-6
+      concfer: 1.e-9
+      chlcm: 0.033
+      xmort: 1e-8
+    coupling:
+      no3: no3/c
+      nh4: nh4/c
+      po4: po4/c
+      biron: fer/fe
+      fer: fer/fe
+      doc: dom/c
+      oxy: oxy/O2
+      heup_01: optics/heup_01
+      pe1: optics/pe1
+      pe2: optics/pe2
+      pe3: optics/pe3
+      etot_ndcy: optics/etot_ndcy
+      zstrn: daylength/zstrn
+      pom: pom
+      gom: gom
+    initialization:
+      c: 1.e-8
+      ch: 2.1818e-9
+      fe: 5.e-14
+  dia:
+    long_name: diatoms
+    model: pisces/phytoplankton
+    parameters:
+      diatom: true
+      beta1: 1.62
+      beta2: 0.74
+      beta3: 0.63
+      concnh4: 3.e-7
+      concno3: 3.e-6
+      concfer: 3.e-9
+      chlcm: 0.05
+      xmort: 1e-9
+      wchlm: 0.03
+    coupling:
+      no3: no3/c
+      nh4: nh4/c
+      po4: po4/c
+      sil: sil/si
+      biron: fer/fe
+      doc: dom/c
+      oxy: oxy/O2
+      heup_01: optics/heup_01
+      pe1: optics/pe1
+      pe2: optics/pe2
+      pe3: optics/pe3
+      etot_ndcy: optics/etot_ndcy
+      zstrn: daylength/zstrn
+      pom: pom
+      gom: gom
+    initialization:
+      c: 1.e-8
+      ch: 2.1818e-9
+      si: 0.15e-8
+      fe: 5.e-14
+  carbonate:
+    model: pisces/carbonate_chemistry
+    coupling:
+      po4: po4/c
+      sil: sil/si
+    initialization:
+      DIC: 2.312e-3
+      Alkalini: 2.426e-3
+  oxy:
+    long_name: oxygen
+    model: pisces/oxygen
+    initialization:
+      O2: 177.6e-6
+  daylength:
+    model: pisces/daylength
+  turbocline:
+    model: pisces/turbocline
+  shear:
+    model: pisces/shear
+  zoo:
+    long_name: microzooplankton
+    model: pisces/zooplankton
+    parameters:
+      epsher: 0.3
+      epshermin: 0.3
+      xprefn: 1.
+      xprefd: 0.5
+      xprefc: 0.1
+      xprefz: 0
+      xdismort: 0
+      grazrat: 3
+      grazflux: 0
+      phlim: 1
+      mzrat: 0.004
+      resrat: 0.03
+      part: 0.5
+    initialization:
+      c: 1.0e-8
+    coupling:
+      dia: dia
+      phy: phy
+      zoo: zoo/c
+      pom: pom
+      gom: gom
+      nitrfac: oxy/nitrfac
+      no3: no3/c
+      po4: po4/c
+      nh4: nh4/c
+      fer: fer/fe
+      oxy: oxy/O2
+      doc: dom/c
+      waste: pom
+      pos_waste: gom/si
+  mes:
+    long_name: mesozooplankton
+    model: pisces/zooplankton
+    parameters:
+      epsher: 0.35
+      epshermin: 0.35
+      xprefn: 0.3
+      xprefd: 1.
+      xprefc: 0.3
+      xprefz: 1
+      grazrat: 0.75
+      grazflux: 3e3
+      phlim: 0
+      mzrat: 0.03
+      resrat: 0.005
+      part: 0.75
+      xsizedia: 1
+    initialization:
+      c: 1.0e-8
+    coupling:
+      dia: dia
+      phy: phy
+      zoo: zoo/c
+      pom: pom
+      gom: gom
+      nitrfac: oxy/nitrfac
+      no3: no3/c
+      po4: po4/c
+      nh4: nh4/c
+      fer: fer/fe
+      oxy: oxy/O2
+      doc: dom/c
+      waste: gom
+  iron_availability:
+    model: pisces/iron
+    coupling:
+      dom: dom
+      pom: pom
+      gom: gom
+      fer: fer/fe
+      hi: carbonate/hi
+      oxy: oxy/O2
+      etot: optics/etot
+      zdust: dust/zdust
+      etot_ndcy: optics/etot_ndcy
+  nitrification:
+    model: pisces/nitrification
+    coupling:
+      no3: no3/c
+      nh4: nh4/c
+      oxy: oxy/O2
+      nitrfac: oxy/nitrfac
+      emoy: optics/emoy
+      etot: optics/etot
+  nitrogen_fixation:
+    model: pisces/nitrogen_fixation
+    coupling:
+      no3: no3/c
+      nh4: nh4/c
+      po4: po4/c
+      biron: fer/fe
+      oxy: oxy/O2
+      dom: dom
+      pom: pom
+      gom: gom
+      etot_ndcy: optics/etot_ndcy
+  dom_rem:
+    model: pisces/dom_remineralization
+    coupling:
+      heup: optics/heup
+      zoo: zoo/c
+      mes: mes/c
+      nitrfac: oxy/nitrfac
+      no3: no3/c
+      po4: po4/c
+      nh4: nh4/c
+      fer: fer/fe
+      oxy: oxy/O2
+      doc: dom/c
+      sfe: pom/fe
+      bfe: gom/fe
+  agg:
+    model: pisces/aggregation
+    coupling:
+      dom: dom
+      pom: pom
+      gom: gom
+  sed:
+    long_name: sediment
+    model: pisces/sediment
+    coupling:
+      no3: no3/c
+      nh4: nh4/c
+      po4: po4/c
+      sil: sil/si
+      fer: fer/fe
+      oxy: oxy/O2
+      doc: dom/c
+      nitrfac: oxy/nitrfac
+  dust:
+    model: pisces/dust
+    parameters:
+      ln_solub: false
+    coupling:
+      po4: po4/c
+      sil: sil/si
+      fer: fer/fe
+      dustdep: zero_hz
+  pco2:
+    model: surface_constant
+    parameters:
+      standard_name: mole_fraction_of_carbon_dioxide_in_air
+      value: 350.
+  ice:
+    model: surface_constant
+    parameters:
+      standard_name: ice_area_fraction
+      value: 0
