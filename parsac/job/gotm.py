@@ -164,7 +164,6 @@ class Simulation(core.Runner):
         self,
         setup_dir: Union[os.PathLike[str], str],
         executable: Union[os.PathLike[str], str] = "gotm",
-        use_shell: bool = False,
         exclude_files: Iterable[str] = ("*.nc", "*.cache"),
         exclude_dirs: Iterable[str] = ("*",),
         work_dir: Optional[Union[os.PathLike[str], str]] = None,
@@ -176,8 +175,6 @@ class Simulation(core.Runner):
         Args:
             setup_dir: path to the GOTM setup directory
             executable: path to the GOTM executable
-            use_shell: whether to run the executable using the shell.
-                This argument is passed to subprocess.Popen.
             exclude_files: patterns to exclude files from being copied to the
                 working directory
             exclude_dirs: patterns to exclude directories from being copied to
@@ -186,7 +183,7 @@ class Simulation(core.Runner):
                 If None, a temporary directory is created.
             logger: logger to use for diagnostic messages
         """
-        logging.basicConfig(level=logging.INFO)        
+        logging.basicConfig(level=logging.INFO)
         setup_dir = Path(setup_dir)
         if not setup_dir.is_dir():
             raise Exception(f"GOTM setup directory {setup_dir} does not exist.")
@@ -202,7 +199,6 @@ class Simulation(core.Runner):
         if work_dir is not None:
             work_dir = Path(work_dir)
         self.work_dir = work_dir
-        self.use_shell = use_shell
         self.tempdir = None
         self.symlink = False
         self.exclude_files = exclude_files
@@ -236,7 +232,9 @@ class Simulation(core.Runner):
             initial_value = util.YAMLFile(original)[variable_path]
         except KeyError:
             raise Exception(f"Parameter {variable_path} not found in {file}.")
-        parameter = core.InitializedParameter(f"{self.name}:{file}:{variable_path}", initial_value)
+        parameter = core.InitializedParameter(
+            f"{self.name}:{file}:{variable_path}", initial_value
+        )
         self.parameters.append((parameter.name, file, variable_path))
         return parameter
 
@@ -273,9 +271,7 @@ class Simulation(core.Runner):
         """
         output_file = Path(output_file)
         obs_file = Path(obs_file)
-        name = (
-            f"{self.name}:{output_file}:{output_expression}={obs_file.relative_to(self.setup_dir)}"
-        )
+        name = f"{self.name}:{output_file}:{output_expression}={obs_file.relative_to(self.setup_dir)}"
 
         blob = None
         if cache:
@@ -400,11 +396,7 @@ class Simulation(core.Runner):
             yaml.save()
 
         returncode = util.run_program(
-            self.executable,
-            self.work_dir,
-            logger=self.logger,
-            use_shell=self.use_shell,
-            show_output=show_output,
+            self.executable, self.work_dir, logger=self.logger, show_output=show_output
         )
 
         if returncode != 0:
