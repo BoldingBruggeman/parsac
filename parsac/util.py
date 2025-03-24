@@ -344,14 +344,17 @@ def run_program(
     if exe.endswith(".py"):
         args = [sys.executable] + args
         use_shell = False
+    kwargs = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.IDLE_PRIORITY_CLASS
     proc = subprocess.Popen(
         args,
         cwd=rundir,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         shell=use_shell,
-        creationflags=subprocess.IDLE_PRIORITY_CLASS,
         universal_newlines=True,
+        **kwargs
     )
     assert proc.stdout is not None
 
