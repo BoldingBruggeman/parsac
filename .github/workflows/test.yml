@@ -36,5 +36,5 @@ jobs:
           cmake -S gotm -B gotm/build
           cmake --build gotm/build --target install
           cd examples
-          export PATH="$PATH:~/local/gotm/bin"
+          export PATH="$PATH:$HOME/local/gotm/bin"
           python demo.py
