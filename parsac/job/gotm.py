@@ -192,11 +192,13 @@ class Simulation(core.Runner):
             raise Exception(f"GOTM setup directory {setup_dir} does not exist.")
         self.setup_dir = setup_dir
         super().__init__(f"gotm({setup_dir})")
-        if not use_shell:
-            executable = (setup_dir / Path(executable)).resolve()
-            if not executable.is_file():
+        abs_exe = (setup_dir / Path(executable)).resolve()
+        if abs_exe.is_file():
+            self.executable = abs_exe
+        else:
+            if shutil.which(executable) is None:
                 raise Exception(f"Executable {executable} not found.")
-        self.executable = executable
+            self.executable = executable
         if work_dir is not None:
             work_dir = Path(work_dir)
         self.work_dir = work_dir
