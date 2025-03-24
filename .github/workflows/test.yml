@@ -25,3 +25,15 @@ jobs:
           environment-file: environment.yml
           activate-environment: parsac
       - run: pip install -v .
+      - uses: actions/checkout@v4
+        with:
+          repository: 'gotm-model/code'
+          ref: 'v6.0'
+          path: 'gotm'
+          submodules: 'recursive'
+      - run: |
+          conda install -c conda-forge fortran-compiler cmake netcdf-fortran
+          cmake -S gotm -B gotm/build
+          cmake --build gotm/build --target install
+          cd examples
+          python demo.py
