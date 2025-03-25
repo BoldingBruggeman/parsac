@@ -210,7 +210,7 @@ def plot(
                     ax.set_xscale("log")
 
         if keep_updating:
-            print("Waiting for new results...")
+            print("Waiting for new results...", end="", flush=True)
 
     fig = plt.figure(figsize=(12, 8))
     fig.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=0.3)
