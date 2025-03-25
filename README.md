@@ -35,7 +35,7 @@ python -m parsac.optimize.plot <DBFILE>
 ```
 
 Here, `<DBFILE>` is the result database created by the optimization.
-By default, it has the name of the run script, `.results.db` appended insetad of `.py`.
+By default, it has the name of the run script, `.results.db` appended instead of `.py`.
 
 ## GOTM - file formats
 
@@ -45,7 +45,7 @@ Each line must contain:
 * the date + time as `YYYY-mm-dd HH:MM:SS`. For instance, a value of `2000-05-08 06:20:00` for 6:20 am on 8 May 2000.
 * _only if you are providing depth-dependent observations:_ the depth (m) at which the
    observation was taken. It decreases downwards from the water surface, e.g., a
-   value of `5.4` indicates a depth of 5.4 meter below the water surface.
+   value of `-5.4` indicates a depth of 5.4 meter below the water surface.
 * the observed value
 * _optional:_ the standard deviation of the observation. This will be interpreted as the combination of measurement and model error.
 
