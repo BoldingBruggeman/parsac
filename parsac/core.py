@@ -178,7 +178,7 @@ class _TargetedParameter(NamedTuple):
     bwt: Callable[[float], float] = _null_transform
 
 
-class Problem:
+class Experiment:
     def __init__(
         self,
         *,

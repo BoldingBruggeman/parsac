@@ -172,6 +172,14 @@ class Simulation(core.Runner):
         """
         Set up a GOTM simulation.
 
+        Call `get_parameter` to select a configurable
+        parameter from a YAML file. This parameter can subsequently be targeted in calibration
+        or sensitivity analysis. Call `request_comparison` to link a model output
+        to observations. This can subsequently contribute to the objective function
+        (likelihood) in calibration. Call `record_output` to record additional
+        model outputs. These can be used as additional diagnostics in calibration
+        or as targets in sensitivity analysis.
+
         Args:
             setup_dir: path to the GOTM setup directory
             executable: path to the GOTM executable

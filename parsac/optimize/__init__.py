@@ -9,9 +9,14 @@ from .. import core
 from . import desolver
 
 
-class Optimization(core.Problem):
+class Optimization(core.Experiment):
     def __init__(self) -> None:
-        """Set up an optimization problem."""
+        """Set up an optimization experiment.
+
+        To configure the experiment, add parameters to calibrate
+        by calling `add_parameter`, and add contributions to the objective
+        function (likelihood) by calling `add_target`.
+        """
         super().__init__()
         self.components: list[str] = []
 
