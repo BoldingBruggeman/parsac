@@ -35,4 +35,4 @@ job.add_target(
 )
 
 if __name__ == "__main__":
-    p = job.run(reltol=0.00001)
+    p = job.run(reltol=0.01)
