@@ -9,9 +9,18 @@ that use YAML-based configuration files and that write their output to NetCDF.
 
 ## Installation
 
+From the top-level directory of this repository:
+
 ```
 conda env create -f environment.yml
 conda activate parsac
+pip install .
+```
+
+### Updating to the latest version
+
+```
+git pull
 pip install .
 ```
 
