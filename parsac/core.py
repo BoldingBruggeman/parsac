@@ -182,6 +182,7 @@ class Experiment:
     def __init__(
         self,
         *,
+        db_file: Optional[Union[str, Path]] = None,
         max_workers: Optional[int] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
@@ -190,7 +191,9 @@ class Experiment:
         self.runners: set[Runner] = set()
         self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.last_result: Optional[dict[str, Any]] = None
-        self.recorder = record.Recorder(Path(sys.argv[0]).with_suffix(".results.db"))
+        if db_file is None:
+            db_file = Path(sys.argv[0]).with_suffix(".results.db")
+        self.recorder = record.Recorder(db_file)
         self.max_workers = max_workers
         self.executor: Optional[concurrent.futures.ProcessPoolExecutor] = None
 

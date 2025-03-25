@@ -10,14 +10,17 @@ from . import desolver
 
 
 class Optimization(core.Experiment):
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         """Set up an optimization experiment.
 
         To configure the experiment, add parameters to calibrate
         by calling `add_parameter`, and add contributions to the objective
         function (likelihood) by calling `add_target`.
+
+        Args:
+            kwargs: Additional keyword arguments to passed to `core.Experiment`.
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.components: list[str] = []
 
     def add_target(self, metric: core.Comparison, **kwargs: Any) -> None:
