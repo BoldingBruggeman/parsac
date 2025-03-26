@@ -183,6 +183,7 @@ class Simulation(core.Runner):
         Args:
             setup_dir: path to the GOTM setup directory
             executable: path to the GOTM executable
+                (relative to the current working directory)
             exclude_files: patterns to exclude files from being copied to the
                 working directory
             exclude_dirs: patterns to exclude directories from being copied to
@@ -197,7 +198,7 @@ class Simulation(core.Runner):
             raise Exception(f"GOTM setup directory {setup_dir} does not exist.")
         self.setup_dir = setup_dir
         super().__init__(f"gotm({setup_dir})")
-        abs_exe = (setup_dir / Path(executable)).resolve()
+        abs_exe = Path(executable).resolve()
         if abs_exe.is_file():
             executable = abs_exe
         else:
@@ -399,10 +400,7 @@ class Simulation(core.Runner):
         for name, file, path in self.parameters:
             if name in name2value:
                 yaml = self.parsed_yaml[file]
-                value = name2value[name]
-                if isinstance(value, (np.ndarray, np.generic)):
-                    value = value.item()
-                yaml[path] = value
+                yaml[path] = name2value[name]
                 update_yaml.add(yaml)
         for yaml in update_yaml:
             yaml.save()

@@ -266,7 +266,10 @@ class Experiment:
         assert len(values) == len(self.parameters)
         name2value: dict[str, float] = {}
         for target, value in zip(self.parameters, values):
-            name2value[target.parameter.name] = target.bwt(value)
+            value = target.bwt(value)
+            if isinstance(value, (np.ndarray, np.generic)):
+                value = value.item()
+            name2value[target.parameter.name] = value
             target.parameter.reset()
         for target in self.parameters:
             target.parameter.update(name2value)
