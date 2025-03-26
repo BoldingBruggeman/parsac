@@ -109,16 +109,12 @@ class Result:
         iinc = self.lnls.searchsorted(self.maxlnl - lnl_crit)
         lbounds = self.values[iinc:].min(axis=0)
         rbounds = self.values[iinc:].max(axis=0)
-        outside = self.values[:iinc]
-        for ipar in range(self.values.shape[-1]):
+        for i in range(lbounds.size):
             # Get conservative confidence interval by extending it to the first point
             # from the boundary that has a likelihood value outside the allowed range.
-            lvalid = outside[:, ipar] < lbounds[ipar]
-            rvalid = outside[:, ipar] > rbounds[ipar]
-            if lvalid.any():
-                lbounds[ipar] = outside[lvalid, ipar].max()
-            if rvalid.any():
-                rbounds[ipar] = outside[rvalid, ipar].min()
+            out = self.values[:iinc, i]
+            lbounds[i] = out.max(where=out < lbounds[i], initial=lbounds[i])
+            rbounds[i] = out.min(where=out > rbounds[i], initial=rbounds[i])
         return lbounds, rbounds
 
     def save_best(self, file: Union[str, os.PathLike[Any]], *, sep: str = "\t") -> None:
