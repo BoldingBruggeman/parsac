@@ -27,6 +27,8 @@ pip install .
 ## Usage
 
 Examples are included in the `examples` subdirectory.
+Those using the General Ocean Turbulence Model (GOTM) are designed
+to work with [its latest stable release, v6.0](https://github.com/gotm-model/code/tree/v6.0).
 
 To view optimization results during or after optimization, you currently can use the following:
 
