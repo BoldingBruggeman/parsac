@@ -37,7 +37,7 @@ python -m parsac.optimize.plot <DBFILE>
 ```
 
 Here, `<DBFILE>` is the result database created by the optimization.
-By default, it has the name of the run script, `.results.db` appended instead of `.py`.
+By default, it has the name of the run script, with `.results.db` appended instead of `.py`.
 
 ## GOTM - file formats
 
