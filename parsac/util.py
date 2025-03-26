@@ -157,27 +157,33 @@ def readVariableFromTextFile(
     Returns:
         Tuple of time, depth, values, and standard deviations
     """
-    times, zs, values, sds = [], [], [], []
+    times: list[datetime.datetime] = []
+    zs: list[float] = []
+    values: list[float] = []
+    sds: list[float] = []
 
     def parse_line(line: str) -> None:
-        times.append(datetime.datetime.strptime(line[:19], "%Y-%m-%d %H:%M:%S"))
+        times.append(datetime.datetime.fromisoformat(line[:19]))
         data = line[20:].split()
         if format == TextFormat.DEPTH_EXPLICIT:
-            # Depth-explicit variable (on each line: time, depth, value)
-            z = float(data.pop(0))
+            # We now expect the z coordinate (<0 below surface)
+            item = data.pop(0)
+            z = float(item)
             if not np.isfinite(z):
-                raise Exception(f"Depth is not a valid number")
+                raise Exception(f"Depth {item} is not a valid number")
             if -z < mindepth or -z > maxdepth:
                 return
             zs.append(z)
-        value = float(data.pop(0))
+        item = data.pop(0)
+        value = float(item)
         if not np.isfinite(value):
-            raise Exception(f"Observed value is not a valid number.")
+            raise Exception(f"Observed value {item} is not a valid number.")
         values.append(value)
         if data:
-            sd = float(data.pop(0))
+            item = data.pop(0)
+            sd = float(item)
             if not np.isfinite(sd):
-                raise Exception(f"Standard deviation is not a valid number.")
+                raise Exception(f"Standard deviation {item} is not a valid number.")
             sds.append(sd)
 
     with file.open() as f:
@@ -189,7 +195,7 @@ def readVariableFromTextFile(
                 try:
                     parse_line(line)
                 except Exception as e:
-                    logger.error(f"Error in line {iline+1}: {e}\n{line}")
+                    raise Exception(f"Error on line {iline+1} of {file}: {e}\n{line}")
 
     sds_ = np.array(sds) if sds else None
     zs_ = np.array(zs) if format == TextFormat.DEPTH_EXPLICIT else None
