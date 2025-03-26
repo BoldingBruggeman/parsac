@@ -318,7 +318,7 @@ class Runner:
     @staticmethod
     def start_all(*runners: "Runner") -> None:
         """Start the given runners and add them to the global active dictionary."""
-        logging.getLogger().setLevel(logging.ERROR)
+        logging.getLogger().setLevel(logging.WARNING)
         for r in runners:
             r.on_start()
             Runner.active[r.name] = r
