@@ -52,7 +52,9 @@ class Optimization(core.Experiment):
         if not self.components:
             raise Exception("No optimization targets defined.")
         await super().start()
-        result = await desolver.solve(self.get_lnl, self.minbounds, self.maxbounds, **kwargs)
+        result = await desolver.solve(
+            self.get_lnl, self.minbounds, self.maxbounds, **kwargs
+        )
         return self.unpack_parameters(result)
 
     async def get_lnl(self, values: np.ndarray) -> float:

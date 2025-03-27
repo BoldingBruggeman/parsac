@@ -1,14 +1,23 @@
-from typing import Optional, Union, Callable, Any, Iterable, TypeVar, Mapping, NamedTuple
+from typing import (
+    Optional,
+    Union,
+    Callable,
+    Any,
+    Iterable,
+    TypeVar,
+    Mapping,
+    NamedTuple,
+)
 import logging
 import functools
 import asyncio
-import multiprocessing
 import sys
-import mpi4py.futures
+import concurrent.futures
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
+import mpi4py.futures
 
 from . import record
 
@@ -188,7 +197,7 @@ class Experiment:
         max_workers: Optional[int] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
-        logging.basicConfig(level=logging.INFO)        
+        logging.basicConfig(level=logging.INFO)
         self.parameters: list[_TargetedParameter] = []
         self.runners: dict[str, Runner] = {}
         self.logger = logger or logging.getLogger(self.__class__.__name__)
@@ -196,10 +205,9 @@ class Experiment:
         if db_file is None:
             db_file = Path(sys.argv[0]).with_suffix(".results.db")
         self.recorder = record.Recorder(db_file)
-        if max_workers is None and not distributed:
-            max_workers = multiprocessing.cpu_count()
+        self.distributed = distributed
         self.max_workers = max_workers
-        self.pool: Optional[mpi4py.futures.MPIPoolExecutor] = None
+        self.pool: Optional[concurrent.futures.Executor] = None
 
     @property
     def minbounds(self) -> np.ndarray:
@@ -242,14 +250,21 @@ class Experiment:
 
     async def start(self) -> None:
         """Start the optimization or sensitivity analysis.
-        
+
         This starts all worker processes, performs a single evaluation with the
         median parameter values, and initializes the recorder. The evaluation
         serves as check that the runners (model configurations) are working
         correctly, and also to determine which outputs are available.
         """
-        self.pool = mpi4py.futures.MPIPoolExecutor(max_workers=self.max_workers,initializer=Runner.start_all,
-            initargs=(self.runners,), main=False)
+        kwargs = dict(
+            max_workers=self.max_workers,
+            initializer=Runner.start_all,
+            initargs=(self.runners,)
+        )
+        if self.distributed:
+            self.pool = mpi4py.futures.MPIPoolExecutor(**kwargs, main=False)
+        else:
+            self.pool = concurrent.futures.ProcessPoolExecutor(**kwargs)
 
         par_info = dict(
             names=[p.parameter.name for p in self.parameters],
