@@ -17,7 +17,10 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
-import mpi4py.futures
+try:
+    import mpi4py.futures
+except ImportError:
+    mpi4py = None
 
 from . import record
 
@@ -206,6 +209,10 @@ class Experiment:
             db_file = Path(sys.argv[0]).with_suffix(".results.db")
         self.recorder = record.Recorder(db_file)
         self.distributed = distributed
+        if distributed and mpi4py is None:
+            raise ImportError(
+                "mpi4py is not installed. Please install it to use distributed mode."
+            )
         self.max_workers = max_workers
         self.pool: Optional[concurrent.futures.Executor] = None
 
@@ -259,7 +266,7 @@ class Experiment:
         kwargs = dict(
             max_workers=self.max_workers,
             initializer=Runner.start_all,
-            initargs=(self.runners,)
+            initargs=(self.runners,),
         )
         if self.distributed:
             self.pool = mpi4py.futures.MPIPoolExecutor(**kwargs, main=False)

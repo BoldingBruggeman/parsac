@@ -103,7 +103,8 @@ class GaussianLikelihood:
             obs_vals: The observed values.
             sd: The standard deviation of the observed values.
             logscale: Whether to log-transform modelled and observed values
-                before calculating the likelihood.
+                before calculating the likelihood. This implies the distribution
+                of observations around the modelled values is log-normal.
             minimum: The minimum allowed value of the modelled and observed
                 values. Lower values will be clipped to this value.
             estimate_scale_factor: Whether to estimate the scale factor with which
