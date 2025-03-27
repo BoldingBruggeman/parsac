@@ -2,8 +2,9 @@ from typing import Optional, Union, Callable, Any, Iterable, TypeVar, Mapping, N
 import logging
 import functools
 import asyncio
-import concurrent.futures
+import multiprocessing
 import sys
+import mpi4py.futures
 from pathlib import Path
 
 import numpy as np
@@ -183,19 +184,22 @@ class Experiment:
         self,
         *,
         db_file: Optional[Union[str, Path]] = None,
+        distributed: bool = False,
         max_workers: Optional[int] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
         logging.basicConfig(level=logging.INFO)        
         self.parameters: list[_TargetedParameter] = []
-        self.runners: set[Runner] = set()
+        self.runners: dict[str, Runner] = {}
         self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.last_result: Optional[dict[str, Any]] = None
         if db_file is None:
             db_file = Path(sys.argv[0]).with_suffix(".results.db")
         self.recorder = record.Recorder(db_file)
+        if max_workers is None and not distributed:
+            max_workers = multiprocessing.cpu_count()
         self.max_workers = max_workers
-        self.executor: Optional[concurrent.futures.ProcessPoolExecutor] = None
+        self.pool: Optional[mpi4py.futures.MPIPoolExecutor] = None
 
     @property
     def minbounds(self) -> np.ndarray:
@@ -236,7 +240,7 @@ class Experiment:
         )
         return parameter
 
-    def start(self) -> None:
+    async def start(self) -> None:
         """Start the optimization or sensitivity analysis.
         
         This starts all worker processes, performs a single evaluation with the
@@ -244,11 +248,9 @@ class Experiment:
         serves as check that the runners (model configurations) are working
         correctly, and also to determine which outputs are available.
         """
-        self.executor = concurrent.futures.ProcessPoolExecutor(
-            max_workers=self.max_workers,
-            initializer=Runner.start_all,
-            initargs=tuple(self.runners),
-        )
+        self.pool = mpi4py.futures.MPIPoolExecutor(max_workers=self.max_workers,initializer=Runner.start_all,
+            initargs=(self.runners,), main=False)
+
         par_info = dict(
             names=[p.parameter.name for p in self.parameters],
             minimum=[p.minimum for p in self.parameters],
@@ -256,7 +258,7 @@ class Experiment:
             logscale=[p.fwt == np.log10 for p in self.parameters],
         )
         p = self.unpack_parameters(0.5 * (self.minbounds + self.maxbounds))
-        result = self.eval({})
+        result = await self.async_eval(p)
         self.recorder.start(p, result, {"parameters": par_info})
 
     def unpack_parameters(self, values: npt.NDArray[np.float64]) -> Mapping[str, float]:
@@ -299,11 +301,9 @@ class Experiment:
             values if isinstance(values, Mapping) else self.unpack_parameters(values)
         )
         self.logger.info(f"Running parameter set {name2value}.")
-        assert self.executor is not None
-        cor = [
-            self.executor.submit(Runner.run, r.name, name2value) for r in self.runners
-        ]
-        results = await asyncio.gather(*map(asyncio.wrap_future, cor))
+        assert self.pool is not None
+        futures = [self.pool.submit(Runner.run, r, name2value) for r in self.runners]
+        results = await asyncio.gather(*map(asyncio.wrap_future, futures))
         name2output: dict[str, Any] = {}
         for result in results:
             name2output.update(result)
@@ -319,12 +319,12 @@ class Runner:
     active: dict[str, "Runner"] = {}
 
     @staticmethod
-    def start_all(*runners: "Runner") -> None:
+    def start_all(runners: dict[str, "Runner"]) -> None:
         """Start the given runners and add them to the global active dictionary."""
         logging.getLogger().setLevel(logging.WARNING)
-        for r in runners:
+        for n, r in runners.items():
             r.on_start()
-            Runner.active[r.name] = r
+            Runner.active[n] = r
 
     @staticmethod
     def run(name: str, name2value: Mapping[str, float]) -> Mapping[str, Any]:

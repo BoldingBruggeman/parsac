@@ -31,7 +31,9 @@ class Optimization(core.Experiment):
                 It is typically produced by a runner.
             kwargs: Additional keyword arguments to pass to the likelihood function.
         """
-        self.runners.add(metric.runner)
+        if metric.runner.name in self.runners:
+            assert metric.runner is self.runners[metric.runner.name]
+        self.runners[metric.runner.name] = metric.runner
         if metric.sd is not None:
             kwargs.setdefault("sd", metric.sd)
         model_vals2lnl = GaussianLikelihood(metric.name, metric.obs_vals, **kwargs)
@@ -44,12 +46,13 @@ class Optimization(core.Experiment):
         Args:
             kwargs: Additional keyword arguments to pass to the solver.
         """
+        return asyncio.run(self.run_async(**kwargs))
+
+    async def run_async(self, **kwargs) -> Mapping[str, float]:
         if not self.components:
             raise Exception("No optimization targets defined.")
-        super().start()
-        result = asyncio.run(
-            desolver.solve(self.get_lnl, self.minbounds, self.maxbounds, **kwargs)
-        )
+        await super().start()
+        result = await desolver.solve(self.get_lnl, self.minbounds, self.maxbounds, **kwargs)
         return self.unpack_parameters(result)
 
     async def get_lnl(self, values: np.ndarray) -> float:
