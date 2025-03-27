@@ -14,9 +14,11 @@ import asyncio
 import sys
 import concurrent.futures
 from pathlib import Path
+import os
 
 import numpy as np
 import numpy.typing as npt
+
 try:
     import mpi4py.futures
 except ImportError:
@@ -196,7 +198,7 @@ class Experiment:
         self,
         *,
         db_file: Optional[Union[str, Path]] = None,
-        distributed: bool = False,
+        distributed: Optional[bool] = None,
         max_workers: Optional[int] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
@@ -208,6 +210,16 @@ class Experiment:
         if db_file is None:
             db_file = Path(sys.argv[0]).with_suffix(".results.db")
         self.recorder = record.Recorder(db_file)
+        if distributed is None:
+            distributed = "MPI4PY_FUTURES_MAX_WORKERS" in os.environ
+            if distributed:
+                self.logger.info(
+                    "Running in distributed mode as MPI4PY_FUTURES_MAX_WORKERS is set."
+                )
+            else:
+                self.logger.info(
+                    "Running locally as MPI4PY_FUTURES_MAX_WORKERS is not set."
+                )
         self.distributed = distributed
         if distributed and mpi4py is None:
             raise ImportError(
