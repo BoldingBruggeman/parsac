@@ -163,7 +163,7 @@ def readVariableFromTextFile(
     sds: list[float] = []
 
     def parse_line(line: str) -> None:
-        times.append(datetime.datetime.fromisoformat(line[:19]))
+        dt = datetime.datetime.fromisoformat(line[:19])
         data = line[20:].split()
         if format == TextFormat.DEPTH_EXPLICIT:
             # We now expect the z coordinate (<0 below surface)
@@ -174,6 +174,7 @@ def readVariableFromTextFile(
             if -z < mindepth or -z > maxdepth:
                 return
             zs.append(z)
+        times.append(dt)   # only append now that we know depth is in range
         item = data.pop(0)
         value = float(item)
         if not np.isfinite(value):
