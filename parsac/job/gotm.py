@@ -168,6 +168,7 @@ class Simulation(core.Runner):
         exclude_dirs: Iterable[str] = ("*",),
         work_dir: Optional[Union[os.PathLike[str], str]] = None,
         logger: Optional[logging.Logger] = None,
+        args: Iterable[str] = (),
     ):
         """
         Set up a GOTM simulation.
@@ -191,6 +192,7 @@ class Simulation(core.Runner):
             work_dir: working directory for the simulation.
                 If None, a temporary directory is created.
             logger: logger to use for diagnostic messages
+            args: additional arguments to pass to the GOTM executable
         """
         logging.basicConfig(level=logging.INFO)
         setup_dir = Path(setup_dir)
@@ -216,6 +218,7 @@ class Simulation(core.Runner):
         self.outputs: list[Output] = []
         self.output2extractor: dict[str, OutputExtractor] = {}
         self.logger = logger or logging.getLogger(name=self.name)
+        self.args = args
 
         gotmyaml = util.YAMLFile(setup_dir / "gotm.yaml")
         self.start_time: datetime.datetime = gotmyaml["time/start"]
@@ -224,7 +227,10 @@ class Simulation(core.Runner):
         self.parsed_yaml: dict[Path, util.YAMLFile] = {}
 
     def get_parameter(
-        self, file: Union[os.PathLike[str], str], variable_path: str, default: Any = None
+        self,
+        file: Union[os.PathLike[str], str],
+        variable_path: str,
+        default: Any = None,
     ) -> core.InitializedParameter:
         """
         Get a parameter from a YAML file.
@@ -406,7 +412,11 @@ class Simulation(core.Runner):
             yaml.save()
 
         returncode = util.run_program(
-            self.executable, self.work_dir, logger=self.logger, show_output=show_output
+            self.executable,
+            self.work_dir,
+            logger=self.logger,
+            show_output=show_output,
+            args=self.args,
         )
 
         if returncode != 0:

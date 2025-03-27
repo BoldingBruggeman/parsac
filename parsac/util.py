@@ -330,6 +330,7 @@ def run_program(
     logger: logging.Logger,
     use_shell: bool = False,
     show_output: bool = True,
+    args: Iterable[str] = (),
 ) -> int:
     """Run a program in a subprocess.
 
@@ -347,7 +348,7 @@ def run_program(
     logger.debug("Starting model run...")
 
     exe = str(executable)
-    args = [exe]
+    args = [exe] + list(args)
     if exe.endswith(".py"):
         args = [sys.executable] + args
         use_shell = False
