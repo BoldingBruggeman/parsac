@@ -28,7 +28,7 @@ def none_representer(self: yaml.Dumper, _: None) -> Any:
     return self.represent_scalar("tag:yaml.org,2002:null", "")
 
 
-yaml.add_representer(type(None), none_representer)
+yaml.SafeDumper.add_representer(type(None), none_representer)
 
 
 def get_md5(file_path: Path) -> str:
@@ -400,7 +400,7 @@ class YAMLFile:
 
     def save(self) -> None:
         with self.file.open("w", encoding="utf-8") as f:
-            yaml.dump(self.data, f, default_flow_style=False)
+            yaml.safe_dump(self.data, f, default_flow_style=False)
 
     def __getitem__(self, key: str) -> Any:
         path_comps = key.split("/")
