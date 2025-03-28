@@ -68,11 +68,8 @@ class Result:
                 self.iselect.append(i)
                 self.parnames.append(parname)
 
-        prefixes = [parnames.split(":", 1)[0] for parnames in self.parnames]
-        if all(prefix == prefixes[0] for prefix in prefixes):
-            self.prettyparnames = [
-                parnames.split(":", 1)[1] for parnames in self.parnames
-            ]
+        nprefix = len(os.path.commonprefix(self.parnames))
+        self.prettyparnames = [n[nprefix:] for n in self.parnames]
         self.npar = len(self.parnames)
 
         par_info = self.rec.config["parameters"]
@@ -249,12 +246,15 @@ def plot_best(db_file: Union[str, os.PathLike[Any]]) -> None:
     result = asyncio.run(pool(best, plot=True))
     print("Building plots...")
     plotters = [v for k, v in result.items() if k.endswith(":plotter")]
+    names = [plotter.name for plotter in plotters]
+    nprefix = len(os.path.commonprefix(names))
     nplot = len(plotters)
     nrows = int(np.ceil(np.sqrt(nplot)))
     ncols = int(np.ceil(float(nplot) / nrows))
     fig = plt.figure()
     ax = None
     for i, plotter in enumerate(plotters):
+        plotter.name = plotter.name[nprefix:]
         ax = fig.add_subplot(nrows, ncols, i + 1, sharex=ax)
         plotter.plot(ax=ax)
     plt.show()
