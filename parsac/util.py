@@ -31,46 +31,6 @@ def none_representer(self: yaml.Dumper, _: None) -> Any:
 yaml.SafeDumper.add_representer(type(None), none_representer)
 
 
-def get_md5(file_path: Path) -> str:
-    hash_md5 = hashlib.md5()
-    with file_path.open("rb") as f:
-        for chunk in iter(lambda: f.read(hash_md5.block_size), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-
-class CachedFile:
-    def __init__(self, file: Path, logger: logging.Logger, postfix: str = "") -> None:
-        self.md5 = get_md5(file)
-        self.file = file
-        self.cache = file.with_suffix(file.suffix + postfix + ".cache")
-        self.logger = logger
-
-    def load(self) -> Optional[Any]:
-        if not self.cache.is_file():
-            return None
-        with self.cache.open("rb") as f:
-            try:
-                oldmd5: str = pickle.load(f)
-                if oldmd5 == self.md5:
-                    self.logger.info(f"Loading cached copy of {self.file}...")
-                    return pickle.load(f)
-            except Exception:
-                pass
-        self.logger.info(
-            f"Failed to load cached copy of {self.file} - file will be reparsed."
-        )
-        return None
-
-    def save(self, data: Any) -> None:
-        try:
-            with self.cache.open("wb") as f:
-                pickle.dump(self.md5, f)
-                pickle.dump(data, f)
-        except Exception as e:
-            self.logger.warning(f"Unable to cache {self.file}. Reason: {e}")
-
-
 def backup_file(file: Path) -> Path:
     """Create a backup of a file by copying it to a new file with a .bck suffix.
 
@@ -175,7 +135,7 @@ def readVariableFromTextFile(
             if -z < mindepth or -z > maxdepth:
                 return
             zs.append(z)
-        times.append(dt)   # only append now that we know depth is in range
+        times.append(dt)  # only append now that we know depth is in range
         item = data.pop(0)
         value = float(item)
         if not np.isfinite(value):
@@ -363,7 +323,7 @@ def run_program(
         stderr=subprocess.STDOUT,
         shell=use_shell,
         universal_newlines=True,
-        **kwargs
+        **kwargs,
     )
     assert proc.stdout is not None
 
