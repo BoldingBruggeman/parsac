@@ -133,6 +133,7 @@ def copy_directory(
 class TextFormat(enum.Enum):
     DEPTH_EXPLICIT = 0
     DEPTH_INDEPENDENT = 1
+    GOTM_PROFILES = 2
 
 
 def readVariableFromTextFile(

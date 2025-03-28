@@ -1,4 +1,13 @@
-from typing import Optional, Union, Iterable, Any, Mapping, NamedTuple, TYPE_CHECKING
+from typing import (
+    Optional,
+    Union,
+    Iterable,
+    Any,
+    Mapping,
+    NamedTuple,
+    TYPE_CHECKING,
+    Sequence,
+)
 from pathlib import Path
 import os
 import logging
@@ -52,8 +61,20 @@ class OutputPlotter:
         else:
             vmin = min(self.values.min(), self.obs_values.min())
             vmax = max(self.values.max(), self.obs_values.max())
-            pc = ax.pcolormesh(self.times, self.zs, self.values.T, shading="auto", vmin=vmin, vmax=vmax)
-            ax.scatter(self.obs_times, self.obs_zs, s=10, c=self.obs_values, mec="k", vmin=vmin, vmax=vmax)
+            t = np.array(self.times, dtype="datetime64[s]")
+            t = np.broadcast_to(t[:, np.newaxis], self.zs.shape)
+            pc = ax.pcolormesh(
+                t, self.zs, self.values, shading="auto", vmin=vmin, vmax=vmax
+            )
+            ax.scatter(
+                self.obs_times,
+                self.obs_zs,
+                s=10,
+                c=self.obs_values,
+                ec="k",
+                vmin=vmin,
+                vmax=vmax,
+            )
             ax.figure.colorbar(pc, ax=ax)
         ax.set_title(self.name)
 
@@ -316,7 +337,6 @@ class Simulation(core.Runner):
         spinupyears: int = 0,
         mindepth: float = -np.inf,
         maxdepth: float = np.inf,
-        cache: bool = True,
     ) -> Optional[core.Comparison]:
         """
         Request comparison of model results and observations for a particular variable.
@@ -334,61 +354,55 @@ class Simulation(core.Runner):
                 when comparing model results to the observations
             mindepth: minimum depth of observations; shallowed observations are ignored
             maxdepth: maximum depth of observations; deeper observations are ignored
-            cache: whether to cache the parsed observations for faster access
         """
         output_file = Path(output_file)
         obs_file = Path(obs_file)
         name = f"{self.name}:{output_file}:{output_expression}={obs_file.relative_to(self.setup_dir)}"
 
-        blob = None
-        if cache:
-            postfix = "" if obs_variable is None else f".{obs_variable}"
-            cached_copy = util.CachedFile(obs_file, self.logger, postfix)
-            blob = cached_copy.load()
-
-        if isinstance(blob, tuple) and len(blob) == 4:
-            times, zs, values, sds = blob
-        else:
-            self.logger.info(
-                f"Reading observations for variable {name} from {obs_file}."
+        self.logger.info(
+            f"Reading observations for variable {name} from {obs_file}."
+        )
+        if not obs_file.is_file():
+            raise Exception(f"{obs_file} is not a file.")
+        if obs_file.suffix == ".nc":
+            if obs_variable is None:
+                raise Exception(
+                    "variable argument must be provided since {obs_file} is a NetCDF file."
+                )
+            times, zs, values = util.readVariableFromNcFile(
+                obs_file,
+                obs_variable,
+                depth_expression=obs_depth_variable,
+                logger=self.logger
             )
-            if not obs_file.is_file():
-                raise Exception(f"{obs_file} is not a file.")
-            if obs_file.suffix == ".nc":
-                if obs_variable is None:
-                    raise Exception(
-                        "variable argument must be provided since {obs_file} is a NetCDF file."
-                    )
-                times, zs, values = util.readVariableFromNcFile(
-                    obs_file,
-                    obs_variable,
-                    depth_expression=obs_depth_variable,
-                    logger=self.logger,
-                    mindepth=mindepth,
-                    maxdepth=maxdepth,
-                )
-                sds = None
-            else:
-                times, zs, values, sds = util.readVariableFromTextFile(
-                    obs_file,
-                    format=obs_file_format,
-                    logger=self.logger,
-                    mindepth=mindepth,
-                    maxdepth=maxdepth,
-                )
+            sds = None
+        elif obs_file_format == util.TextFormat.GOTM_PROFILES:
+            times, values, zs = read_profiles(obs_file)
+            sds = None
+        else:
+            times, zs, values, sds = util.readVariableFromTextFile(
+                obs_file,
+                format=obs_file_format,
+                logger=self.logger,
+                mindepth=mindepth,
+                maxdepth=maxdepth,
+            )
 
-            if cache:
-                cached_copy.save((times, zs, values, sds))
+        valid = np.ones(values.shape, dtype=bool)
+        if zs is not None:
+            valid &= (zs <= -mindepth) & (zs >= -maxdepth)
 
         # Filter out observations that lie outide simulated period (excluding spin-up)
         obs_start = self.start_time.replace(year=self.start_time.year + spinupyears)
-        valid = np.array([t >= obs_start and t <= self.stop_time for t in times])
+        valid &= [t >= obs_start and t <= self.stop_time for t in times]
+
         if not valid.any():
             self.logger.warning(
                 f"{name}: skipping because {obs_file} has no observations in "
                 f" simulated interval {obs_start} - {self.stop_time}."
             )
             return None
+
         times = [t for t, v in zip(times, valid) if v]
         if zs is not None:
             zs = zs[valid]
@@ -507,3 +521,41 @@ class Simulation(core.Runner):
             simple_results[k] = v
 
         return simple_results
+
+
+def read_profiles(
+    path: Union[os.PathLike[str], str], column: int = 0
+) -> tuple[Sequence[datetime.datetime], np.ndarray, np.ndarray]:
+    """Read GOTM observations in profile format
+
+    Args:
+        path: path to the GOTM profile file
+        column: column number to read (0-indexed)
+    """
+    dts = []
+    values = []
+    zs = []
+    ncol = None
+    with open(path) as f:
+        last_dt = None
+        while 1:
+            line = f.readline()
+            if line.startswith("#"):
+                continue
+            if not line:
+                break
+            dt = datetime.datetime.fromisoformat(line[:19])
+            assert last_dt is None or last_dt <= dt
+            items = line[20:].rstrip("\n").split()
+            n = int(items[0])
+            up = int(items[1]) == 1
+            for i in range(n):
+                line = f.readline()
+                if line.startswith("#"):
+                    continue
+                items = line.rstrip("\n").split()
+                zs.append(float(items.pop(0)))
+                assert ncol is None or len(items) == ncol
+                values.append(float(items[column]))
+                dts.append(dt)
+    return dts, np.array(values), np.array(zs)
