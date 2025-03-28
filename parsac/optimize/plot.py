@@ -245,18 +245,17 @@ def plot_best(db_file: Union[str, os.PathLike[Any]]) -> None:
     pool = core.RunnerPool(res.rec.config["runners"])
     result = asyncio.run(pool(best, plot=True))
     print("Building plots...")
-    plotters = [v for k, v in result.items() if k.endswith(":plotter")]
-    names = [plotter.name for plotter in plotters]
-    nprefix = len(os.path.commonprefix(names))
-    nplot = len(plotters)
-    nrows = int(np.ceil(np.sqrt(nplot)))
-    ncols = int(np.ceil(float(nplot) / nrows))
+    name2plotter = {k[:-8]: v for k, v in result.items() if k.endswith(":plotter")}
+    nprefix = len(os.path.commonprefix(list(name2plotter)))
+    n = len(name2plotter)
+    nrows = int(np.ceil(np.sqrt(n)))
+    ncols = int(np.ceil(float(n) / nrows))
     fig = plt.figure()
     ax = None
-    for i, plotter in enumerate(plotters):
-        plotter.name = plotter.name[nprefix:]
+    for i, (name, plotter) in enumerate(name2plotter.items()):
         ax = fig.add_subplot(nrows, ncols, i + 1, sharex=ax)
         plotter.plot(ax=ax)
+        ax.set_title(name[nprefix:])
     plt.show()
 
 

@@ -37,14 +37,12 @@ class Output(NamedTuple):
 class OutputPlotter:
     def __init__(
         self,
-        name: str,
         times: list[datetime.datetime],
         zs: Optional[np.ndarray],
         values: np.ndarray,
         obs_times: list[datetime.datetime],
         obs_zs: Optional[np.ndarray],
     ):
-        self.name = name
         self.times = times
         self.zs = zs
         self.values = values
@@ -76,7 +74,6 @@ class OutputPlotter:
                 vmax=vmax,
             )
             ax.figure.colorbar(pc, ax=ax)
-        ax.set_title(self.name)
 
 
 class OutputExtractor:
@@ -165,7 +162,7 @@ class OutputExtractor:
         times = netCDF4.num2date(wrappednc["time"], time_units)
         values = wrappednc.eval(self.compiled_expression)
         z = None if self.zs is None else self._get_z(wrappednc)
-        return OutputPlotter(self.name, times, z, values, self.times, self.zs)
+        return OutputPlotter(times, z, values, self.times, self.zs)
 
     def _get_z(self, wrappednc: util.NcDict) -> np.ndarray:
         """Get model depth coordinates
@@ -359,9 +356,7 @@ class Simulation(core.Runner):
         obs_file = Path(obs_file)
         name = f"{self.name}:{output_file}:{output_expression}={obs_file.relative_to(self.setup_dir)}"
 
-        self.logger.info(
-            f"Reading observations for variable {name} from {obs_file}."
-        )
+        self.logger.info(f"Reading observations for variable {name} from {obs_file}.")
         if not obs_file.is_file():
             raise Exception(f"{obs_file} is not a file.")
         if obs_file.suffix == ".nc":
@@ -373,7 +368,7 @@ class Simulation(core.Runner):
                 obs_file,
                 obs_variable,
                 depth_expression=obs_depth_variable,
-                logger=self.logger
+                logger=self.logger,
             )
             sds = None
         elif obs_file_format == util.TextFormat.GOTM_PROFILES:
