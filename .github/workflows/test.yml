@@ -33,7 +33,7 @@ jobs:
           submodules: 'recursive'
       - run: |
           conda install -c conda-forge fortran-compiler cmake netcdf-fortran
-          cmake -S gotm -B gotm/build
+          cmake -S gotm -B gotm/build -DCMAKE_POLICY_VERSION_MINIMUM=3.5
           cmake --build gotm/build --target install
           cd examples
           export PATH="$PATH:$HOME/local/gotm/bin"
