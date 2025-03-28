@@ -1,4 +1,4 @@
-from typing import Optional, Union, Iterable, Any, Mapping, NamedTuple
+from typing import Optional, Union, Iterable, Any, Mapping, NamedTuple, TYPE_CHECKING
 from pathlib import Path
 import os
 import logging
@@ -13,6 +13,9 @@ import netCDF4
 from .. import core
 from .. import util
 
+if TYPE_CHECKING:
+    import matplotlib.axes
+
 
 class Output(NamedTuple):
     name: str
@@ -20,6 +23,39 @@ class Output(NamedTuple):
     expression: str
     times: Optional[list[datetime.datetime]]
     zs: Optional[np.ndarray]
+
+
+class OutputPlotter:
+    def __init__(
+        self,
+        name: str,
+        times: list[datetime.datetime],
+        zs: Optional[np.ndarray],
+        values: np.ndarray,
+        obs_times: list[datetime.datetime],
+        obs_zs: Optional[np.ndarray],
+    ):
+        self.name = name
+        self.times = times
+        self.zs = zs
+        self.values = values
+        self.obs_times = obs_times
+        self.obs_zs = obs_zs
+        self.obs_values = None
+
+    def plot(self, ax: "matplotlib.axes.Axes") -> None:
+        """Plot the output data."""
+        if self.zs is None:
+            ax.plot(self.obs_times, self.obs_values, ".")
+            ax.plot(self.times, self.values, "-")
+            ax.grid()
+        else:
+            vmin = min(self.values.min(), self.obs_values.min())
+            vmax = max(self.values.max(), self.obs_values.max())
+            pc = ax.pcolormesh(self.times, self.zs, self.values.T, shading="auto", vmin=vmin, vmax=vmax)
+            ax.scatter(self.obs_times, self.obs_zs, s=10, c=self.obs_values, mec="k", vmin=vmin, vmax=vmax)
+            ax.figure.colorbar(pc, ax=ax)
+        ax.set_title(self.name)
 
 
 class OutputExtractor:
@@ -31,6 +67,7 @@ class OutputExtractor:
         self.ileft_weights: Optional[np.ndarray] = None
         self.iright_weights: Optional[np.ndarray] = None
         self.depth_dimension: Optional[str] = None
+        self.times = output.times
         self.zs = output.zs
         self.name = output.name
         self.logger = logger
@@ -102,6 +139,27 @@ class OutputExtractor:
 
         return values
 
+    def get_plotter(self, wrappednc: util.NcDict) -> OutputPlotter:
+        time_units: str = wrappednc.nc.variables["time"].units
+        times = netCDF4.num2date(wrappednc["time"], time_units)
+        values = wrappednc.eval(self.compiled_expression)
+        z = None if self.zs is None else self._get_z(wrappednc)
+        return OutputPlotter(self.name, times, z, values, self.times, self.zs)
+
+    def _get_z(self, wrappednc: util.NcDict) -> np.ndarray:
+        """Get model depth coordinates
+        (currently expressed as elevation relative to water surface)
+        """
+        h = wrappednc["h"]
+        h = h.reshape(h.shape[:2])
+        h_cumsum = h.cumsum(axis=1)
+        if self.depth_dimension == "z":
+            # Centres (all)
+            return h_cumsum - h_cumsum[:, -1:] - 0.5 * h
+        else:
+            # Interfaces (all except bottom)
+            return h_cumsum - h_cumsum[:, -1:]
+
     def _interpolate(self, values: np.ndarray, wrappednc: util.NcDict) -> np.ndarray:
         assert self.numtimes is not None
         assert self.ileft is not None
@@ -116,17 +174,7 @@ class OutputExtractor:
                 + values[self.iright] * self.iright_weights
             )
 
-        # Get model depth coordinates
-        # (currently expressed as elevation relative to water surface)
-        h = wrappednc["h"]
-        h = h.reshape(h.shape[:2])
-        h_cumsum = h.cumsum(axis=1)
-        if self.depth_dimension == "z":
-            # Centres (all)
-            zs_model = h_cumsum - h_cumsum[:, -1:] - 0.5 * h
-        else:
-            # Interfaces (all except bottom)
-            zs_model = h_cumsum - h_cumsum[:, -1:]
+        zs_model = self._get_z(wrappednc)
 
         # Interpolate in depth
         model_vals = np.empty(self.numtimes.shape)
@@ -398,7 +446,10 @@ class Simulation(core.Runner):
         return core.Metric(name, self)
 
     def __call__(
-        self, name2value: Mapping[str, float], show_output: bool = False
+        self,
+        name2value: Mapping[str, float],
+        show_output: bool = False,
+        plot: bool = False,
     ) -> Mapping[str, Any]:
         assert self.work_dir is not None
 
@@ -439,12 +490,14 @@ class Simulation(core.Runner):
                 )
             extractor = self.output2extractor[output.name]
             results[output.name] = extractor(wrappednc)
+            if plot:
+                results[output.name + ":plotter"] = extractor.get_plotter(wrappednc)
 
         for wrappednc in outputpath2nc.values():
             wrappednc.finalize()
 
         for transform in self.transforms:
-            transform(self.logger, results)
+            transform(self.logger, results, plot)
 
         simple_results = {}
         for k, v in results.items():

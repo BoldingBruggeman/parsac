@@ -1,6 +1,7 @@
 from typing import Optional, Any, Union
 from pathlib import Path
 import os
+import asyncio
 
 from matplotlib import pyplot as plt
 import matplotlib.artist
@@ -9,6 +10,7 @@ from matplotlib import animation
 import numpy as np
 
 from .. import record
+from .. import core
 
 
 def _get_marginal(
@@ -66,7 +68,7 @@ class Result:
             ]
         self.npar = len(self.parnames)
 
-        par_info = list(self.rec.run_info.values())[0]["info"]["parameters"]
+        par_info = self.rec.config["parameters"]
         self.parmin = dict(zip(par_info["names"], par_info["minimum"]))
         self.parmax = dict(zip(par_info["names"], par_info["maximum"]))
         self.parlog = dict(zip(par_info["names"], par_info["logscale"]))
@@ -231,13 +233,36 @@ def plot(
     # Show figure and wait until the user closes it.
     plt.show()
 
+def plot_best(db_file: Union[str, os.PathLike[Any]]) -> None:
+    res = Result(db_file)
+    best = {n: float(v) for n, v in zip(res.parnames, res.best)}
+    print("Evaluating best parameter set...")
+    pool = core.RunnerPool(res.rec.config["runners"])
+    result = asyncio.run(pool(best, plot=True))
+    print("Building plots...")
+    plotters = [v for k, v in result.items() if k.endswith(":plotter")]
+    nplot = len(plotters)
+    nrows = int(np.ceil(np.sqrt(nplot)))
+    ncols = int(np.ceil(float(nplot) / nrows))    
+    fig, axes = plt.subplots(nrows, ncols)
+    axes = np.ravel(axes)
+    for i, plotter in enumerate(plotters):
+        ax = axes[i]
+        plotter.plot(ax=ax)
+    plt.show()
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--best", action="store_true", help="Show current best result"
+    )
+    parser.add_argument(
         "db_file", help="SQLite database file with optimization results"
     )
     args = parser.parse_args()
-    plot(args.db_file, keep_updating=True)
+    if args.best:
+        plot_best(args.db_file)
+    else:
+        plot(args.db_file, keep_updating=True)

@@ -2,7 +2,7 @@ import sqlite3
 import os
 from typing import Any, Mapping, Union, Optional, Iterable, Sequence
 from pathlib import Path
-import json
+import pickle
 
 import numpy as np
 
@@ -19,42 +19,50 @@ def _get_sqlite_type(value: Any) -> str:
 
 
 class Recorder:
-    def __init__(self, file: Union[os.PathLike[Any], str]):
+    def __init__(self, file: Union[os.PathLike[Any], str]) -> None:
         self.file = Path(file)
+        self.create = not self.file.is_file()
         self.conn = sqlite3.connect(self.file, detect_types=sqlite3.PARSE_DECLTYPES)
         self.run_id: Optional[int] = None
 
     def start(
-        self, parameters: Mapping[str, Any], output: Mapping[str, Any], info: Any
+        self,
+        parameters: Mapping[str, Any],
+        output: Mapping[str, Any],
+        config: Mapping[str, Any],
     ) -> None:
-        self.conn.execute(
-            """CREATE TABLE IF NOT EXISTS "runs" (
-            id INTEGER PRIMARY KEY,
-            time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            info TEXT
-            )
-        """
-        )
+        if self.create:
+            columns = [f'"{k}" {_get_sqlite_type(v)}' for k, v in config.items()]
+            self.conn.execute(f'CREATE TABLE "config" ({", ".join(columns)})')
+            keys = ", ".join(f'"{k}"' for k in config)
+            values = [pickle.dumps(v) for v in config.values()]
+            qs = ", ".join('?' for _ in values)
+            self.conn.execute(f"INSERT INTO config ({keys}) VALUES ({qs})", values)
 
-        cursor = self.conn.execute(
-            "INSERT INTO runs (info) VALUES (?)", (json.dumps(info),)
-        )
+            self.conn.execute(
+                """CREATE TABLE "runs" (
+                id INTEGER PRIMARY KEY,
+                time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+            pcolumns = [
+                f'"{k}" {_get_sqlite_type(v)} NOT NULL' for k, v in parameters.items()
+            ]
+            ocolumns = [f'"{k}" {_get_sqlite_type(v)}' for k, v in output.items()]
+            combined_columns = ", ".join(pcolumns + ocolumns)
+            self.conn.execute(
+                f"""CREATE TABLE "results" (
+                id INTEGER PRIMARY KEY,
+                run_id INTEGER,
+                {combined_columns}
+                )
+            """
+            )
+
+        cursor = self.conn.execute("INSERT INTO runs DEFAULT VALUES")
         self.run_id = cursor.lastrowid
         assert self.run_id is not None
-
-        pcolumns = [
-            f'"{k}" {_get_sqlite_type(v)} NOT NULL' for k, v in parameters.items()
-        ]
-        ocolumns = [f'"{k}" {_get_sqlite_type(v)}' for k, v in output.items()]
-        combined_columns = ", ".join(pcolumns + ocolumns)
-        self.conn.execute(
-            f"""CREATE TABLE IF NOT EXISTS "results" (
-            id INTEGER PRIMARY KEY,
-            run_id INTEGER,
-            {combined_columns}
-            )
-        """
-        )
 
         self.conn.commit()
 
@@ -86,12 +94,11 @@ class Recorder:
             yield row
 
     @property
-    def run_info(self) -> Mapping[int, Any]:
-        cursor = self.conn.execute("SELECT * FROM runs")
-        result = {}
-        for row in cursor:
-            result[row[0]] = dict(info=json.loads(row[2]))
-        return result
+    def config(self) -> Mapping[str, Any]:
+        """Global experiment configuration."""
+        cursor = self.conn.execute("SELECT * FROM config")
+        row = cursor.fetchone()
+        return {d[0]: pickle.loads(v) for d, v in zip(cursor.description, row)}
 
     def to_ndarray(self) -> np.ndarray:
         """Convert the results table to a numpy array."""

@@ -27,8 +27,102 @@ except ImportError:
 from . import record
 
 
+class Runner:
+    def __init__(self, name: str):
+        self.name = name
+        self.transforms: list[
+            Callable[[logging.Logger, dict[str, Any], bool], None]
+        ] = []
+
+    def __call__(self, name2value: Mapping[str, float]) -> Mapping[str, Any]:
+        raise NotImplementedError
+
+    def on_start(self) -> None:
+        pass
+
+
+class RunnerPool:
+    active: dict[str, Runner] = {}
+
+    def __init__(
+        self,
+        runners: Mapping[str, Runner],
+        *,
+        distributed: Optional[bool] = None,
+        max_workers: Optional[int] = None,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        logging.basicConfig(level=logging.INFO)
+        logger = logger or logging.getLogger(self.__class__.__name__)
+        if distributed is None:
+            distributed = "MPI4PY_FUTURES_MAX_WORKERS" in os.environ
+            if distributed:
+                logger.info(
+                    "Running in distributed mode as MPI4PY_FUTURES_MAX_WORKERS is set."
+                )
+            else:
+                logger.info("Running locally as MPI4PY_FUTURES_MAX_WORKERS is not set.")
+        if distributed and mpi4py is None:
+            raise ImportError(
+                "mpi4py is not installed. Please install it to use distributed mode."
+            )
+
+        self.runners = runners
+        kwargs = dict(
+            max_workers=max_workers,
+            initializer=self._init,
+            initargs=(tuple(runners.values()),),
+        )
+        self.executor: concurrent.futures.Executor
+        if distributed:
+            self.executor = mpi4py.futures.MPIPoolExecutor(**kwargs, main=False)
+        else:
+            self.executor = concurrent.futures.ProcessPoolExecutor(**kwargs)
+
+    async def __call__(
+        self, name2value: Mapping[str, float], **kwargs
+    ) -> Mapping[str, Any]:
+        futures = [
+            self.executor.submit(self._run, r, name2value, **kwargs)
+            for r in self.runners
+        ]
+        results = await asyncio.gather(*map(asyncio.wrap_future, futures))
+        name2output: dict[str, Any] = {}
+        for result in results:
+            name2output.update(result)
+        return name2output
+
+    @staticmethod
+    def _init(runners: Iterable[Runner]) -> None:
+        """Start the given runners on this worker and add them to the runner's
+        active dictionary.
+
+        Args:
+            runners: The runners to start.
+        """
+        logging.getLogger().setLevel(logging.WARNING)
+        for r in runners:
+            r.on_start()
+            RunnerPool.active[r.name] = r
+
+    @staticmethod
+    def _run(name: str, name2value: Mapping[str, float], **kwargs) -> Mapping[str, Any]:
+        """Run the runner with the given name and parameter values.
+        All runners must be started on this worker with _init before calling
+        this function.
+
+        Args:
+            name: The name of the runner to run.
+            name2value: The parameter values to use.
+
+        Returns:
+            The output of the runner.
+        """
+        return RunnerPool.active[name](name2value, **kwargs)
+
+
 class Metric:
-    def __init__(self, name: str, runner: "Runner"):
+    def __init__(self, name: str, runner: Runner):
         self.name = name
         self.runner = runner
 
@@ -40,7 +134,7 @@ class Comparison(Metric):
     def __init__(
         self,
         name: str,
-        runner: "Runner",
+        runner: Runner,
         obs_vals: np.ndarray,
         sd: Optional[Union[float, np.ndarray]] = None,
     ):
@@ -210,23 +304,9 @@ class Experiment:
         if db_file is None:
             db_file = Path(sys.argv[0]).with_suffix(".results.db")
         self.recorder = record.Recorder(db_file)
-        if distributed is None:
-            distributed = "MPI4PY_FUTURES_MAX_WORKERS" in os.environ
-            if distributed:
-                self.logger.info(
-                    "Running in distributed mode as MPI4PY_FUTURES_MAX_WORKERS is set."
-                )
-            else:
-                self.logger.info(
-                    "Running locally as MPI4PY_FUTURES_MAX_WORKERS is not set."
-                )
         self.distributed = distributed
-        if distributed and mpi4py is None:
-            raise ImportError(
-                "mpi4py is not installed. Please install it to use distributed mode."
-            )
         self.max_workers = max_workers
-        self.pool: Optional[concurrent.futures.Executor] = None
+        self.pool: Optional[RunnerPool] = None
 
     @property
     def minbounds(self) -> np.ndarray:
@@ -275,15 +355,9 @@ class Experiment:
         serves as check that the runners (model configurations) are working
         correctly, and also to determine which outputs are available.
         """
-        kwargs = dict(
-            max_workers=self.max_workers,
-            initializer=Runner.start_all,
-            initargs=(self.runners,),
+        self.pool = RunnerPool(
+            self.runners, distributed=self.distributed, max_workers=self.max_workers
         )
-        if self.distributed:
-            self.pool = mpi4py.futures.MPIPoolExecutor(**kwargs, main=False)
-        else:
-            self.pool = concurrent.futures.ProcessPoolExecutor(**kwargs)
 
         par_info = dict(
             names=[p.parameter.name for p in self.parameters],
@@ -293,7 +367,8 @@ class Experiment:
         )
         p = self.unpack_parameters(0.5 * (self.minbounds + self.maxbounds))
         result = await self.async_eval(p)
-        self.recorder.start(p, result, {"parameters": par_info})
+        config = dict(parameters=par_info, runners=self.runners)
+        self.recorder.start(p, result, config)
 
     def unpack_parameters(self, values: npt.NDArray[np.float64]) -> Mapping[str, float]:
         """Unpack the vector with parameter values into a dictionary
@@ -335,44 +410,10 @@ class Experiment:
             values if isinstance(values, Mapping) else self.unpack_parameters(values)
         )
         self.logger.info(f"Running parameter set {name2value}.")
-        assert self.pool is not None
-        futures = [self.pool.submit(Runner.run, r, name2value) for r in self.runners]
-        results = await asyncio.gather(*map(asyncio.wrap_future, futures))
-        name2output: dict[str, Any] = {}
-        for result in results:
-            name2output.update(result)
+        name2output = await self.pool(name2value)
         self.add_global_metrics(name2value, name2output)
         self.recorder.record(name2value, name2output)
         return name2output
 
     def eval(self, values: Union[Mapping[str, float], np.ndarray]) -> Mapping[str, Any]:
         return asyncio.run(self.async_eval(values))
-
-
-class Runner:
-    active: dict[str, "Runner"] = {}
-
-    @staticmethod
-    def start_all(runners: dict[str, "Runner"]) -> None:
-        """Start the given runners and add them to the global active dictionary."""
-        logging.getLogger().setLevel(logging.WARNING)
-        for n, r in runners.items():
-            r.on_start()
-            Runner.active[n] = r
-
-    @staticmethod
-    def run(name: str, name2value: Mapping[str, float]) -> Mapping[str, Any]:
-        """Run the runner with the given name and parameter values.
-        The runner must be started with start_all before calling this method.
-        """
-        return Runner.active[name](name2value)
-
-    def __init__(self, name: str):
-        self.name = name
-        self.transforms: list[Callable[[logging.Logger, dict[str, Any]], None]] = []
-
-    def __call__(self, name2value: Mapping[str, float]) -> Mapping[str, Any]:
-        raise NotImplementedError
-
-    def on_start(self) -> None:
-        pass

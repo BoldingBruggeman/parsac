@@ -37,7 +37,7 @@ class Optimization(core.Experiment):
         if metric.sd is not None:
             kwargs.setdefault("sd", metric.sd)
         model_vals2lnl = GaussianLikelihood(metric.name, metric.obs_vals, **kwargs)
-        self.components.append(metric.name + ":lnl")
+        self.components.append(model_vals2lnl.name)
         metric.runner.transforms.append(model_vals2lnl)
 
     def run(self, **kwargs: Any) -> Mapping[str, float]:
@@ -144,7 +144,7 @@ class GaussianLikelihood:
         self.max_scale_factor = max_scale_factor
         self.scale_factor = scale_factor
 
-    def __call__(self, logger: logging.Logger, name2output: dict[str, Any]) -> None:
+    def __call__(self, logger: logging.Logger, name2output: dict[str, Any], plot: bool=False) -> None:
         model_vals = name2output.pop(self.source)
         obs_vals = self.obs_vals
         assert model_vals.shape == obs_vals.shape
@@ -207,3 +207,6 @@ class GaussianLikelihood:
         # Note: this assumes normally distributed errors
         # Omitting constant terms in the log likelihood = -n*ln(2*pi)/2
         name2output[self.name] = (-np.log(sd) - diff2 / (2 * sd * sd)).sum()
+
+        if plot:
+            name2output[self.source + ":plotter"].obs_values = obs_vals
