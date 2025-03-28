@@ -60,7 +60,14 @@ class Result:
         if not db_path.exists():
             raise FileNotFoundError(f"Database file {db_file} not found.")
         self.rec = record.Recorder(db_path)
-        self.parnames = self.prettyparnames = self.rec.headers[2:-1]
+
+        self.iselect = []
+        self.parnames = []
+        for i, parname in enumerate(self.rec.headers[:-1]):
+            if not parname.endswith(":lnl") and i >= 2:
+                self.iselect.append(i)
+                self.parnames.append(parname)
+
         prefixes = [parnames.split(":", 1)[0] for parnames in self.parnames]
         if all(prefix == prefixes[0] for prefix in prefixes):
             self.prettyparnames = [
@@ -95,7 +102,7 @@ class Result:
         res = res[self.order, :]
         self.lnls = res[:, -1]
         self.run_ids = res[:, 1]
-        self.values = res[:, 2:-1]
+        self.values = res[:, self.iselect]
 
         # Show best parameter set
         self.maxlnl = self.lnls[-1]
@@ -233,6 +240,7 @@ def plot(
     # Show figure and wait until the user closes it.
     plt.show()
 
+
 def plot_best(db_file: Union[str, os.PathLike[Any]]) -> None:
     res = Result(db_file)
     best = {n: float(v) for n, v in zip(res.parnames, res.best)}
@@ -243,21 +251,20 @@ def plot_best(db_file: Union[str, os.PathLike[Any]]) -> None:
     plotters = [v for k, v in result.items() if k.endswith(":plotter")]
     nplot = len(plotters)
     nrows = int(np.ceil(np.sqrt(nplot)))
-    ncols = int(np.ceil(float(nplot) / nrows))    
-    fig, axes = plt.subplots(nrows, ncols)
-    axes = np.ravel(axes)
+    ncols = int(np.ceil(float(nplot) / nrows))
+    fig = plt.figure()
+    ax = None
     for i, plotter in enumerate(plotters):
-        ax = axes[i]
+        ax = fig.add_subplot(nrows, ncols, i + 1, sharex=ax)
         plotter.plot(ax=ax)
     plt.show()
+
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--best", action="store_true", help="Show current best result"
-    )
+    parser.add_argument("--best", action="store_true", help="Show current best result")
     parser.add_argument(
         "db_file", help="SQLite database file with optimization results"
     )
