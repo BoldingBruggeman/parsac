@@ -78,6 +78,7 @@ class RunnerPool:
             self.executor = mpi4py.futures.MPIPoolExecutor(**kwargs, main=False)
         else:
             self.executor = concurrent.futures.ProcessPoolExecutor(**kwargs)
+        logger.info(f"Using {self.executor._max_workers} workers.")
 
     async def __call__(
         self, name2value: Mapping[str, float], **kwargs
@@ -366,6 +367,7 @@ class Experiment:
             logscale=[p.fwt == np.log10 for p in self.parameters],
         )
         p = self.unpack_parameters(0.5 * (self.minbounds + self.maxbounds))
+        self.logger.info(f"Running single initial evaluation with median parameter (in serial).")
         result = await self.async_eval(p)
         config = dict(parameters=par_info, runners=self.runners)
         self.recorder.start(p, result, config)

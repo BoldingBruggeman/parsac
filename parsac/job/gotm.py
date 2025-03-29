@@ -355,7 +355,7 @@ class Simulation(core.Runner):
         obs_file = Path(obs_file)
         name = f"{self.name}:{output_file}:{output_expression}={obs_file.relative_to(self.setup_dir)}"
 
-        self.logger.info(f"Reading observations for variable {name} from {obs_file}.")
+        self.logger.debug(f"Reading observations for variable {name} from {obs_file}.")
         if not obs_file.is_file():
             raise Exception(f"{obs_file} is not a file.")
         if obs_file.suffix == ".nc":
