@@ -43,10 +43,10 @@ class OutputPlotter:
         obs_times: list[datetime.datetime],
         obs_zs: Optional[np.ndarray],
     ):
-        self.times = times
+        self.times = np.array(times, dtype="datetime64[s]")
         self.zs = zs
         self.values = values
-        self.obs_times = obs_times
+        self.obs_times = np.array(obs_times, dtype="datetime64[s]")
         self.obs_zs = obs_zs
         self.obs_values = None
 
@@ -59,10 +59,9 @@ class OutputPlotter:
         else:
             vmin = min(self.values.min(), self.obs_values.min())
             vmax = max(self.values.max(), self.obs_values.max())
-            t = np.array(self.times, dtype="datetime64[s]")
-            t = np.broadcast_to(t[:, np.newaxis], self.zs.shape)
+            times = np.broadcast_to(self.times[:, np.newaxis], self.zs.shape)
             pc = ax.pcolormesh(
-                t, self.zs, self.values, shading="auto", vmin=vmin, vmax=vmax
+                times, self.zs, self.values, shading="auto", vmin=vmin, vmax=vmax
             )
             ax.scatter(
                 self.obs_times,
