@@ -39,6 +39,32 @@ python -m parsac.optimize.plot <DBFILE>
 Here, `<DBFILE>` is the result database created by the optimization.
 By default, it has the name of the run script, with `.results.db` appended instead of `.py`.
 
+### On HPC clusters
+
+Parsac uses MPI for communication, which it accesse via [mpi4py](https://mpi4py.readthedocs.io/en/stable/). Therefore, mpi4py needs to be installed in your conda environment. If your system has MPI libraries installed,
+then you'll want to install mpi4py with:
+
+```
+conda activate parsac
+pip install mpi4py
+```
+
+This builds mpi4py against your existing MPI libraries. More information about installing mpi4py can be found [here](https://mpi4py.readthedocs.io/en/stable/install.html).
+
+Alternatively, if you do not have any MPI libraries on your system yet (`mpiexec` and `mpirun` commands are not available), you can install mpi4py with:
+
+```
+conda install -c conda-forge mpi4py
+```
+
+To run a parsac experiment in parallel, you need to specify how many workers you will use (the MPI "universe size") via environment variable `MPI4PY_FUTURES_MAX_WORKERS`. You then start the calibration with a single MPI process, like this:
+
+```
+export MPI4PY_FUTURES_MAX_WORKERS=<NWORKERS>
+mpiexec -n 1 python <RUNSCRIPT>
+```
+
+
 ## GOTM - file formats
 
 Observations for GOTM must be provided as a whitespace-separated (e.g., tab-separated)
