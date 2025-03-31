@@ -57,7 +57,7 @@ Alternatively, if you do not have any MPI libraries on your system yet (`mpiexec
 conda install -c conda-forge mpi4py
 ```
 
-To run a parsac experiment in parallel, you need to specify how many workers you will use (the MPI "universe size") via environment variable `MPI4PY_FUTURES_MAX_WORKERS`. You then start the calibration with a single MPI process, like this:
+To run a parsac experiment in parallel, you need to specify how many workers (CPU cores) you will use (the MPI "universe size") via environment variable `MPI4PY_FUTURES_MAX_WORKERS`. You then start the calibration with a single MPI process, like this:
 
 ```
 export MPI4PY_FUTURES_MAX_WORKERS=<NWORKERS>
