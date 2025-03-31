@@ -8,4 +8,3 @@ dependencies:
   - matplotlib
   - netcdf4
   - scipy
-  - mpi4py
