@@ -333,18 +333,13 @@ if __name__ == "__main__":
         "db_file", help="SQLite database file with optimization results"
     )
     args = parser.parse_args()
-    result = Result(args.db_file)
+    result = Result(args.db_file, skip_inferred=args.skip_inferred)
     args.marg |= result.generations is None
     plot_type = PlotType.MARGINAL if args.marg else PlotType.GENERATIONS
     if args.best:
         fig = result.plot_best()
     else:
-        fig = result.plot(
-            keep_updating=True,
-            plot_type=plot_type,
-            lnl_range=args.range,
-            skip_inferred=args.skip_inferred,
-        )
+        fig = result.plot(keep_updating=True, plot_type=plot_type, lnl_range=args.range)
 
     # Show figure and wait until the user closes it.
     plt.show()
