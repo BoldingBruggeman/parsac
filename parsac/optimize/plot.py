@@ -326,14 +326,24 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--best", action="store_true", help="Show current best result")
-    parser.add_argument("--marg", action="store_true")
-    parser.add_argument("--range", type=float, default=None)
-    parser.add_argument("--skip_inferred", action="store_true")
+    parser.add_argument(
+        "--marg",
+        action="store_true",
+        help="Plot marginal likelihood rather than generations",
+    )
+    parser.add_argument(
+        "--range", type=float, default=None, help="Likelihood range for marginal plot"
+    )
+    parser.add_argument(
+        "--primary_only",
+        action="store_true",
+        help="Only plot primary parameters (no inferred parameters, no extra scalar outputs)",
+    )
     parser.add_argument(
         "db_file", help="SQLite database file with optimization results"
     )
     args = parser.parse_args()
-    result = Result(args.db_file, skip_inferred=args.skip_inferred)
+    result = Result(args.db_file, skip_inferred=args.primary_only)
     args.marg |= result.generations is None
     plot_type = PlotType.MARGINAL if args.marg else PlotType.GENERATIONS
     if args.best:
