@@ -15,7 +15,7 @@ def _get_sqlite_type(value: Any) -> str:
     elif isinstance(value, str):
         return "TEXT"
     else:
-        return "BLOB"
+        raise NotImplementedError(f"Unsupported type {type(value)}")
 
 
 class Recorder:
@@ -27,16 +27,16 @@ class Recorder:
 
     def start(
         self,
-        parameters: Mapping[str, Any],
-        output: Mapping[str, Any],
         config: Mapping[str, Any],
+        required: Mapping[str, Any],
+        optional: Mapping[str, Any],
     ) -> None:
         if self.create:
-            columns = [f'"{k}" {_get_sqlite_type(v)}' for k, v in config.items()]
+            columns = [f'"{k}" BLOB' for k in config]
             self.conn.execute(f'CREATE TABLE "config" ({", ".join(columns)})')
             keys = ", ".join(f'"{k}"' for k in config)
             values = [pickle.dumps(v) for v in config.values()]
-            qs = ", ".join('?' for _ in values)
+            qs = ", ".join("?" for _ in values)
             self.conn.execute(f"INSERT INTO config ({keys}) VALUES ({qs})", values)
 
             self.conn.execute(
@@ -46,15 +46,16 @@ class Recorder:
                 )
             """
             )
-            pcolumns = [
-                f'"{k}" {_get_sqlite_type(v)} NOT NULL' for k, v in parameters.items()
+            req_columns = [
+                f'"{k}" {_get_sqlite_type(v)} NOT NULL' for k, v in required.items()
             ]
-            ocolumns = [f'"{k}" {_get_sqlite_type(v)}' for k, v in output.items()]
-            combined_columns = ", ".join(pcolumns + ocolumns)
+            opt_columns = [f'"{k}" {_get_sqlite_type(v)}' for k, v in optional.items()]
+            combined_columns = ", ".join(req_columns + opt_columns)
             self.conn.execute(
                 f"""CREATE TABLE "results" (
                 id INTEGER PRIMARY KEY,
-                run_id INTEGER,
+                run_id INTEGER NOT NULL,
+                exception TEXT,
                 {combined_columns}
                 )
             """
@@ -66,17 +67,18 @@ class Recorder:
 
         self.conn.commit()
 
-    def record(self, parameters: Mapping[str, Any], output: Mapping[str, Any]) -> None:
+    def record(self, exception: Optional[Exception], **fields: Any) -> None:
         if self.run_id is None:
             return
-        items = {"run_id": self.run_id, **parameters, **output}
+        if exception is not None:
+            fields["exception"] = repr(exception)
         self.conn.execute(
             f"""
             INSERT INTO results
-            ({", ".join(f'"{k}"' for k in items)})
-            VALUES ({", ".join('?' for _ in items)})
+            ("run_id"{''.join(f', "{k}"' for k in fields)})
+            VALUES (?{', ?' * len(fields)})
         """,
-            list(items.values()),
+            [self.run_id] + list(fields.values()),
         )
         self.conn.commit()
 
@@ -86,10 +88,9 @@ class Recorder:
         cursor = self.conn.execute("PRAGMA table_info(results)")
         return [info[1] for info in cursor]
 
-    @property
-    def rows(self) -> Iterable[Iterable[Any]]:
+    def rows(self, where: str = "") -> Iterable[Iterable[Any]]:
         """Iterate over the rows of the results table."""
-        cursor = self.conn.execute("SELECT * FROM results")
+        cursor = self.conn.execute(f"SELECT * FROM results {where}")
         for row in cursor:
             yield row
 
@@ -100,9 +101,9 @@ class Recorder:
         row = cursor.fetchone()
         return {d[0]: pickle.loads(v) for d, v in zip(cursor.description, row)}
 
-    def to_ndarray(self) -> np.ndarray:
+    def to_ndarray(self, where: str = "") -> np.ndarray:
         """Convert the results table to a numpy array."""
-        return np.array(list(self.rows), dtype=float)
+        return np.array(list(self.rows(where)), dtype=float)
 
     def to_text(self, file: Union[os.PathLike[Any], str], sep: str = "\t") -> None:
         """Write the results table to a text file.
@@ -113,8 +114,24 @@ class Recorder:
         """
         with open(file, "w") as f:
             f.write(sep.join(self.headers) + "\n")
-            for row in self.rows:
-                f.write(sep.join(map(str, row)) + "\n")
+            for row in self.rows():
+                values = ["" if v is None else str(v) for v in row]
+                f.write(sep.join(values) + "\n")
 
     def close(self) -> None:
         self.conn.close()
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dump")
+    parser.add_argument(
+        "db_file", help="SQLite database file with optimization results"
+    )
+    args = parser.parse_args()
+    rec = Recorder(args.db_file)
+    print(f"{rec.file} contains {len(list(rec.rows()))} rows.")
+    if args.dump:
+        rec.to_text(args.dump, sep="\t")
+        print(f"Dumped results table to {args.dump}.")

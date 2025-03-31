@@ -22,6 +22,7 @@ class Optimization(core.Experiment):
         """
         super().__init__(**kwargs)
         self.components: list[str] = []
+        self.row_metadata["generation"] = 0
 
     def add_target(self, metric: core.Comparison, **kwargs: Any) -> None:
         """Add a contribution to the fitness (log-likelihood) function.
@@ -49,18 +50,21 @@ class Optimization(core.Experiment):
         return asyncio.run(self.run_async(**kwargs))
 
     async def run_async(self, **kwargs) -> Mapping[str, float]:
+        def cb(igen_finished: int) -> None:
+            self.row_metadata["generation"] = igen_finished + 1
+
         if not self.components:
             raise Exception("No optimization targets defined.")
         await super().start()
         result = await desolver.solve(
-            self.get_lnl, self.minbounds, self.maxbounds, **kwargs
+            self.get_lnl, self.minbounds, self.maxbounds, callback=cb, **kwargs
         )
         return self.unpack_parameters(result)
 
     async def get_lnl(self, values: np.ndarray) -> float:
         """Calculate the log-likelihood of a parameter set."""
         try:
-            results = await self.async_eval(self.unpack_parameters(values))
+            results = await self.async_eval(values)
         except Exception as e:
             self.logger.error(f"Error evaluating parameters: {e}")
             return -np.inf
@@ -144,7 +148,9 @@ class GaussianLikelihood:
         self.max_scale_factor = max_scale_factor
         self.scale_factor = scale_factor
 
-    def __call__(self, logger: logging.Logger, name2output: dict[str, Any], plot: bool=False) -> None:
+    def __call__(
+        self, logger: logging.Logger, name2output: dict[str, Any], plot: bool = False
+    ) -> None:
         model_vals = name2output.pop(self.source)
         obs_vals = self.obs_vals
         assert model_vals.shape == obs_vals.shape

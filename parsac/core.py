@@ -7,6 +7,7 @@ from typing import (
     TypeVar,
     Mapping,
     NamedTuple,
+    TYPE_CHECKING,
 )
 import logging
 import functools
@@ -25,6 +26,9 @@ except ImportError:
     mpi4py = None
 
 from . import record
+
+if TYPE_CHECKING:
+    import matplotlib.axes
 
 
 class Runner:
@@ -75,7 +79,7 @@ class RunnerPool:
         )
         self.executor: concurrent.futures.Executor
         if distributed:
-            self.executor = mpi4py.futures.MPIPoolExecutor(**kwargs, main=False)
+            self.executor = mpi4py.futures.MPIPoolExecutor(**kwargs)
         else:
             self.executor = concurrent.futures.ProcessPoolExecutor(**kwargs)
         logger.info(f"Using {self.executor._max_workers} workers.")
@@ -308,6 +312,7 @@ class Experiment:
         self.distributed = distributed
         self.max_workers = max_workers
         self.pool: Optional[RunnerPool] = None
+        self.row_metadata: dict[str, Any] = {}
 
     @property
     def minbounds(self) -> np.ndarray:
@@ -367,10 +372,12 @@ class Experiment:
             logscale=[p.fwt == np.log10 for p in self.parameters],
         )
         p = self.unpack_parameters(0.5 * (self.minbounds + self.maxbounds))
-        self.logger.info(f"Running single initial evaluation with median parameter (in serial).")
+        self.logger.info(
+            f"Running single initial evaluation with median parameter set (in serial)."
+        )
         result = await self.async_eval(p)
         config = dict(parameters=par_info, runners=self.runners)
-        self.recorder.start(p, result, config)
+        self.recorder.start(config, self.row_metadata | p, result)
 
     def unpack_parameters(self, values: npt.NDArray[np.float64]) -> Mapping[str, float]:
         """Unpack the vector with parameter values into a dictionary
@@ -412,10 +419,30 @@ class Experiment:
             values if isinstance(values, Mapping) else self.unpack_parameters(values)
         )
         self.logger.info(f"Running parameter set {name2value}.")
-        name2output = await self.pool(name2value)
-        self.add_global_metrics(name2value, name2output)
-        self.recorder.record(name2value, name2output)
+        exception: Optional[Exception] = None
+        try:
+            name2output = await self.pool(name2value)
+            self.add_global_metrics(name2value, name2output)
+        except Exception as e:
+            exception = e
+            name2output = {}
+            raise
+        finally:
+            self.recorder.record(
+                exception=exception, **name2value, **name2output, **self.row_metadata
+            )
         return name2output
 
     def eval(self, values: Union[Mapping[str, float], np.ndarray]) -> Mapping[str, Any]:
         return asyncio.run(self.async_eval(values))
+
+
+class Plotter:
+    def __init__(
+        self, sharex: Optional["Plotter"] = None, sharey: Optional["Plotter"] = None
+    ):
+        self.sharex = sharex
+        self.sharey = sharey
+
+    def plot(self, ax: "matplotlib.axes.Axes") -> None:
+        raise NotImplementedError

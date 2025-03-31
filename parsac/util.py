@@ -292,7 +292,7 @@ def run_program(
     use_shell: bool = False,
     show_output: bool = True,
     args: Iterable[str] = (),
-) -> int:
+):
     """Run a program in a subprocess.
 
     Args:
@@ -340,11 +340,7 @@ def run_program(
     if proc.returncode != 0:
         last_lines = stdout_data.rsplit("\n", 10)[-10:]
         last_output = "\n".join([f"> {line}" for line in last_lines])
-        logger.warning(
-            f"{exe} returned non-zero code {proc.returncode}."
-            f" An error must have occured. Last output:\n{last_output}"
-        )
-    return proc.returncode
+        raise Exception(f"{exe} returned non-zero code {proc.returncode}.", last_output)
 
 
 class YAMLFile:

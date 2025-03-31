@@ -1,5 +1,14 @@
 import logging
-from typing import Optional, Callable, Awaitable, Iterable, Iterator, overload, Union, Sequence
+from typing import (
+    Optional,
+    Callable,
+    Awaitable,
+    Iterable,
+    Iterator,
+    overload,
+    Union,
+    Sequence,
+)
 import asyncio
 
 import numpy as np
@@ -24,6 +33,7 @@ async def solve(
     logger: Optional[logging.Logger] = None,
     enforce_bounds: bool = True,
     seed: Optional[Union[int, Sequence[int]]] = None,
+    callback: Optional[Callable[[int], None]] = None,
 ) -> np.ndarray[tuple[int], np.dtype[np.float64]]:
     """
     Solve an optimization problem using the Differential Evolution algorithm.
@@ -46,6 +56,8 @@ async def solve(
             prescribed initial range [minbounds, maxbounds]
         seed: seed for random number generator.
             It will be used to initialize numpy.random.SeedSequence.
+        callback: function to call after each generation.
+            It should take the generation number as an argument.
 
     Returns:
         The optimal parameter vector.
@@ -96,7 +108,9 @@ async def solve(
             " to any of the parameters."
         )
 
-    def draw(exclude: Iterable[int] = ()) -> Iterator[np.ndarray[tuple[int], np.dtype[np.float64]]]:
+    def draw(
+        exclude: Iterable[int] = (),
+    ) -> Iterator[np.ndarray[tuple[int], np.dtype[np.float64]]]:
         """Draws n vectors at random from the population, ensuring they
         do not overlap.
         """
@@ -110,7 +124,7 @@ async def solve(
             yield population[i]
             excluded.append(i)
 
-    def check_ready(msg: str) -> bool:
+    def check_ready(igen: int, msg: str) -> bool:
         curminpar = population.min(axis=0)
         curmaxpar = population.max(axis=0)
         currange = curmaxpar - curminpar
@@ -123,9 +137,12 @@ async def solve(
         logger.debug(f"  Tolerance: {', '.join([f'{v:.2e}' for v in tol])}")
         logger.debug(f"  Fitness range: {frange}")
 
+        if callback is not None:
+            callback(igen)
+
         return (currange <= tol).all() and frange <= ftol
 
-    if check_ready("Initial population"):
+    if check_ready(0, "Initial population"):
         return population[ibest]
 
     for igeneration in range(maxgen):
@@ -179,7 +196,7 @@ async def solve(
         # Next default ancestor is current best
         ancestor = population[ibest]
 
-        if check_ready(f"Finished generation {igeneration + 1}"):
+        if check_ready(igeneration + 1, f"Finished generation {igeneration + 1}"):
             break
     else:
         logger.warning(f"No convergence within the maximum {maxgen} generations.")

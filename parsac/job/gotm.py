@@ -30,11 +30,11 @@ class Output(NamedTuple):
     name: str
     file: Path
     expression: str
-    times: Optional[list[datetime.datetime]]
-    zs: Optional[np.ndarray]
+    times: Optional[list[datetime.datetime]] = None
+    zs: Optional[np.ndarray] = None
 
 
-class OutputPlotter:
+class OutputPlotter(core.Plotter):
     def __init__(
         self,
         times: list[datetime.datetime],
@@ -42,13 +42,21 @@ class OutputPlotter:
         values: np.ndarray,
         obs_times: list[datetime.datetime],
         obs_zs: Optional[np.ndarray],
+        previous: dict[str, "OutputPlotter"],
     ):
+        super().__init__(
+            sharex=previous.get("t"),
+            sharey=None if zs is None else previous.get("tz"),
+        )
         self.times = np.array(times, dtype="datetime64[s]")
         self.zs = zs
         self.values = values
         self.obs_times = np.array(obs_times, dtype="datetime64[s]")
         self.obs_zs = obs_zs
         self.obs_values = None
+        previous["t"] = self
+        if zs is not None:
+            previous["tz"] = self
 
     def plot(self, ax: "matplotlib.axes.Axes") -> None:
         """Plot the output data."""
@@ -148,20 +156,27 @@ class OutputExtractor:
                     f" but found {data.ndim} dimensions."
                 )
 
-    def __call__(self, wrappednc: util.NcDict) -> np.ndarray:
+    def __call__(
+        self,
+        wrappednc: util.NcDict,
+        name2output: dict[str, Any],
+        plot: bool,
+        previous: dict[str, OutputPlotter],
+    ):
         values = wrappednc.eval(self.compiled_expression)
 
         if self.numtimes is not None:
+            if plot:
+                time_units: str = wrappednc.nc.variables["time"].units
+                times = netCDF4.num2date(wrappednc["time"], time_units)
+                values = wrappednc.eval(self.compiled_expression)
+                z = None if self.zs is None else self._get_z(wrappednc)
+                plotter = OutputPlotter(times, z, values, self.times, self.zs, previous)
+                name2output[self.name + ":plotter"] = plotter
+
             values = self._interpolate(values, wrappednc)
 
-        return values
-
-    def get_plotter(self, wrappednc: util.NcDict) -> OutputPlotter:
-        time_units: str = wrappednc.nc.variables["time"].units
-        times = netCDF4.num2date(wrappednc["time"], time_units)
-        values = wrappednc.eval(self.compiled_expression)
-        z = None if self.zs is None else self._get_z(wrappednc)
-        return OutputPlotter(times, z, values, self.times, self.zs)
+        name2output[self.name] = values
 
     def _get_z(self, wrappednc: util.NcDict) -> np.ndarray:
         """Get model depth coordinates
@@ -450,7 +465,7 @@ class Simulation(core.Runner):
         """
         output_file = Path(output_file)
         name = f"{self.name}:{output_file}:{output_expression}"
-        self.outputs.append(Output(name, output_file, output_expression, None, None))
+        self.outputs.append(Output(name, output_file, output_expression))
         return core.Metric(name, self)
 
     def __call__(
@@ -470,16 +485,13 @@ class Simulation(core.Runner):
         for yaml in update_yaml:
             yaml.save()
 
-        returncode = util.run_program(
+        util.run_program(
             self.executable,
             self.work_dir,
             logger=self.logger,
             show_output=show_output,
             args=self.args,
         )
-
-        if returncode != 0:
-            raise Exception(f"Simulation failed with return code {returncode}.")
 
         outputpath2nc: dict[Path, util.NcDict] = {}
         for output in self.outputs:
@@ -489,6 +501,7 @@ class Simulation(core.Runner):
             outputpath2nc[output.file] = util.NcDict(ncpath)
 
         results: dict[str, Optional[Union[float, np.ndarray]]] = {}
+        previous_plotters: dict[str, OutputPlotter] = {}
         for output in self.outputs:
             wrappednc = outputpath2nc[output.file]
 
@@ -497,9 +510,7 @@ class Simulation(core.Runner):
                     output, wrappednc, self.logger
                 )
             extractor = self.output2extractor[output.name]
-            results[output.name] = extractor(wrappednc)
-            if plot:
-                results[output.name + ":plotter"] = extractor.get_plotter(wrappednc)
+            extractor(wrappednc, results, plot, previous_plotters)
 
         for wrappednc in outputpath2nc.values():
             wrappednc.finalize()

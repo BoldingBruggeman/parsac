@@ -1,16 +1,24 @@
-from typing import Optional, Any, Union
+from typing import Optional, Any, Union, Mapping
 from pathlib import Path
 import os
 import asyncio
+import enum
+import sys
 
 from matplotlib import pyplot as plt
 import matplotlib.artist
 import matplotlib.axes
+import matplotlib.figure
 from matplotlib import animation
 import numpy as np
 
 from .. import record
 from .. import core
+
+
+class PlotType(enum.Enum):
+    MARGINAL = enum.auto()
+    GENERATIONS = enum.auto()
 
 
 def _get_marginal(
@@ -63,8 +71,9 @@ class Result:
 
         self.iselect = []
         self.parnames = []
+        SKIP_COLS = ("id", "run_id", "exception", "generation")
         for i, parname in enumerate(self.rec.headers[:-1]):
-            if not parname.endswith(":lnl") and i >= 2:
+            if not parname.endswith(":lnl") and parname not in SKIP_COLS:
                 self.iselect.append(i)
                 self.parnames.append(parname)
 
@@ -86,9 +95,16 @@ class Result:
         """Number of rows in the results table."""
         return self.values.shape[0]
 
+    def get_errors(self) -> list[str]:
+        iex = self.rec.headers.index("exception")
+        exceptions = []
+        for r in self.rec.rows(where="WHERE exception IS NOT NULL"):
+            exceptions.append(r[iex])
+        return exceptions
+
     def update(self) -> int:
         """Update the results from the database."""
-        res = self.rec.to_ndarray()
+        res = self.rec.to_ndarray(where="WHERE exception IS NULL")
 
         newcount = res.shape[0] - self._lastcount
         if newcount == 0:
@@ -98,7 +114,12 @@ class Result:
         self.order = res[:, -1].argsort()
         res = res[self.order, :]
         self.lnls = res[:, -1]
-        self.run_ids = res[:, 1]
+        self.run_ids = res[:, 1].astype(int)
+        if "generation" in self.rec.headers:
+            icol = self.rec.headers.index("generation")
+            self.generations = res[:, icol].astype(int)
+        else:
+            self.generations = None
         self.values = res[:, self.iselect]
 
         # Show best parameter set
@@ -129,134 +150,160 @@ class Result:
             for parname, value in zip(self.parnames, self.best):
                 f.write(f"{parname}{sep}{value}\n")
 
+    def plot(
+        self,
+        lnl_range: Optional[float] = None,
+        bincount: int = 25,
+        keep_updating: bool = False,
+        save: Optional[Union[str, os.PathLike[Any]]] = None,
+        plot_type: PlotType = PlotType.MARGINAL,
+    ) -> matplotlib.figure.Figure:
+        if lnl_range is not None:
+            lnl_range = abs(lnl_range)
 
-def plot(
-    db_file: Union[str, os.PathLike[Any]],
-    lnl_range: Optional[float] = None,
-    bincount: int = 25,
-    keep_updating: bool = False,
-    save: Optional[Union[str, os.PathLike[Any]]] = None,
-) -> None:
-    res = Result(db_file)
+        artists: list[matplotlib.artist.Artist] = []
 
-    if lnl_range is not None:
-        lnl_range = abs(lnl_range)
+        def update(frame: Optional[int] = None):
+            n_new = self.update()
+            first_time = not artists
+            if n_new == 0 and not first_time:
+                return
 
-    artists: list[matplotlib.artist.Artist] = []
+            if not first_time:
+                print(f" {n_new} found.")
 
-    def update(frame: Optional[int] = None):
-        n_new = res.update()
-        first_time = not artists
-        if n_new == 0 and not first_time:
-            return
+            # Clear previous points and lines and reset color cycle
+            # We do preserve axes limits and titles.
+            for a in artists:
+                a.remove()
+            artists.clear()
+            for ax in axes:
+                ax.set_prop_cycle(None)
 
-        if not first_time:
-            print(f"  {n_new} found.")
-
-        # Clear previous points and lines and reset color cycle
-        # We do preserve axes limits and titles.
-        for a in artists:
-            a.remove()
-        artists.clear()
-        for ax in axes:
-            ax.set_prop_cycle(None)
-
-        lci, uci = res.get_confidence_interval()
-        print(
-            f"Best parameter set is # {res.order[-1]} with ln likelihood = {res.maxlnl:.6g}:"
-        )
-        for parname, value, l, u in zip(res.prettyparnames, res.best, lci, uci):
-            print(f"  {parname}: {value:.6g} ({l:.6g} - {u:.6g})")
-
-        if save is not None:
-            print(f"Writing best parameter set to {save}...")
-            res.save_best(save)
-
-        # For each run, print max lnl and add points to each parameter plot
-        print("Points per run:")
-        for run_id in sorted(set(res.run_ids)):
-            match = res.run_ids == run_id
-            curres = res.values[match, :]
-            lnl = res.lnls[match]
-            print(f"  {run_id}: {match.sum()} points, best lnl = {lnl.max():.8g}.")
-            for ipar, ax in enumerate(axes):
-                (points,) = ax.plot(curres[:, ipar], lnl, ".", label=run_id)
-                artists.append(points)
-
-        for ipar, (name, lbound, rbound, ax) in enumerate(
-            zip(res.parnames, lci, uci, axes)
-        ):
-            # Plot marginal
-            logscale = res.parlog.get(name, False)
-            margx, margy = _get_marginal(
-                res.values[:, ipar], res.lnls, logscale, bincount
+            lci, uci = self.get_confidence_interval()
+            print(
+                f"Best parameter set is # {self.order[-1]} with ln likelihood = {self.maxlnl:.6g}:"
             )
-            (line_marg,) = ax.plot(margx, margy, "-k", label="_nolegend_")
+            for parname, value, l, u in zip(self.prettyparnames, self.best, lci, uci):
+                print(f"  {parname}: {value:.6g} ({l:.6g} - {u:.6g})")
 
-            # Show confidence interval
-            line_cil = ax.axvline(lbound, color="k", linestyle="--")
-            line_cir = ax.axvline(rbound, color="k", linestyle="--")
+            if save is not None:
+                print(f"Writing best parameter set to {save}...")
+                self.save_best(save)
 
-            artists.extend([line_marg, line_cil, line_cir])
+            # For each run, print max lnl and add points to each parameter plot
+            print("Points per run:")
+            for run_id in sorted(set(self.run_ids)):
+                match = self.run_ids == run_id
+                curres = self.values[match, :]
+                lnl = self.lnls[match]
+                gen = self.generations[match]
+                print(f"  {run_id}: {match.sum()} points, best lnl = {lnl.max():.8g}.")
+                for ipar, ax in enumerate(axes):
+                    if plot_type == plot_type.MARGINAL:
+                        (points,) = ax.plot(curres[:, ipar], lnl, ".", label=run_id)
+                    else:
+                        (points,) = ax.plot(
+                            gen, curres[:, ipar], ".", alpha=0.5, label=run_id
+                        )
 
-        if first_time:
-            # First time we are plotting - put finishing touches on subplots
-            cur_lnl_range = res.maxlnl - res.lnls[0] if lnl_range is None else lnl_range
-            for name, title, ax in zip(res.parnames, res.prettyparnames, axes):
-                ax.set_title(title)
-                ax.set_xlim(res.parmin.get(name), res.parmax.get(name))
-                ax.set_ylim(
-                    res.maxlnl - cur_lnl_range, ymax=res.maxlnl + 0.1 * cur_lnl_range
+                    artists.append(points)
+
+            for ipar, (name, lbound, rbound, ax) in enumerate(
+                zip(self.parnames, lci, uci, axes)
+            ):
+                if plot_type == PlotType.MARGINAL:
+                    # Plot marginal
+                    logscale = self.parlog.get(name, False)
+                    margx, margy = _get_marginal(
+                        self.values[:, ipar], self.lnls, logscale, bincount
+                    )
+                    (line_marg,) = ax.plot(margx, margy, "-k", label="_nolegend_")
+                    artists.append(line_marg)
+
+                plotci = ax.axhline if plot_type == PlotType.GENERATIONS else ax.axvline
+                line_cil = plotci(lbound, color="k", linestyle="--")
+                line_cir = plotci(rbound, color="k", linestyle="--")
+                artists.extend([line_cil, line_cir])
+
+            if first_time:
+                cur_lnl_range = (
+                    self.maxlnl - self.lnls[0] if lnl_range is None else lnl_range
                 )
-                if res.parlog.get(name, False):
-                    ax.set_xscale("log")
+                for name, title, ax in zip(self.parnames, self.prettyparnames, axes):
+                    ax.set_title(title)
+                    if plot_type == PlotType.GENERATIONS:
+                        ax.set_ylim(self.parmin.get(name), self.parmax.get(name))
+                        if self.parlog.get(name, False):
+                            ax.set_yscale("log")
+                    else:
+                        ax.set_xlim(self.parmin.get(name), self.parmax.get(name))
+                        ax.set_ylim(
+                            self.maxlnl - cur_lnl_range,
+                            ymax=self.maxlnl + 0.1 * cur_lnl_range,
+                        )
+                        if self.parlog.get(name, False):
+                            ax.set_xscale("log")
 
+            if keep_updating:
+                print("Waiting for new results...", end="", flush=True)
+
+        fig = plt.figure(figsize=(12, 8))
+        fig.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=0.3)
+        nrow = int(np.ceil(np.sqrt(0.5 * self.npar)))
+        ncol = int(np.ceil(float(self.npar) / nrow))
+
+        # Create subplots
+        ax: Optional[matplotlib.axes.Axes] = None
+        axes: list[matplotlib.axes.Axes] = []
+        share = "x" if plot_type == PlotType.GENERATIONS else "y"
+        for ipar in range(self.npar):
+            kwargs = {f"share{share}": ax}
+            ax = fig.add_subplot(nrow, ncol, ipar + 1, **kwargs)
+            axes.append(ax)
+
+        update()
         if keep_updating:
-            print("Waiting for new results...", end="", flush=True)
+            self._anim = animation.FuncAnimation(
+                fig, update, interval=5000, cache_frame_data=False
+            )
+        return fig
 
-    fig = plt.figure(figsize=(12, 8))
-    fig.subplots_adjust(left=0.075, right=0.95, top=0.95, bottom=0.05, hspace=0.3)
-    nrow = int(np.ceil(np.sqrt(0.5 * res.npar)))
-    ncol = int(np.ceil(float(res.npar) / nrow))
+    def plot_best(self) -> matplotlib.figure.Figure:
+        print("Evaluating best parameter set...")
+        best = {n: float(v) for n, v in zip(self.parnames, self.best)}
+        pool = core.RunnerPool(self.rec.config["runners"])
+        name2output = asyncio.run(pool(best, plot=True))
 
-    # Create subplots
-    ax: Optional[matplotlib.axes.Axes] = None
-    axes: list[matplotlib.axes.Axes] = []
-    for ipar in range(res.npar):
-        ax = fig.add_subplot(nrow, ncol, ipar + 1, sharey=ax)
-        axes.append(ax)
+        print("Building plots...")
+        name2plotter = _collect_plotters(name2output)
+        nprefix = len(os.path.commonprefix(list(name2plotter)))
+        n = len(name2plotter)
+        nrows = int(np.ceil(np.sqrt(n)))
+        ncols = int(np.ceil(float(n) / nrows))
+        fig = plt.figure()
+        id2ax = {}
+        for i, (name, plotter) in enumerate(name2plotter.items()):
+            ax = fig.add_subplot(
+                nrows,
+                ncols,
+                i + 1,
+                sharex=id2ax.get(id(plotter.sharex)),
+                sharey=id2ax.get(id(plotter.sharey)),
+            )
+            plotter.plot(ax=ax)
+            ax.set_title(name[nprefix:])
+            id2ax[id(plotter)] = ax
+        return fig
 
-    update()
-    if keep_updating:
-        anim = animation.FuncAnimation(
-            fig, update, interval=5000, cache_frame_data=False
-        )
-    else:
-        fig.savefig("estimates.png", dpi=300)
 
-    # Show figure and wait until the user closes it.
-    plt.show()
-
-
-def plot_best(db_file: Union[str, os.PathLike[Any]]) -> None:
-    res = Result(db_file)
-    best = {n: float(v) for n, v in zip(res.parnames, res.best)}
-    print("Evaluating best parameter set...")
-    pool = core.RunnerPool(res.rec.config["runners"])
-    result = asyncio.run(pool(best, plot=True))
-    print("Building plots...")
-    name2plotter = {k[:-8]: v for k, v in result.items() if k.endswith(":plotter")}
-    nprefix = len(os.path.commonprefix(list(name2plotter)))
-    n = len(name2plotter)
-    nrows = int(np.ceil(np.sqrt(n)))
-    ncols = int(np.ceil(float(n) / nrows))
-    fig = plt.figure()
-    ax = None
-    for i, (name, plotter) in enumerate(name2plotter.items()):
-        ax = fig.add_subplot(nrows, ncols, i + 1, sharex=ax)
-        plotter.plot(ax=ax)
-        ax.set_title(name[nprefix:])
-    plt.show()
+def _collect_plotters(name2output: Mapping[str, Any]) -> dict[str, core.Plotter]:
+    """Collect plotters from the output."""
+    name2plotter = {}
+    for name, output in name2output.items():
+        if isinstance(output, core.Plotter):
+            name2plotter[name.rsplit(":", 1)[0]] = output
+    return name2plotter
 
 
 if __name__ == "__main__":
@@ -264,11 +311,19 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--best", action="store_true", help="Show current best result")
+    parser.add_argument("--marg", action="store_true")
+    parser.add_argument("--range", type=float, default=None)
     parser.add_argument(
         "db_file", help="SQLite database file with optimization results"
     )
     args = parser.parse_args()
+    result = Result(args.db_file)
+    args.marg |= result.generations is None
+    plot_type = PlotType.MARGINAL if args.marg else PlotType.GENERATIONS
     if args.best:
-        plot_best(args.db_file)
+        fig = result.plot_best()
     else:
-        plot(args.db_file, keep_updating=True)
+        fig = result.plot(keep_updating=True, plot_type=plot_type, lnl_range=args.range)
+
+    # Show figure and wait until the user closes it.
+    plt.show()
