@@ -200,7 +200,8 @@ class Result:
                 match = self.run_ids == run_id
                 curres = self.values[match, :]
                 lnl = self.lnls[match]
-                gen = self.generations[match]
+                if plot_type != plot_type.MARGINAL:
+                    gen = self.generations[match]
                 print(f"  {run_id}: {match.sum()} points, best lnl = {lnl.max():.8g}.")
                 for ipar, ax in enumerate(axes):
                     if plot_type == plot_type.MARGINAL:
