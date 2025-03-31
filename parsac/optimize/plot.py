@@ -63,28 +63,37 @@ LNL_CRIT = 1.920729410347062  # 0.5 * scipy.stats.chi2.ppf(0.95, 1)
 
 
 class Result:
-    def __init__(self, db_file: Union[str, os.PathLike[Any]]):
+    def __init__(
+        self,
+        db_file: Union[str, os.PathLike[Any]],
+        skip_lnl: bool = True,
+        skip_inferred=False,
+    ):
         db_path = Path(db_file)
         if not db_path.exists():
             raise FileNotFoundError(f"Database file {db_file} not found.")
         self.rec = record.Recorder(db_path)
 
+        par_info = self.rec.config["parameters"]
+        self.parmin = dict(zip(par_info["names"], par_info["minimum"]))
+        self.parmax = dict(zip(par_info["names"], par_info["maximum"]))
+        self.parlog = dict(zip(par_info["names"], par_info["logscale"]))
+
         self.iselect = []
         self.parnames = []
-        SKIP_COLS = ("id", "run_id", "exception", "generation")
-        for i, parname in enumerate(self.rec.headers[:-1]):
-            if not parname.endswith(":lnl") and parname not in SKIP_COLS:
+        SKIP_COLS = {"id", "run_id", "exception", "generation", "lnl"}
+        if skip_lnl:
+            SKIP_COLS.update(n for n in self.rec.headers if n.endswith(":lnl"))
+        if skip_inferred:
+            SKIP_COLS.update(n for n in self.rec.headers if n not in par_info["names"])
+        for i, parname in enumerate(self.rec.headers):
+            if parname not in SKIP_COLS:
                 self.iselect.append(i)
                 self.parnames.append(parname)
 
         nprefix = len(os.path.commonprefix(self.parnames))
         self.prettyparnames = [n[nprefix:] for n in self.parnames]
         self.npar = len(self.parnames)
-
-        par_info = self.rec.config["parameters"]
-        self.parmin = dict(zip(par_info["names"], par_info["minimum"]))
-        self.parmax = dict(zip(par_info["names"], par_info["maximum"]))
-        self.parlog = dict(zip(par_info["names"], par_info["logscale"]))
 
         self._lastcount = 0
 
@@ -319,6 +328,7 @@ if __name__ == "__main__":
     parser.add_argument("--best", action="store_true", help="Show current best result")
     parser.add_argument("--marg", action="store_true")
     parser.add_argument("--range", type=float, default=None)
+    parser.add_argument("--skip_inferred", action="store_true")
     parser.add_argument(
         "db_file", help="SQLite database file with optimization results"
     )
@@ -329,7 +339,12 @@ if __name__ == "__main__":
     if args.best:
         fig = result.plot_best()
     else:
-        fig = result.plot(keep_updating=True, plot_type=plot_type, lnl_range=args.range)
+        fig = result.plot(
+            keep_updating=True,
+            plot_type=plot_type,
+            lnl_range=args.range,
+            skip_inferred=args.skip_inferred,
+        )
 
     # Show figure and wait until the user closes it.
     plt.show()
