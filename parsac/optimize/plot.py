@@ -104,7 +104,10 @@ class Result:
 
     def update(self) -> int:
         """Update the results from the database."""
-        res = self.rec.to_ndarray(where="WHERE exception IS NULL")
+        where = ""
+        if "exception" in self.rec.headers:
+            where = "WHERE exception IS NULL"
+        res = self.rec.to_ndarray(where=where)
 
         newcount = res.shape[0] - self._lastcount
         if newcount == 0:
