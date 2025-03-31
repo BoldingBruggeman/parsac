@@ -51,7 +51,7 @@ pip install mpi4py
 
 This builds mpi4py against your existing MPI libraries. More information about installing mpi4py can be found [here](https://mpi4py.readthedocs.io/en/stable/install.html).
 
-Alternatively, if you do not have any MPI libraries on your system yet (`mpiexec` and `mpirun` commands are not available), you can install mpi4py with:
+Alternatively, if you do not have any MPI libraries on your system yet (`mpiexec` and `mpirun` commands are not available), you can install both MPI and mpi4py with:
 
 ```
 conda install -c conda-forge mpi4py
