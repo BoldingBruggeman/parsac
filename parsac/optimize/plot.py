@@ -276,6 +276,8 @@ class Result:
     def plot_best(self) -> matplotlib.figure.Figure:
         print("Evaluating best parameter set...")
         best = {n: float(v) for n, v in zip(self.parnames, self.best)}
+        for n, v in best.items():
+            print(f"  {n}: {v:.6g}")
         pool = core.RunnerPool(self.rec.config["runners"])
         name2output = asyncio.run(pool(best, plot=True))
 
