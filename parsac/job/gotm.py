@@ -53,18 +53,20 @@ class OutputPlotter(core.Plotter):
         self.values = values
         self.obs_times = np.array(obs_times, dtype="datetime64[s]")
         self.obs_zs = obs_zs
-        self.obs_values = None
+        self.obs_values: Optional[np.ndarray] = None
         previous["t"] = self
         if zs is not None:
             previous["tz"] = self
 
     def plot(self, ax: "matplotlib.axes.Axes") -> None:
         """Plot the output data."""
+        assert self.obs_values is not None
         if self.zs is None:
             ax.plot(self.obs_times, self.obs_values, ".")
             ax.plot(self.times, self.values, "-")
             ax.grid()
         else:
+            assert self.obs_zs is not None
             vmin = min(self.values.min(), self.obs_values.min())
             vmax = max(self.values.max(), self.obs_values.max())
             times = np.broadcast_to(self.times[:, np.newaxis], self.zs.shape)
@@ -167,6 +169,7 @@ class OutputExtractor:
 
         if self.numtimes is not None:
             if plot:
+                assert self.times is not None
                 time_units: str = wrappednc.nc.variables["time"].units
                 times = netCDF4.num2date(wrappednc["time"], time_units)
                 values = wrappednc.eval(self.compiled_expression)

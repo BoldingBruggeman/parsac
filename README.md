@@ -64,6 +64,13 @@ export MPI4PY_FUTURES_MAX_WORKERS=<NWORKERS>
 mpiexec -n 1 python <RUNSCRIPT>
 ```
 
+If you are using Intel MPI, you may need to allow MPI spawning beforehand with:
+
+```
+export I_MPI_SPAWN=on
+```
+
+This typically goes into your job submission script.
 
 ## GOTM - file formats
 

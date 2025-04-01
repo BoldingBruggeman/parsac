@@ -37,6 +37,7 @@ class Runner:
         self.transforms: list[
             Callable[[logging.Logger, dict[str, Any], bool], None]
         ] = []
+        self.work_dir: Optional[Path] = None
 
     def __call__(self, name2value: Mapping[str, float]) -> Mapping[str, Any]:
         raise NotImplementedError
@@ -86,7 +87,7 @@ class RunnerPool:
 
     async def __call__(
         self, name2value: Mapping[str, float], **kwargs
-    ) -> Mapping[str, Any]:
+    ) -> dict[str, Any]:
         futures = [
             self.executor.submit(self._run, r, name2value, **kwargs)
             for r in self.runners
@@ -373,13 +374,13 @@ class Experiment:
         )
         p = self.unpack_parameters(0.5 * (self.minbounds + self.maxbounds))
         self.logger.info(
-            f"Running single initial evaluation with median parameter set (in serial)."
+            "Running single initial evaluation with median parameter set (in serial)."
         )
         result = await self.async_eval(p)
         config = dict(parameters=par_info, runners=self.runners)
         self.recorder.start(config, self.row_metadata | p, result)
 
-    def unpack_parameters(self, values: npt.NDArray[np.float64]) -> Mapping[str, float]:
+    def unpack_parameters(self, values: npt.NDArray[np.float64]) -> dict[str, float]:
         """Unpack the vector with parameter values into a dictionary
         and add any dynamically calculated parameters.
         """
@@ -418,6 +419,7 @@ class Experiment:
         name2value = (
             values if isinstance(values, Mapping) else self.unpack_parameters(values)
         )
+        assert self.pool is not None
         self.logger.info(f"Running parameter set {name2value}.")
         exception: Optional[Exception] = None
         try:

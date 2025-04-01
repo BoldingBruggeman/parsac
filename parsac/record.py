@@ -29,9 +29,10 @@ class Recorder:
             self.connect()
         self.run_id: Optional[int] = None
 
-    def connect(self, read_only: bool = False) -> None:
+    def connect(self) -> sqlite3.Connection:
         uri = f"file:{self.file}?mode={self.mode}"
         self.conn = sqlite3.connect(uri, detect_types=sqlite3.PARSE_DECLTYPES, uri=True)
+        return self.conn
 
     def start(
         self,
@@ -40,16 +41,16 @@ class Recorder:
         optional: Mapping[str, Any],
     ) -> None:
         create = not self.file.exists()
-        self.connect()
+        conn = self.connect()
         if create:
             columns = [f'"{k}" BLOB' for k in config]
-            self.conn.execute(f'CREATE TABLE "config" ({", ".join(columns)})')
+            conn.execute(f'CREATE TABLE "config" ({", ".join(columns)})')
             keys = ", ".join(f'"{k}"' for k in config)
             values = [pickle.dumps(v) for v in config.values()]
             qs = ", ".join("?" for _ in values)
-            self.conn.execute(f"INSERT INTO config ({keys}) VALUES ({qs})", values)
+            conn.execute(f"INSERT INTO config ({keys}) VALUES ({qs})", values)
 
-            self.conn.execute(
+            conn.execute(
                 """CREATE TABLE "runs" (
                 id INTEGER PRIMARY KEY,
                 time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -61,7 +62,7 @@ class Recorder:
             ]
             opt_columns = [f'"{k}" {_get_sqlite_type(v)}' for k, v in optional.items()]
             combined_columns = ", ".join(req_columns + opt_columns)
-            self.conn.execute(
+            conn.execute(
                 f"""CREATE TABLE "results" (
                 id INTEGER PRIMARY KEY,
                 run_id INTEGER NOT NULL,
@@ -71,17 +72,18 @@ class Recorder:
             """
             )
 
-        cursor = self.conn.execute("INSERT INTO runs DEFAULT VALUES")
+        cursor = conn.execute("INSERT INTO runs DEFAULT VALUES")
         self.run_id = cursor.lastrowid
         assert self.run_id is not None
 
-        self.conn.commit()
+        conn.commit()
 
     def record(self, exception: Optional[Exception], **fields: Any) -> None:
         if self.run_id is None:
             return
         if exception is not None:
             fields["exception"] = repr(exception)
+        assert self.conn is not None
         self.conn.execute(
             f"""
             INSERT INTO results
@@ -95,10 +97,12 @@ class Recorder:
     @property
     def headers(self) -> Sequence[str]:
         """Column headers for the results table."""
+        assert self.conn is not None
         cursor = self.conn.execute("PRAGMA table_info(results)")
         return [info[1] for info in cursor]
 
-    def rows(self, where: str = "") -> Iterable[Iterable[Any]]:
+    def rows(self, where: str = "") -> Iterable[Sequence[Any]]:
+        assert self.conn is not None
         """Iterate over the rows of the results table."""
         cursor = self.conn.execute(f"SELECT * FROM results {where}")
         for row in cursor:
@@ -107,6 +111,7 @@ class Recorder:
     @property
     def config(self) -> Mapping[str, Any]:
         """Global experiment configuration."""
+        assert self.conn is not None
         cursor = self.conn.execute("SELECT * FROM config")
         row = cursor.fetchone()
         return {d[0]: pickle.loads(v) for d, v in zip(cursor.description, row)}
@@ -129,6 +134,7 @@ class Recorder:
                 f.write(sep.join(values) + "\n")
 
     def close(self) -> None:
+        assert self.conn is not None
         self.conn.close()
 
 

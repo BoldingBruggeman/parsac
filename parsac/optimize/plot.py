@@ -126,6 +126,7 @@ class Result:
 
         self.lnls = res[:, -1]
         self.run_ids = res[:, 1].astype(int)
+        self.generations: Optional[np.ndarray]
         if "generation" in self.rec.headers:
             icol = self.rec.headers.index("generation")
             self.generations = res[:, icol].astype(int)
@@ -324,7 +325,7 @@ class Result:
         nrows = int(np.ceil(np.sqrt(n)))
         ncols = int(np.ceil(float(n) / nrows))
         fig = plt.figure()
-        id2ax = {}
+        id2ax: dict[int, matplotlib.axes.Axes] = {}
         for i, (name, plotter) in enumerate(name2plotter.items()):
             ax = fig.add_subplot(
                 nrows,

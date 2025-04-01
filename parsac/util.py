@@ -22,7 +22,7 @@ del yaml.loader.Loader.yaml_implicit_resolvers["O"]
 
 
 # YAML: when dumping, represent None by an empty string
-def none_representer(self: yaml.Dumper, _: None) -> Any:
+def none_representer(self: yaml.SafeDumper, _: None) -> Any:
     return self.represent_scalar("tag:yaml.org,2002:null", "")
 
 
