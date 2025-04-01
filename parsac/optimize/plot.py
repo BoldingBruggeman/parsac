@@ -283,6 +283,11 @@ class Result:
     def plot_best(
         self, target_dir: Union[str, os.PathLike[Any], None] = None
     ) -> matplotlib.figure.Figure:
+        print("Evaluating best parameter set...")
+        best = {n: float(v) for n, v in zip(self.parnames, self.best)}
+        for n, v in best.items():
+            print(f"  {n}: {v:.6g}")
+
         runners: Mapping[str, core.Runner] = self.rec.config["runners"]
         if target_dir is not None:
             print(
@@ -293,10 +298,6 @@ class Result:
             for r in runners.values():
                 r.work_dir = dir / re.sub(r"[^\w()]", "_", r.name)
 
-        print("Evaluating best parameter set...")
-        best = {n: float(v) for n, v in zip(self.parnames, self.best)}
-        for n, v in best.items():
-            print(f"  {n}: {v:.6g}")
         pool = core.RunnerPool(runners, distributed=False)
         name2output = asyncio.run(pool(best, plot=True))
 
