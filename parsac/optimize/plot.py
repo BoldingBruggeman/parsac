@@ -4,6 +4,8 @@ import os
 import asyncio
 import enum
 import re
+import logging
+import shutil
 
 from matplotlib import pyplot as plt
 import matplotlib.artist
@@ -167,7 +169,10 @@ class Result:
         keep_updating: bool = False,
         save: Optional[Union[str, os.PathLike[Any]]] = None,
         plot_type: PlotType = PlotType.MARGINAL,
+        logger: Optional[logging.Logger] = None,
     ) -> matplotlib.figure.Figure:
+        logger = logger or logging.getLogger(__name__)
+
         if lnl_range is not None:
             lnl_range = abs(lnl_range)
 
@@ -191,25 +196,27 @@ class Result:
                 ax.set_prop_cycle(None)
 
             lci, uci = self.get_confidence_interval()
-            print(
+            logger.info(
                 f"Best parameter set is # {self.ibest} with ln likelihood = {self.maxlnl:.6g}:"
             )
             for parname, value, l, u in zip(self.prettyparnames, self.best, lci, uci):
-                print(f"  {parname}: {value:.6g} ({l:.6g} - {u:.6g})")
+                logger.info(f"  {parname}: {value:.6g} ({l:.6g} - {u:.6g})")
 
             if save is not None:
-                print(f"Writing best parameter set to {save}...")
+                logger.info(f"Writing best parameter set to {save}...")
                 self.save_best(save)
 
             # For each run, print max lnl and add points to each parameter plot
-            print("Points per run:")
+            logger.info("Points per run:")
             for run_id in sorted(set(self.run_ids)):
                 match = self.run_ids == run_id
                 curres = self.values[match, :]
                 lnl = self.lnls[match]
                 if plot_type != plot_type.MARGINAL:
                     gen = self.generations[match]
-                print(f"  {run_id}: {match.sum()} points, best lnl = {lnl.max():.8g}.")
+                logger.info(
+                    f"  {run_id}: {match.sum()} points, best lnl = {lnl.max():.8g}."
+                )
                 for ipar, ax in enumerate(axes):
                     if plot_type == plot_type.MARGINAL:
                         (points,) = ax.plot(curres[:, ipar], lnl, ".", label=run_id)
@@ -281,27 +288,36 @@ class Result:
         return fig
 
     def plot_best(
-        self, target_dir: Union[str, os.PathLike[Any], None] = None
+        self,
+        target_dir: Union[str, os.PathLike[Any], None] = None,
+        logger: Optional[logging.Logger] = None,
     ) -> matplotlib.figure.Figure:
-        print("Evaluating best parameter set...")
+        logger = logger or logging.getLogger(__name__)
+
+        logger.info("Evaluating best parameter set...")
         best = {n: float(v) for n, v in zip(self.parnames, self.best)}
         for n, v in best.items():
-            print(f"  {n}: {v:.6g}")
+            logger.info(f"  {n}: {v:.6g}")
 
         runners: Mapping[str, core.Runner] = self.rec.config["runners"]
         if target_dir is not None:
-            print(
+            logger.info(
                 "Worker configurations for best parameter set will be"
                 f" created in {target_dir}"
             )
             dir = Path(target_dir)
             for r in runners.values():
                 r.work_dir = dir / re.sub(r"[^\w()]", "_", r.name)
+                if r.work_dir.exists():
+                    logger.warning(
+                        f"Directory {r.work_dir} already exists and will be overwritten."
+                    )
+                    shutil.rmtree(r.work_dir)
 
         pool = core.RunnerPool(runners, distributed=False)
         name2output = asyncio.run(pool(best, plot=True))
 
-        print("Building plots...")
+        logger.info("Building plots...")
         name2plotter = _collect_plotters(name2output)
         nprefix = len(os.path.commonprefix(list(name2plotter)))
         n = len(name2plotter)
@@ -361,13 +377,19 @@ if __name__ == "__main__":
         "db_file", help="SQLite database file with optimization results"
     )
     args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger()
+
     result = Result(args.db_file, skip_inferred=args.primary_only)
     args.marg |= result.generations is None
     plot_type = PlotType.MARGINAL if args.marg else PlotType.GENERATIONS
     if args.best:
-        fig = result.plot_best(target_dir=args.target_dir)
+        fig = result.plot_best(target_dir=args.target_dir, logger=logger)
     else:
-        fig = result.plot(keep_updating=True, plot_type=plot_type, lnl_range=args.range)
+        fig = result.plot(
+            keep_updating=True, plot_type=plot_type, lnl_range=args.range, logger=logger
+        )
 
     # Show figure and wait until the user closes it.
     plt.show()
