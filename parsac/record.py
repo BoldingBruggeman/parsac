@@ -19,11 +19,19 @@ def _get_sqlite_type(value: Any) -> str:
 
 
 class Recorder:
-    def __init__(self, file: Union[os.PathLike[Any], str]) -> None:
+    def __init__(
+        self, file: Union[os.PathLike[Any], str], read_only: bool = False
+    ) -> None:
         self.file = Path(file)
-        self.create = not self.file.is_file()
-        self.conn = sqlite3.connect(self.file, detect_types=sqlite3.PARSE_DECLTYPES)
+        self.conn: Optional[sqlite3.Connection] = None
+        self.mode = "ro" if read_only else "rwc"
+        if read_only:
+            self.connect()
         self.run_id: Optional[int] = None
+
+    def connect(self, read_only: bool = False) -> None:
+        uri = f"file:{self.file}?mode={self.mode}"
+        self.conn = sqlite3.connect(uri, detect_types=sqlite3.PARSE_DECLTYPES, uri=True)
 
     def start(
         self,
@@ -31,7 +39,9 @@ class Recorder:
         required: Mapping[str, Any],
         optional: Mapping[str, Any],
     ) -> None:
-        if self.create:
+        create = not self.file.exists()
+        self.connect()
+        if create:
             columns = [f'"{k}" BLOB' for k in config]
             self.conn.execute(f'CREATE TABLE "config" ({", ".join(columns)})')
             keys = ", ".join(f'"{k}"' for k in config)
@@ -121,6 +131,7 @@ class Recorder:
     def close(self) -> None:
         self.conn.close()
 
+
 if __name__ == "__main__":
     import argparse
 
@@ -130,7 +141,7 @@ if __name__ == "__main__":
         "db_file", help="SQLite database file with optimization results"
     )
     args = parser.parse_args()
-    rec = Recorder(args.db_file)
+    rec = Recorder(args.db_file, read_only=True)
     print(f"{rec.file} contains {len(list(rec.rows()))} rows.")
     if args.dump:
         rec.to_text(args.dump, sep="\t")

@@ -74,7 +74,7 @@ class Result:
         db_path = Path(db_file)
         if not db_path.exists():
             raise FileNotFoundError(f"Database file {db_file} not found.")
-        self.rec = record.Recorder(db_path)
+        self.rec = record.Recorder(db_path, read_only=True)
 
         par_info = self.rec.config["parameters"]
         self.parmin = dict(zip(par_info["names"], par_info["minimum"]))
@@ -314,7 +314,7 @@ class Result:
                     )
                     shutil.rmtree(r.work_dir)
 
-        pool = core.RunnerPool(runners, distributed=False)
+        pool = core.RunnerPool(runners, distributed=False, logger=logger)
         name2output = asyncio.run(pool(best, plot=True))
 
         logger.info("Building plots...")
