@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 import asyncio
 import enum
-import sys
+import re
 
 from matplotlib import pyplot as plt
 import matplotlib.artist
@@ -115,16 +115,13 @@ class Result:
         """Update the results from the database."""
         where = ""
         if "exception" in self.rec.headers:
-            where = "WHERE exception IS NULL"
-        res = self.rec.to_ndarray(where=where)
+            where += " WHERE exception IS NULL"
+        res = self.rec.to_ndarray(where=where + " ORDER BY lnl")
 
         newcount = res.shape[0] - self._lastcount
         if newcount == 0:
             return newcount
 
-        # Sort by likelihood
-        self.order = res[:, -1].argsort()
-        res = res[self.order, :]
         self.lnls = res[:, -1]
         self.run_ids = res[:, 1].astype(int)
         if "generation" in self.rec.headers:
@@ -137,6 +134,7 @@ class Result:
         # Show best parameter set
         self.maxlnl = self.lnls[-1]
         self.best = self.values[-1]
+        self.ibest = int(res[-1, 0])
 
         self._lastcount = res.shape[0]
         return newcount
@@ -194,7 +192,7 @@ class Result:
 
             lci, uci = self.get_confidence_interval()
             print(
-                f"Best parameter set is # {self.order[-1]} with ln likelihood = {self.maxlnl:.6g}:"
+                f"Best parameter set is # {self.ibest} with ln likelihood = {self.maxlnl:.6g}:"
             )
             for parname, value, l, u in zip(self.prettyparnames, self.best, lci, uci):
                 print(f"  {parname}: {value:.6g} ({l:.6g} - {u:.6g})")
@@ -282,12 +280,24 @@ class Result:
             )
         return fig
 
-    def plot_best(self) -> matplotlib.figure.Figure:
+    def plot_best(
+        self, target_dir: Union[str, os.PathLike[Any], None] = None
+    ) -> matplotlib.figure.Figure:
+        runners: Mapping[str, core.Runner] = self.rec.config["runners"]
+        if target_dir is not None:
+            print(
+                "Worker configurations for best parameter set will be"
+                f" created in {target_dir}"
+            )
+            dir = Path(target_dir)
+            for r in runners.values():
+                r.work_dir = dir / re.sub(r"[^\w()]", "_", r.name)
+
         print("Evaluating best parameter set...")
         best = {n: float(v) for n, v in zip(self.parnames, self.best)}
         for n, v in best.items():
             print(f"  {n}: {v:.6g}")
-        pool = core.RunnerPool(self.rec.config["runners"])
+        pool = core.RunnerPool(runners, distributed=False)
         name2output = asyncio.run(pool(best, plot=True))
 
         print("Building plots...")
@@ -327,6 +337,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--best", action="store_true", help="Show current best result")
     parser.add_argument(
+        "--target_dir",
+        help=(
+            "Target directory to create setups (worker configurations) of best parameter"
+            " set in. If not provided a temporary directory will be used."
+        ),
+    )
+    parser.add_argument(
         "--marg",
         action="store_true",
         help="Plot marginal likelihood rather than generations",
@@ -347,7 +364,7 @@ if __name__ == "__main__":
     args.marg |= result.generations is None
     plot_type = PlotType.MARGINAL if args.marg else PlotType.GENERATIONS
     if args.best:
-        fig = result.plot_best()
+        fig = result.plot_best(target_dir=args.target_dir)
     else:
         fig = result.plot(keep_updating=True, plot_type=plot_type, lnl_range=args.range)
 
