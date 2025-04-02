@@ -85,9 +85,21 @@ class RunnerPool:
         self.executor: concurrent.futures.Executor
         if distributed:
             self.executor = mpi4py.futures.MPIPoolExecutor(**kwargs)
+            workers = self.executor.map(
+                self._get_worker_name, range(self.executor.num_workers)
+            )
+            work2count = {}
+            for worker in workers:
+                work2count[worker] = work2count.get(worker, 0) + 1
+            logger.info(
+                f"Using {self.executor.num_workers} workers"
+                f" on {len(work2count)} machines:"
+            )
+            for name in sorted(work2count.keys()):
+                logger.info(f"  {name}: {work2count[name]} workers")
         else:
             self.executor = concurrent.futures.ProcessPoolExecutor(**kwargs)
-        logger.info(f"Using {self.executor._max_workers} workers.")
+            logger.info(f"Using {self.executor._max_workers} workers.")
 
     async def __call__(
         self, name2value: Mapping[str, float], **kwargs
@@ -114,6 +126,12 @@ class RunnerPool:
         for r in runners:
             r.on_start()
             RunnerPool.active[r.name] = r
+
+    @staticmethod
+    def _get_worker_name(i) -> None:
+        comm = mpi4py.futures.get_comm_workers()
+        comm.Barrier()
+        return mpi4py.MPI.Get_processor_name()
 
     @staticmethod
     def _run(name: str, name2value: Mapping[str, float], **kwargs) -> Mapping[str, Any]:
