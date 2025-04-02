@@ -35,6 +35,14 @@ class Output(NamedTuple):
 
 
 class OutputPlotter(core.Plotter):
+    """This class encapsulates the model output and observations necessary to
+    produce a comparison plot for single variable. It also provides one method
+    `plot` to plot the data in a matplotlib axes object.
+    
+    Instances of this class will be created in workers and then pickled to be
+    sent to the main process for plotting. Therefore, all its attributes must
+    be picklable.
+    """
     def __init__(
         self,
         times: list[datetime.datetime],
@@ -59,7 +67,7 @@ class OutputPlotter(core.Plotter):
             previous["tz"] = self
 
     def plot(self, ax: "matplotlib.axes.Axes") -> None:
-        """Plot the output data."""
+        """Plot model output versus observations."""
         assert self.obs_values is not None
         if self.zs is None:
             ax.plot(self.obs_times, self.obs_values, ".")
@@ -86,18 +94,24 @@ class OutputPlotter(core.Plotter):
 
 
 class OutputExtractor:
+    """This class encapsulates all information necessary to extract a variable
+    from the model output and (optionally) to interpolate the extracted values
+    to the time and location of observations."""
     def __init__(self, output: Output, wrappednc: util.NcDict, logger: logging.Logger):
+        self.name = output.name
+        self.logger = logger
         self.compiled_expression = compile(output.expression, "<string>", "eval")
+
+        # Times and locations of observations (if any), and weights for
+        # interpolating model output to those times and locations.
+        self.times = output.times
+        self.zs = output.zs
+        self.depth_dimension: Optional[str] = None
         self.numtimes: Optional[np.ndarray] = None
         self.ileft: Optional[np.ndarray] = None
         self.iright: Optional[np.ndarray] = None
         self.ileft_weights: Optional[np.ndarray] = None
         self.iright_weights: Optional[np.ndarray] = None
-        self.depth_dimension: Optional[str] = None
-        self.times = output.times
-        self.zs = output.zs
-        self.name = output.name
-        self.logger = logger
 
         if output.times is not None:
             logger.info(
@@ -235,8 +249,11 @@ class OutputExtractor:
             jleft = max(0, jright - 1)
             jright = min(jright, len(zprofile) - 1)
             if jleft == jright:
+                # Observation depth beyond model depth range.
+                # Clamp to nearest model value.
                 model_vals[i] = profile[jright]
             else:
+                # Linear interpolation in depth
                 w = (z - zprofile[jleft]) / (zprofile[jright] - zprofile[jleft])
                 model_vals[i] = (1.0 - w) * profile[jleft] + w * profile[jright]
         return model_vals
@@ -249,7 +266,7 @@ class Simulation(core.Runner):
         executable: Union[os.PathLike[str], str] = "gotm",
         exclude_files: Iterable[str] = ("*.nc", "*.cache"),
         exclude_dirs: Iterable[str] = ("*",),
-        work_dir: Optional[Union[os.PathLike[str], str]] = None,
+        work_dir: Union[os.PathLike[str], str, None] = None,
         logger: Optional[logging.Logger] = None,
         args: Iterable[str] = (),
     ):
@@ -282,7 +299,7 @@ class Simulation(core.Runner):
         if not setup_dir.is_dir():
             raise Exception(f"GOTM setup directory {setup_dir} does not exist.")
         self.setup_dir = setup_dir
-        super().__init__(f"gotm({setup_dir})")
+        super().__init__(f"gotm({setup_dir})", work_dir=work_dir)
         abs_exe = Path(executable).resolve()
         if abs_exe.is_file():
             executable = abs_exe
@@ -290,9 +307,6 @@ class Simulation(core.Runner):
             if shutil.which(executable) is None:
                 raise Exception(f"Executable {executable} not found.")
         self.executable = executable
-        if work_dir is not None:
-            work_dir = Path(work_dir)
-        self.work_dir = work_dir
         self.tempdir = None
         self.symlink = False
         self.exclude_files = exclude_files

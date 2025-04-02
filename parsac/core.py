@@ -34,12 +34,14 @@ if TYPE_CHECKING:
 
 
 class Runner:
-    def __init__(self, name: str):
+    def __init__(self, name: str, work_dir: Union[os.PathLike[str], str, None] = None):
         self.name = name
         self.transforms: list[
             Callable[[logging.Logger, dict[str, Any], bool], None]
         ] = []
-        self.work_dir: Optional[Path] = None
+        if work_dir is not None:
+            work_dir = Path(work_dir)
+        self.work_dir = work_dir
 
     def __call__(self, name2value: Mapping[str, float]) -> Mapping[str, Any]:
         raise NotImplementedError
