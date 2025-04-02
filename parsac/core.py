@@ -8,6 +8,7 @@ from typing import (
     Mapping,
     NamedTuple,
     TYPE_CHECKING,
+    Sequence,
 )
 import logging
 import functools
@@ -19,6 +20,7 @@ import os
 
 import numpy as np
 import numpy.typing as npt
+import scipy.stats
 
 try:
     import mpi4py.futures
@@ -287,8 +289,7 @@ def _null_transform(x: float) -> float:
 
 class _TargetedParameter(NamedTuple):
     parameter: Parameter
-    minimum: float
-    maximum: float
+    dist: scipy.stats.rv_continuous
     fwt: Callable[[float], float] = _null_transform
     bwt: Callable[[float], float] = _null_transform
 
@@ -300,6 +301,7 @@ class Experiment:
         db_file: Optional[Union[str, Path]] = None,
         distributed: Optional[bool] = None,
         max_workers: Optional[int] = None,
+        seed: Optional[Union[int, Sequence[int]]] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
         logging.basicConfig(level=logging.INFO)
@@ -314,22 +316,35 @@ class Experiment:
         self.max_workers = max_workers
         self.pool: Optional[RunnerPool] = None
         self.row_metadata: dict[str, Any] = {}
+        ss = np.random.SeedSequence(seed)
+        self._config = dict(seed=ss.entropy)
+        self.rng = np.random.default_rng(ss)
 
-    @property
-    def minbounds(self) -> np.ndarray:
-        """The minimum value of the parameters after applying any transforms"""
-        return np.array([target.fwt(target.minimum) for target in self.parameters])
+    def get_parameter_bounds(
+        self, transform: bool = False
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The minimum and maximum value of the parameters after applying any transforms"""
+        bounds = np.empty((2, len(self.parameters)))
+        for i, target in enumerate(self.parameters):
+            bounds[:, i] = target.dist.support()
+            if transform:
+                bounds[:, i] = target.fwt(bounds[:, i])
+        return bounds[0], bounds[1]
 
-    @property
-    def maxbounds(self) -> np.ndarray:
-        """The maximum value of the parameters after applying any transforms"""
-        return np.array([target.fwt(target.maximum) for target in self.parameters])
+    def sample_parameters(
+        self, n: int
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]:
+        """Sample n parameter sets from the parameter distributions."""
+        sample = np.empty((n, len(self.parameters)), dtype=float)
+        for i, p in enumerate(self.parameters):
+            sample[:, i] = p.fwt(p.dist.rvs(10 * len(self.parameters)))
+        return sample
 
     def add_parameter(
         self,
         parameter: Union[str, Parameter],
-        minimum: float,
-        maximum: float,
+        minimum: Union[float, scipy.stats.rv_continuous],
+        maximum: Optional[float] = None,
         logscale: bool = False,
     ) -> Parameter:
         """Mark a parameter as target for optimization or sensitivity analysis.
@@ -344,14 +359,25 @@ class Experiment:
         """
         if isinstance(parameter, str):
             parameter = Parameter(parameter)
-        assert minimum < maximum, "Minimum must be less than maximum."
+        if maximum is None:
+            assert isinstance(
+                minimum, scipy.stats.distributions.rv_frozen
+            ), f"{type(minimum)} is not a distribution."
+            dist = minimum
+            logscale = dist.dist.name in ("lognorm", "loguniform")
+        else:
+            assert minimum < maximum, "Minimum must be less than maximum."
+            if logscale:
+                dist = scipy.stats.loguniform(minimum, maximum)
+            else:
+                dist = scipy.stats.uniform(minimum, maximum - minimum)
+            assert dist.support() == (minimum, maximum)
+        minimum, maximum = dist.support()
         kwargs: dict[str, Any] = {}
         if logscale:
-            assert minimum > 0, "Minimum must be positive for logscale."
-            kwargs.update(fwt=np.log10, bwt=lambda x: 10**x)
-        self.parameters.append(
-            _TargetedParameter(parameter, minimum, maximum, **kwargs)
-        )
+            assert minimum >= 0.0, "Minimum must be non-negative for logscale."
+            kwargs.update(fwt=np.log, bwt=np.exp)
+        self.parameters.append(_TargetedParameter(parameter, dist, **kwargs))
         return parameter
 
     async def start(self) -> None:
@@ -366,18 +392,20 @@ class Experiment:
             self.runners, distributed=self.distributed, max_workers=self.max_workers
         )
 
+        parmin, parmax = self.get_parameter_bounds()
         par_info = dict(
             names=[p.parameter.name for p in self.parameters],
-            minimum=[p.minimum for p in self.parameters],
-            maximum=[p.maximum for p in self.parameters],
-            logscale=[p.fwt == np.log10 for p in self.parameters],
+            minimum=[float(v) if np.isfinite(v) else None for v in parmin],
+            maximum=[float(v) if np.isfinite(v) else None for v in parmax],
+            logscale=[p.fwt == np.log for p in self.parameters],
         )
-        p = self.unpack_parameters(0.5 * (self.minbounds + self.maxbounds))
+        median = [p.fwt(p.dist.median()) for p in self.parameters]
+        p = self.unpack_parameters(median)
         self.logger.info(
             "Running single initial evaluation with median parameter set (in serial)."
         )
         result = await self.async_eval(p)
-        config = dict(parameters=par_info, runners=self.runners)
+        config = self._config | dict(parameters=par_info, runners=self.runners)
         self.recorder.start(config, self.row_metadata | p, result)
 
     def unpack_parameters(self, values: npt.NDArray[np.float64]) -> dict[str, float]:

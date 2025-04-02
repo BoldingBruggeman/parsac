@@ -1,4 +1,4 @@
-from typing import Optional, Any, Mapping
+from typing import Optional, Any, Mapping, Union, Sequence
 import logging
 import asyncio
 
@@ -56,8 +56,15 @@ class Optimization(core.Experiment):
         if not self.components:
             raise Exception("No optimization targets defined.")
         await super().start()
+        pop = self.sample_parameters(10 * len(self.parameters))
+        minbounds, maxbounds = self.get_parameter_bounds(transform=True)
         result = await desolver.solve(
-            self.get_lnl, self.minbounds, self.maxbounds, callback=cb, **kwargs
+            self.get_lnl,
+            minbounds,
+            maxbounds,
+            initial_population=pop,
+            callback=cb,
+            **kwargs,
         )
         return self.unpack_parameters(result)
 
@@ -83,6 +90,11 @@ class Optimization(core.Experiment):
         lnl = 0.0
         for component in self.components:
             lnl += name2output[component]
+        for target in self.parameters:
+            value = name2value[target.parameter.name]
+            lnl += target.dist.logpdf(value)
+            if target.fwt == np.log:
+               lnl += np.log(value)
         name2output["lnl"] = lnl if np.isfinite(lnl) else -np.inf
 
 
@@ -112,7 +124,7 @@ class GaussianLikelihood:
             minimum: The minimum allowed value of the modelled and observed
                 values. Lower values will be clipped to this value.
             estimate_scale_factor: Whether to estimate the scale factor with which
-                modle values are multiplied before comparing to observations.
+                model values are multiplied before comparing to observations.
             min_scale_factor: Lower bound of the estimated scale factor.
             max_scale_factor: Upper bound of the estimated scale factor.
             scale_factor: Fixed scale factor, active only if estimate_scale_factor is False.

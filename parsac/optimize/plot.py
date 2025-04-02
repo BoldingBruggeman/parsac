@@ -30,6 +30,9 @@ def _get_marginal(
     assert par.ndim == 1
     assert lnl.ndim == 1
     assert par.shape[0] == lnl.shape[0]
+    valid = np.isfinite(lnl)
+    par = par[valid]
+    lnl = lnl[valid]
     order = par.argsort()
     par = par[order]
     lnl = lnl[order]
@@ -98,6 +101,7 @@ class Result:
         self.npar = len(self.parnames)
 
         self._lastcount = 0
+        self.generations: Optional[np.ndarray] = None
 
         self.update()
 
@@ -126,7 +130,6 @@ class Result:
 
         self.lnls = res[:, -1]
         self.run_ids = res[:, 1].astype(int)
-        self.generations: Optional[np.ndarray]
         if "generation" in self.rec.headers:
             icol = self.rec.headers.index("generation")
             self.generations = res[:, icol].astype(int)
@@ -149,12 +152,17 @@ class Result:
         iinc = self.lnls.searchsorted(self.maxlnl - lnl_crit)
         lbounds = self.values[iinc:].min(axis=0)
         rbounds = self.values[iinc:].max(axis=0)
+        all_out = self.values[:iinc, :][np.isfinite(self.lnls[:iinc]), :]
         for i in range(lbounds.size):
             # Get conservative confidence interval by extending it to the first point
             # from the boundary that has a likelihood value outside the allowed range.
-            out = self.values[:iinc, i]
-            lbounds[i] = out.max(where=out < lbounds[i], initial=lbounds[i])
-            rbounds[i] = out.min(where=out > rbounds[i], initial=rbounds[i])
+            out = all_out[:, i]
+            lower = out < lbounds[i]
+            if lower.any():
+                lbounds[i] = out.max(where=lower, initial=-np.inf)
+            higher = out > rbounds[i]
+            if higher.any():
+                rbounds[i] = out.min(where=higher, initial=np.inf)
         return lbounds, rbounds
 
     def save_best(self, file: Union[str, os.PathLike[Any]], *, sep: str = "\t") -> None:
@@ -246,23 +254,28 @@ class Result:
                 artists.extend([line_cil, line_cir])
 
             if first_time:
-                cur_lnl_range = (
-                    self.maxlnl - self.lnls[0] if lnl_range is None else lnl_range
-                )
+                if lnl_range is None:
+                    lnl_min = self.lnls.min(where=np.isfinite(self.lnls), initial=self.maxlnl)
+                    cur_lnl_range = self.maxlnl - lnl_min
+                else:
+                    cur_lnl_range = lnl_range
                 for name, title, ax in zip(self.parnames, self.prettyparnames, axes):
                     ax.set_title(title)
+                    mi, ma = self.parmin.get(name), self.parmax.get(name)
+                    if self.parlog.get(name, False) and mi == 0.0:
+                        mi = None
                     if plot_type == PlotType.GENERATIONS:
-                        ax.set_ylim(self.parmin.get(name), self.parmax.get(name))
                         if self.parlog.get(name, False):
                             ax.set_yscale("log")
+                        ax.set_ylim(mi, ma)
                     else:
-                        ax.set_xlim(self.parmin.get(name), self.parmax.get(name))
+                        if self.parlog.get(name, False):
+                            ax.set_xscale("log")
+                        ax.set_xlim(mi, ma)
                         ax.set_ylim(
                             self.maxlnl - cur_lnl_range,
                             ymax=self.maxlnl + 0.1 * cur_lnl_range,
                         )
-                        if self.parlog.get(name, False):
-                            ax.set_xscale("log")
 
             if keep_updating:
                 print("Waiting for new results...", end="", flush=True)

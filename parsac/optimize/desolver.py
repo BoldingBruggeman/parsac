@@ -32,7 +32,7 @@ async def solve(
     ndiffvector: int = 1,
     logger: Optional[logging.Logger] = None,
     enforce_bounds: bool = True,
-    seed: Optional[Union[int, Sequence[int]]] = None,
+    rng: Optional[np.random.Generator] = None,
     callback: Optional[Callable[[int], None]] = None,
 ) -> np.ndarray[tuple[int], np.dtype[np.float64]]:
     """
@@ -54,8 +54,7 @@ async def solve(
         logger: logger to use
         enforce_bounds: whether to force parameter vectors to stay within
             prescribed initial range [minbounds, maxbounds]
-        seed: seed for random number generator.
-            It will be used to initialize numpy.random.SeedSequence.
+        rng: random number generator
         callback: function to call after each generation.
             It should take the generation number as an argument.
 
@@ -67,10 +66,8 @@ async def solve(
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(__name__)
 
-    # Set up random number generator
-    ss = np.random.SeedSequence(seed)
-    logger.info(f"Seed: {ss.entropy}")
-    rng = np.random.default_rng(ss)
+    if rng is None:
+        rng = np.random.default_rng()
 
     # Set up initial population
     minbounds, maxbounds = np.broadcast_arrays(minbounds, maxbounds)
@@ -82,6 +79,7 @@ async def solve(
             f" Its current shape is {population.shape}."
         )
         npop = population.shape[0]
+        logger.info(f"Population size: {npop}")
     else:
         if npop is None:
             npop = 10 * minbounds.size
@@ -175,10 +173,13 @@ async def solve(
             # Reflect parameter values if they have digressed beyond the specified
             # boundaries. This may need to be done multiple times, if the allowed
             # range is small and the parameter deviation large.
-            if enforce_bounds:
-                while ((trial < minbounds) | (trial > maxbounds)).any():
-                    trial = minbounds + np.abs(minbounds - trial)
-                    trial = maxbounds - np.abs(maxbounds - trial)
+            while enforce_bounds:
+                too_small = trial < minbounds
+                too_large = trial > maxbounds
+                if not (too_small.any() or too_large.any()):
+                    break
+                trial[too_small] += (minbounds - trial)[too_small]
+                trial[too_large] -= (trial - maxbounds)[too_large]
 
             trials.append(trial)
             tasks.append(fn(trial))

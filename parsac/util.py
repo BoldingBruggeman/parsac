@@ -320,7 +320,7 @@ def run_program(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         shell=use_shell,
-        universal_newlines=True,
+        text=True,
         **kwargs,
     )
     assert proc.stdout is not None
@@ -337,7 +337,7 @@ def run_program(
     logger.debug(f"Model run took {elapsed:.1f} s.")
     if proc.returncode != 0:
         last_lines = stdout_data.rsplit("\n", 10)[-10:]
-        last_output = "\n".join([f"> {line}" for line in last_lines])
+        last_output = "\n".join(last_lines)
         raise Exception(f"{exe} returned non-zero code {proc.returncode}.", last_output)
 
 
