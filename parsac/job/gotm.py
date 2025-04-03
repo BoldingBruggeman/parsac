@@ -317,7 +317,12 @@ class Simulation(core.Runner):
         self.logger = logger or logging.getLogger(name=self.name)
         self.args = args
 
-        gotmyaml = util.YAMLFile(setup_dir / "gotm.yaml")
+        for fn in args:
+            if not fn.startswith("-"):
+                break
+        else:
+            fn = "gotm.yaml"
+        gotmyaml = util.YAMLFile(setup_dir / fn)
         self.start_time: datetime.datetime = gotmyaml["time/start"]
         self.stop_time: datetime.datetime = gotmyaml["time/stop"]
 
