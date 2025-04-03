@@ -178,8 +178,8 @@ async def solve(
                 too_large = trial > maxbounds
                 if not (too_small.any() or too_large.any()):
                     break
-                trial[too_small] += (minbounds - trial)[too_small]
-                trial[too_large] -= (trial - maxbounds)[too_large]
+                trial[too_small] += 2 * (minbounds - trial)[too_small]
+                trial[too_large] -= 2 * (trial - maxbounds)[too_large]
 
             trials.append(trial)
             tasks.append(fn(trial))
