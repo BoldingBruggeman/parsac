@@ -57,7 +57,9 @@ Alternatively, if you do not have any MPI libraries on your system yet (`mpiexec
 conda install -c conda-forge mpi4py
 ```
 
-To run a parsac experiment in parallel, you need to specify how many workers (CPU cores) you will use (the MPI "universe size") via environment variable `MPI4PY_FUTURES_MAX_WORKERS`. You then start the calibration with a single MPI process, like this:
+To run a parsac experiment in parallel, you need to specify how many workers (CPU cores) you will use via environment variable `MPI4PY_FUTURES_MAX_WORKERS`.
+
+You now start the calibration with a single MPI process, like this:
 
 ```
 export MPI4PY_FUTURES_MAX_WORKERS=<NWORKERS>
@@ -69,6 +71,10 @@ If you are using Intel MPI, you may need to allow MPI spawning beforehand with:
 ```
 export I_MPI_SPAWN=on
 ```
+
+Parsac uses your MPI implementation's dynamic process management to spawn the workers. If you experience problems with this, you can
+instead use [an MPI-1 compatible mechanism](https://mpi4py.github.io/mpi4py/stable/html/mpi4py.futures.html#command-line) to start all processes (a single controller and all workers). Note that the total number of processes then is equivalent to `MPI4PY_FUTURES_MAX_WORKERS + 1`. As long as your MPI settings
+allow oversubscription, you only need to request a total of `MPI4PY_FUTURES_MAX_WORKERS` cores from the queue manager, as the controller process uses little to no CPU.
 
 This typically goes into your job submission script.
 
