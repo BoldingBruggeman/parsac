@@ -1,4 +1,4 @@
-from typing import Optional, Any, Mapping, Union, Sequence
+from typing import Optional, Any, Mapping
 import logging
 import asyncio
 
@@ -21,8 +21,9 @@ class Optimization(core.Experiment):
             kwargs: Additional keyword arguments to passed to `core.Experiment`.
         """
         super().__init__(**kwargs)
-        self.components: list[str] = []
-        self.row_metadata["generation"] = 0
+        self.total_lnl = TotalLikelihood(self.priors)
+        self.global_transforms.append(self.total_lnl)
+        self.row_metadata["generation"] = -1
 
     def add_target(self, metric: core.Comparison, **kwargs: Any) -> None:
         """Add a contribution to the fitness (log-likelihood) function.
@@ -38,7 +39,7 @@ class Optimization(core.Experiment):
         if metric.sd is not None:
             kwargs.setdefault("sd", metric.sd)
         model_vals2lnl = GaussianLikelihood(metric.name, metric.obs_vals, **kwargs)
-        self.components.append(model_vals2lnl.name)
+        self.total_lnl.components.append(model_vals2lnl.name)
         metric.runner.transforms.append(model_vals2lnl)
 
     def run(self, **kwargs: Any) -> Mapping[str, float]:
@@ -53,9 +54,10 @@ class Optimization(core.Experiment):
         def cb(igen_finished: int) -> None:
             self.row_metadata["generation"] = igen_finished + 1
 
-        if not self.components:
+        if not self.total_lnl.components:
             raise Exception("No optimization targets defined.")
-        await super().start()
+        await super().start(record=True)
+        self.row_metadata["generation"] = 0
         pop = self.sample_parameters(10 * len(self.parameters))
         minbounds, maxbounds = self.get_parameter_bounds(transform=True)
         result = await desolver.solve(
@@ -78,23 +80,20 @@ class Optimization(core.Experiment):
         assert isinstance(results["lnl"], float)
         return results["lnl"]
 
-    def add_global_metrics(
-        self, name2value: Mapping[str, float], name2output: dict[str, float]
-    ) -> None:
-        """Add global metrics to the output.
 
-        Args:
-            name2value: Input parameters.
-            name2output: Outputs set by individual runners.
-        """
+class TotalLikelihood:
+    def __init__(self, priors: list[core.Prior]) -> None:
+        self.components: list[str] = []
+        self.priors = priors
+
+    def __call__(
+        self, name2value: Mapping[str, float], name2output: dict[str, Any], **kwargs
+    ) -> None:
         lnl = 0.0
         for component in self.components:
             lnl += name2output[component]
-        for target in self.parameters:
-            value = name2value[target.parameter.name]
-            lnl += target.dist.logpdf(value)
-            if target.fwt == np.log:
-               lnl += np.log(value)
+        for prior in self.priors:
+            lnl += prior.logpdf(name2value)
         name2output["lnl"] = lnl if np.isfinite(lnl) else -np.inf
 
 
@@ -159,19 +158,25 @@ class GaussianLikelihood:
         self.min_scale_factor = min_scale_factor
         self.max_scale_factor = max_scale_factor
         self.scale_factor = scale_factor
+        self.logger = logging.getLogger(self.name)
 
     def __call__(
-        self, logger: logging.Logger, name2output: dict[str, Any], plot: bool = False
+        self,
+        name2value: Mapping[str, float],
+        name2output: dict[str, Any],
+        plot: bool = False,
     ) -> None:
         model_vals = name2output.pop(self.source)
         obs_vals = self.obs_vals
         assert model_vals.shape == obs_vals.shape
         if not np.isfinite(model_vals).all():
             raise Exception(f"{self.source} contains non-finite values.")
+        if self.minimum is not None:
+            model_vals = np.maximum(model_vals, self.minimum)
+            obs_vals = np.maximum(obs_vals, self.minimum)
         if self.logscale:
-            assert self.minimum is not None
-            model_vals = np.log10(np.maximum(model_vals, self.minimum))
-            obs_vals = np.log10(np.maximum(obs_vals, self.minimum))
+            model_vals = np.log10(model_vals)
+            obs_vals = np.log10(obs_vals)
 
         # If the model fit is relative, calculate the optimal model to observation scaling factor.
         scale = self.scale_factor
@@ -188,16 +193,16 @@ class GaussianLikelihood:
                 scale = (obs_vals * model_vals).dot(w) / (model_vals**2).dot(w)
 
             # Report and check optimal scale factor.
-            logger.info(
+            self.logger.info(
                 f"{self.name}: optimal model-to-observation scale factor = {scale:.6g}."
             )
             if self.min_scale_factor is not None and scale < self.min_scale_factor:
-                logger.info(
+                self.logger.info(
                     f"{self.name}: clipping scale factor to minimum = {self.min_scale_factor:.6g}."
                 )
                 scale = self.min_scale_factor
             elif self.max_scale_factor is not None and scale > self.max_scale_factor:
-                logger.info(
+                self.logger.info(
                     f"{self.name}: clipping scale factor to maximum = {self.max_scale_factor:.6g}."
                 )
                 scale = self.max_scale_factor
@@ -217,7 +222,7 @@ class GaussianLikelihood:
         if sd is None:
             # No standard deviation specified: calculate the optimal s.d.
             sd = np.sqrt(diff2.sum() / (diff2.size - 1))
-            logger.info(f"{self.name}: optimal s.d. = {sd:.6g}")
+            self.logger.info(f"{self.name}: optimal s.d. = {sd:.6g}")
             name2output[self.name + ":sd"] = sd
 
         # Calculate likelihood contribution

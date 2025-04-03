@@ -493,8 +493,8 @@ class Simulation(core.Runner):
     def __call__(
         self,
         name2value: Mapping[str, float],
-        show_output: bool = False,
         plot: bool = False,
+        show_output: bool = False,
     ) -> Mapping[str, Any]:
         assert self.work_dir is not None
 
@@ -538,7 +538,7 @@ class Simulation(core.Runner):
             wrappednc.finalize()
 
         for transform in self.transforms:
-            transform(self.logger, results, plot)
+            transform(name2value, results, plot)
 
         simple_results = {}
         for k, v in results.items():

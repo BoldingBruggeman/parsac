@@ -37,7 +37,7 @@ class Runner:
     def __init__(self, name: str, work_dir: Union[os.PathLike[str], str, None] = None):
         self.name = name
         self.transforms: list[
-            Callable[[logging.Logger, dict[str, Any], bool], None]
+            Callable[[Mapping[str, float], dict[str, Any], bool], None]
         ] = []
         if work_dir is not None:
             work_dir = Path(work_dir)
@@ -314,6 +314,25 @@ class _TargetedParameter(NamedTuple):
     bwt: Callable[[float], float] = _null_transform
 
 
+class Prior:
+    def logpdf(self, name2value: Mapping[str, float]) -> float:
+        raise NotImplementedError
+
+
+class UnivariatePrior(Prior):
+    def __init__(self, parameter: _TargetedParameter) -> None:
+        self.name = parameter.parameter.name
+        self.dist = parameter.dist
+        self.logscale = parameter.fwt == np.log
+
+    def logpdf(self, name2value: Mapping[str, float]) -> float:
+        value = name2value[self.name]
+        lnl = self.dist.logpdf(value)
+        if self.logscale:
+            lnl += np.log(value)
+        return lnl
+
+
 class Experiment:
     def __init__(
         self,
@@ -328,7 +347,6 @@ class Experiment:
         self.parameters: list[_TargetedParameter] = []
         self.runners: dict[str, Runner] = {}
         self.logger = logger or logging.getLogger(self.__class__.__name__)
-        self.last_result: Optional[dict[str, Any]] = None
         if db_file is None:
             db_file = Path(sys.argv[0]).with_suffix(".results.db")
         self.recorder = record.Recorder(db_file)
@@ -337,8 +355,12 @@ class Experiment:
         self.pool: Optional[RunnerPool] = None
         self.row_metadata: dict[str, Any] = {}
         ss = np.random.SeedSequence(seed)
-        self._config = dict(seed=ss.entropy)
         self.rng = np.random.default_rng(ss)
+        self.priors: list[Prior] = []
+        self.global_transforms: list[
+            Callable[[Mapping[str, float], dict[str, Any]], None]
+        ] = []
+        self._config = dict(seed=ss.entropy, global_transforms=self.global_transforms)
 
     def get_parameter_bounds(
         self, transform: bool = False
@@ -397,10 +419,12 @@ class Experiment:
         if logscale:
             assert minimum >= 0.0, "Minimum must be non-negative for logscale."
             kwargs.update(fwt=np.log, bwt=np.exp)
-        self.parameters.append(_TargetedParameter(parameter, dist, **kwargs))
+        target = _TargetedParameter(parameter, dist, **kwargs)
+        self.parameters.append(target)
+        self.priors.append(UnivariatePrior(target))
         return parameter
 
-    async def start(self) -> None:
+    async def start(self, record: bool) -> None:
         """Start the optimization or sensitivity analysis.
 
         This starts all worker processes, performs a single evaluation with the
@@ -420,13 +444,17 @@ class Experiment:
             logscale=[p.fwt == np.log for p in self.parameters],
         )
         median = [p.fwt(p.dist.median()) for p in self.parameters]
-        p = self.unpack_parameters(median)
+        name2value = self.unpack_parameters(median)
         self.logger.info(
             "Running single initial evaluation with median parameter set (in serial)."
         )
-        result = await self.async_eval(p)
+        name2output = await self.async_eval(name2value)
         config = self._config | dict(parameters=par_info, runners=self.runners)
-        self.recorder.start(config, self.row_metadata | p, result)
+        self.recorder.start(config, self.row_metadata | name2value, name2output)
+        if record:
+            self.recorder.record(
+                exception=None, **name2value, **name2output, **self.row_metadata
+            )
 
     def unpack_parameters(self, values: npt.NDArray[np.float64]) -> dict[str, float]:
         """Unpack the vector with parameter values into a dictionary
@@ -443,15 +471,6 @@ class Experiment:
         for target in self.parameters:
             target.parameter.update(name2value)
         return name2value
-
-    def add_global_metrics(
-        self, name2value: Mapping[str, float], name2output: dict[str, float]
-    ) -> None:
-        """Allow inheriting classes to add global metrics to the output.
-        For example, the sum of all likelihood contributions (the target
-        metric), in the case of optimization.
-        """
-        pass
 
     async def async_eval(
         self, values: Union[Mapping[str, float], np.ndarray]
@@ -472,7 +491,8 @@ class Experiment:
         exception: Optional[Exception] = None
         try:
             name2output = await self.pool(name2value)
-            self.add_global_metrics(name2value, name2output)
+            for transform in self.global_transforms:
+                transform(name2value, name2output)
         except Exception as e:
             exception = e
             name2output = {}

@@ -330,6 +330,8 @@ class Result:
 
         pool = core.RunnerPool(runners, distributed=False, logger=logger)
         name2output = asyncio.run(pool(best, plot=True))
+        for transform in self.rec.config.get("global_transforms", ()):
+            transform(best, name2output, plot=True)
 
         logger.info("Building plots...")
         name2plotter = _collect_plotters(name2output)
