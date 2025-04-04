@@ -36,9 +36,9 @@ if TYPE_CHECKING:
 class Runner:
     def __init__(self, name: str, work_dir: Union[os.PathLike[str], str, None] = None):
         self.name = name
-        self.transforms: list[
-            Callable[[Mapping[str, float], dict[str, Any], bool], None]
-        ] = []
+        self.transforms: list[Callable[[Mapping[str, float], dict[str, Any]], None]] = (
+            []
+        )
         if work_dir is not None:
             work_dir = Path(work_dir)
         self.work_dir = work_dir
@@ -417,7 +417,9 @@ class Experiment:
         minimum, maximum = dist.support()
         kwargs: dict[str, Any] = {}
         if logscale:
-            assert minimum >= 0.0, "Minimum must be non-negative for logscale."
+            assert (
+                minimum >= 0.0
+            ), f"{parameter.name}: minimum must be non-negative for logscale, but is {minimum}."
             kwargs.update(fwt=np.log, bwt=np.exp)
         target = _TargetedParameter(parameter, dist, **kwargs)
         self.parameters.append(target)
@@ -508,9 +510,14 @@ class Experiment:
 
 
 class Plotter:
+    POSTFIX = ":plotter"
+
     def __init__(
         self, sharex: Optional["Plotter"] = None, sharey: Optional["Plotter"] = None
     ):
+        self.obs_values: Optional[np.ndarray] = None
+        self.scale_factor = 1.0
+        self.sd: Optional[np.ndarray] = None
         self.sharex = sharex
         self.sharey = sharey
 

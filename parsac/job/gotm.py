@@ -38,11 +38,12 @@ class OutputPlotter(core.Plotter):
     """This class encapsulates the model output and observations necessary to
     produce a comparison plot for single variable. It also provides one method
     `plot` to plot the data in a matplotlib axes object.
-    
+
     Instances of this class will be created in workers and then pickled to be
     sent to the main process for plotting. Therefore, all its attributes must
     be picklable.
     """
+
     def __init__(
         self,
         times: list[datetime.datetime],
@@ -61,7 +62,6 @@ class OutputPlotter(core.Plotter):
         self.values = values
         self.obs_times = np.array(obs_times, dtype="datetime64[s]")
         self.obs_zs = obs_zs
-        self.obs_values: Optional[np.ndarray] = None
         previous["t"] = self
         if zs is not None:
             previous["tz"] = self
@@ -71,7 +71,7 @@ class OutputPlotter(core.Plotter):
         assert self.obs_values is not None
         if self.zs is None:
             ax.plot(self.obs_times, self.obs_values, ".")
-            ax.plot(self.times, self.values, "-")
+            ax.plot(self.times, self.scale_factor * self.values, "-")
             ax.grid()
         else:
             assert self.obs_zs is not None
@@ -79,7 +79,7 @@ class OutputPlotter(core.Plotter):
             vmax = max(self.values.max(), self.obs_values.max())
             times = np.broadcast_to(self.times[:, np.newaxis], self.zs.shape)
             pc = ax.pcolormesh(
-                times, self.zs, self.values, shading="auto", vmin=vmin, vmax=vmax
+                times, self.zs, self.scale_factor * self.values, shading="auto", vmin=vmin, vmax=vmax
             )
             ax.scatter(
                 self.obs_times,
@@ -97,6 +97,7 @@ class OutputExtractor:
     """This class encapsulates all information necessary to extract a variable
     from the model output and (optionally) to interpolate the extracted values
     to the time and location of observations."""
+
     def __init__(self, output: Output, wrappednc: util.NcDict, logger: logging.Logger):
         self.name = output.name
         self.logger = logger
@@ -189,7 +190,7 @@ class OutputExtractor:
                 values = wrappednc.eval(self.compiled_expression)
                 z = None if self.zs is None else self._get_z(wrappednc)
                 plotter = OutputPlotter(times, z, values, self.times, self.zs, previous)
-                name2output[self.name + ":plotter"] = plotter
+                name2output[self.name + core.Plotter.POSTFIX] = plotter
 
             values = self._interpolate(values, wrappednc)
 
@@ -538,7 +539,7 @@ class Simulation(core.Runner):
             wrappednc.finalize()
 
         for transform in self.transforms:
-            transform(name2value, results, plot)
+            transform(name2value, results)
 
         simple_results = {}
         for k, v in results.items():
@@ -563,10 +564,12 @@ def read_profiles(
     values = []
     zs = []
     ncol = None
+    iline = 0
     with open(path) as f:
         last_dt = None
         while 1:
             line = f.readline()
+            iline += 1
             if line.startswith("#"):
                 continue
             if not line:
@@ -578,6 +581,7 @@ def read_profiles(
             up = int(items[1]) == 1
             for i in range(n):
                 line = f.readline()
+                iline += 1
                 if line.startswith("#"):
                     continue
                 items = line.rstrip("\n").split()

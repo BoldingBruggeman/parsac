@@ -108,13 +108,20 @@ class Recorder:
         for row in cursor:
             yield row
 
-    @property
-    def config(self) -> Mapping[str, Any]:
+    def get_config(self, key: str, default: Any = None) -> Any:
         """Global experiment configuration."""
         assert self.conn is not None
-        cursor = self.conn.execute("SELECT * FROM config")
+        cursor = self.conn.execute("PRAGMA table_info(config)")
+        for info in cursor:
+            if info[1] == key:
+                break
+        else:
+            if default is not None:
+                return default
+            raise KeyError(f"Key {key} not found in config table")
+        cursor = self.conn.execute(f"SELECT {key} FROM config")
         row = cursor.fetchone()
-        return {d[0]: pickle.loads(v) for d, v in zip(cursor.description, row)}
+        return pickle.loads(row[0])
 
     def to_ndarray(self, where: str = "") -> np.ndarray:
         """Convert the results table to a numpy array."""

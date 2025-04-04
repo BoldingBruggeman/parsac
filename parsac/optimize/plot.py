@@ -79,7 +79,7 @@ class Result:
             raise FileNotFoundError(f"Database file {db_file} not found.")
         self.rec = record.Recorder(db_path, read_only=True)
 
-        par_info = self.rec.config["parameters"]
+        par_info = self.rec.get_config("parameters")
         self.parmin = dict(zip(par_info["names"], par_info["minimum"]))
         self.parmax = dict(zip(par_info["names"], par_info["maximum"]))
         self.parlog = dict(zip(par_info["names"], par_info["logscale"]))
@@ -255,7 +255,9 @@ class Result:
 
             if first_time:
                 if lnl_range is None:
-                    lnl_min = self.lnls.min(where=np.isfinite(self.lnls), initial=self.maxlnl)
+                    lnl_min = self.lnls.min(
+                        where=np.isfinite(self.lnls), initial=self.maxlnl
+                    )
                     cur_lnl_range = self.maxlnl - lnl_min
                 else:
                     cur_lnl_range = lnl_range
@@ -313,7 +315,7 @@ class Result:
         for n, v in best.items():
             logger.info(f"  {n}: {v:.6g}")
 
-        runners: Mapping[str, core.Runner] = self.rec.config["runners"]
+        runners: Mapping[str, core.Runner] = self.rec.get_config("runners")
         if target_dir is not None:
             logger.info(
                 "Worker configurations for best parameter set will be"
@@ -330,8 +332,8 @@ class Result:
 
         pool = core.RunnerPool(runners, distributed=False, logger=logger)
         name2output = asyncio.run(pool(best, plot=True))
-        for transform in self.rec.config.get("global_transforms", ()):
-            transform(best, name2output, plot=True)
+        for transform in self.rec.get_config("global_transforms", ()):
+            transform(best, name2output)
 
         logger.info("Building plots...")
         name2plotter = _collect_plotters(name2output)

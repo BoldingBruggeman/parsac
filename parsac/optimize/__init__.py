@@ -87,7 +87,7 @@ class TotalLikelihood:
         self.priors = priors
 
     def __call__(
-        self, name2value: Mapping[str, float], name2output: dict[str, Any], **kwargs
+        self, name2value: Mapping[str, float], name2output: dict[str, Any]
     ) -> None:
         lnl = 0.0
         for component in self.components:
@@ -161,10 +161,7 @@ class GaussianLikelihood:
         self.logger = logging.getLogger(self.name)
 
     def __call__(
-        self,
-        name2value: Mapping[str, float],
-        name2output: dict[str, Any],
-        plot: bool = False,
+        self, name2value: Mapping[str, float], name2output: dict[str, Any]
     ) -> None:
         model_vals = name2output.pop(self.source)
         obs_vals = self.obs_vals
@@ -231,5 +228,8 @@ class GaussianLikelihood:
         # Omitting constant terms in the log likelihood = -n*ln(2*pi)/2
         name2output[self.name] = (-np.log(sd) - diff2 / (2 * sd * sd)).sum()
 
-        if plot:
-            name2output[self.source + ":plotter"].obs_values = obs_vals
+        if self.source + core.Plotter.POSTFIX in name2output:
+            plotter: core.Plotter = name2output[self.source + core.Plotter.POSTFIX]
+            plotter.obs_values = obs_vals
+            plotter.scale_factor = scale
+            plotter.sd = np.broadcast_to(sd, obs_vals.shape)
