@@ -518,6 +518,7 @@ class Plotter:
         self.obs_values: Optional[np.ndarray] = None
         self.scale_factor = 1.0
         self.sd: Optional[np.ndarray] = None
+        self.logscale = False
         self.sharex = sharex
         self.sharey = sharey
 

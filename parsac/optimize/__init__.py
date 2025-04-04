@@ -232,4 +232,5 @@ class GaussianLikelihood:
             plotter: core.Plotter = name2output[self.source + core.Plotter.POSTFIX]
             plotter.obs_values = obs_vals
             plotter.scale_factor = scale
+            plotter.logscale = self.logscale
             plotter.sd = np.broadcast_to(sd, obs_vals.shape)

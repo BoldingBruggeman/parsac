@@ -68,27 +68,33 @@ class OutputPlotter(core.Plotter):
 
     def plot(self, ax: "matplotlib.axes.Axes") -> None:
         """Plot model output versus observations."""
+        import matplotlib.colors
+
         assert self.obs_values is not None
         if self.zs is None:
             ax.plot(self.obs_times, self.obs_values, ".")
             ax.plot(self.times, self.scale_factor * self.values, "-")
             ax.grid()
+            if self.logscale:
+                ax.set_yscale("log")
         else:
-            assert self.obs_zs is not None
             vmin = min(self.values.min(), self.obs_values.min())
             vmax = max(self.values.max(), self.obs_values.max())
+            if self.logscale:        
+                norm = matplotlib.colors.LogNorm()
+            else:
+                norm = matplotlib.colors.Normalize(vmin, vmax)
+            assert self.obs_zs is not None
             times = np.broadcast_to(self.times[:, np.newaxis], self.zs.shape)
             pc = ax.pcolormesh(
-                times, self.zs, self.scale_factor * self.values, shading="auto", vmin=vmin, vmax=vmax
+                times,
+                self.zs,
+                self.scale_factor * self.values,
+                shading="auto",
+                norm=norm,
             )
             ax.scatter(
-                self.obs_times,
-                self.obs_zs,
-                s=10,
-                c=self.obs_values,
-                ec="k",
-                vmin=vmin,
-                vmax=vmax,
+                self.obs_times, self.obs_zs, s=10, c=self.obs_values, ec="k", norm=norm
             )
             ax.figure.colorbar(pc, ax=ax)
 
