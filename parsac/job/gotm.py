@@ -81,9 +81,10 @@ class OutputPlotter(core.Plotter):
             vmin = min(self.values.min(), self.obs_values.min())
             vmax = max(self.values.max(), self.obs_values.max())
             if self.logscale:        
-                norm = matplotlib.colors.LogNorm()
-            else:
+            if not self.logscale:
                 norm = matplotlib.colors.Normalize(vmin, vmax)
+            else:
+                norm = matplotlib.colors.LogNorm(vmin, vmax)
             assert self.obs_zs is not None
             times = np.broadcast_to(self.times[:, np.newaxis], self.zs.shape)
             pc = ax.pcolormesh(
@@ -96,6 +97,7 @@ class OutputPlotter(core.Plotter):
             ax.scatter(
                 self.obs_times, self.obs_zs, s=10, c=self.obs_values, ec="k", norm=norm
             )
+            assert ax.figure is not None
             ax.figure.colorbar(pc, ax=ax)
 
 

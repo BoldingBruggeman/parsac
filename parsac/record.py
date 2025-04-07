@@ -111,14 +111,6 @@ class Recorder:
     def get_config(self, key: str, default: Any = None) -> Any:
         """Global experiment configuration."""
         assert self.conn is not None
-        cursor = self.conn.execute("PRAGMA table_info(config)")
-        for info in cursor:
-            if info[1] == key:
-                break
-        else:
-            if default is not None:
-                return default
-            raise KeyError(f"Key {key} not found in config table")
         cursor = self.conn.execute(f"SELECT {key} FROM config")
         row = cursor.fetchone()
         return pickle.loads(row[0])

@@ -81,7 +81,9 @@ class Optimization(core.Experiment):
         return results["lnl"]
 
 
-class TotalLikelihood:
+class TotalLikelihood(core.Transform):
+    """Sum of all likelihood contributions."""
+
     def __init__(self, priors: list[core.Prior]) -> None:
         self.components: list[str] = []
         self.priors = priors
@@ -97,7 +99,7 @@ class TotalLikelihood:
         name2output["lnl"] = lnl if np.isfinite(lnl) else -np.inf
 
 
-class GaussianLikelihood:
+class GaussianLikelihood(core.Transform):
     def __init__(
         self,
         source: str,
@@ -160,9 +162,7 @@ class GaussianLikelihood:
         self.scale_factor = scale_factor
         self.logger = logging.getLogger(self.name)
 
-    def __call__(
-        self, name2value: Mapping[str, float], name2output: dict[str, Any]
-    ) -> None:
+    def __call__(self, name2value: Mapping[str, float], name2output: dict[str, Any]):
         model_vals = name2output.pop(self.source)
         obs_vals = self.obs_vals
         assert model_vals.shape == obs_vals.shape
@@ -171,6 +171,7 @@ class GaussianLikelihood:
         if self.minimum is not None:
             model_vals = np.maximum(model_vals, self.minimum)
             obs_vals = np.maximum(obs_vals, self.minimum)
+        obs_vals_nontf = obs_vals
         if self.logscale:
             model_vals = np.log10(model_vals)
             obs_vals = np.log10(obs_vals)
@@ -230,7 +231,7 @@ class GaussianLikelihood:
 
         if self.source + core.Plotter.POSTFIX in name2output:
             plotter: core.Plotter = name2output[self.source + core.Plotter.POSTFIX]
-            plotter.obs_values = obs_vals
+            plotter.obs_values = obs_vals_nontf
             plotter.scale_factor = scale
             plotter.logscale = self.logscale
             plotter.sd = np.broadcast_to(sd, obs_vals.shape)

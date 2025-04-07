@@ -33,12 +33,15 @@ if TYPE_CHECKING:
     import matplotlib.axes
 
 
+class Transform:
+    def __call__(self, name2value: Mapping[str, float], name2output: dict[str, Any]):
+        raise NotImplementedError
+
+
 class Runner:
     def __init__(self, name: str, work_dir: Union[os.PathLike[str], str, None] = None):
         self.name = name
-        self.transforms: list[Callable[[Mapping[str, float], dict[str, Any]], None]] = (
-            []
-        )
+        self.transforms: list[Transform] = []
         if work_dir is not None:
             work_dir = Path(work_dir)
         self.work_dir = work_dir
@@ -128,7 +131,7 @@ class RunnerPool:
             RunnerPool.active[r.name] = r
 
     @staticmethod
-    def _get_worker_name() -> None:
+    def _get_worker_name() -> str:
         comm = mpi4py.futures.get_comm_workers()
         comm.Barrier()
         return mpi4py.MPI.Get_processor_name()
@@ -257,10 +260,11 @@ class Parameter:
         Args:
             fn: The function that will return the parameter value.
             *args: Arguments to the function. Any parameter objects in the
-                list will be replaced by their values. If these parameters
-                are themselves calculated dynamically, they will be updated
-                before the function is called.
-            **kwargs: The named parameters to pass to the function. Any
+                list will be replaced by their values when the function is
+                called. If these parameters are themselves calculated
+                dynamically (for instance, if they are also inferred),
+                they will be updated before the function is called.
+            **kwargs: The named arguments to pass to the function. Any
                 parameter objects will be replaced by their values.
         """
         wrapped_fn = functools.partial(_wrap_result_in_tuple, fn)
@@ -357,15 +361,16 @@ class Experiment:
         ss = np.random.SeedSequence(seed)
         self.rng = np.random.default_rng(ss)
         self.priors: list[Prior] = []
-        self.global_transforms: list[
-            Callable[[Mapping[str, float], dict[str, Any]], None]
-        ] = []
+        self.global_transforms: list[Transform] = []
         self._config = dict(seed=ss.entropy, global_transforms=self.global_transforms)
 
     def get_parameter_bounds(
         self, transform: bool = False
     ) -> tuple[np.ndarray, np.ndarray]:
-        """The minimum and maximum value of the parameters after applying any transforms"""
+        """The minimum and maximum value of the parameters.
+
+        Args:
+            transform: Whether to apply the forward transform to the bounds."""
         bounds = np.empty((2, len(self.parameters)))
         for i, target in enumerate(self.parameters):
             bounds[:, i] = target.dist.support()
@@ -379,7 +384,7 @@ class Experiment:
         """Sample n parameter sets from the parameter distributions."""
         sample = np.empty((n, len(self.parameters)), dtype=float)
         for i, p in enumerate(self.parameters):
-            sample[:, i] = p.fwt(p.dist.rvs(10 * len(self.parameters)))
+            sample[:, i] = p.fwt(p.dist.rvs(n, random_state=self.rng))
         return sample
 
     def add_parameter(

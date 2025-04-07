@@ -1,4 +1,4 @@
-from typing import Optional, Any, Union, Mapping
+from typing import Optional, Any, Union, Mapping, Iterable
 from pathlib import Path
 import os
 import asyncio
@@ -84,8 +84,8 @@ class Result:
         self.parmax = dict(zip(par_info["names"], par_info["maximum"]))
         self.parlog = dict(zip(par_info["names"], par_info["logscale"]))
 
-        self.iselect = []
-        self.parnames = []
+        self.iselect: list[int] = []
+        self.parnames: list[str] = []
         SKIP_COLS = {"id", "run_id", "exception", "generation", "lnl"}
         if skip_lnl:
             SKIP_COLS.update(n for n in self.rec.headers if n.endswith(":lnl"))
@@ -236,6 +236,7 @@ class Result:
 
                     artists.append(points)
 
+            iref, = (self.generations==-1).nonzero()[0]
             for ipar, (name, lbound, rbound, ax) in enumerate(
                 zip(self.parnames, lci, uci, axes)
             ):
@@ -251,7 +252,9 @@ class Result:
                 plotci = ax.axhline if plot_type == PlotType.GENERATIONS else ax.axvline
                 line_cil = plotci(lbound, color="k", linestyle="--")
                 line_cir = plotci(rbound, color="k", linestyle="--")
-                artists.extend([line_cil, line_cir])
+
+                line_median = plotci(self.values[iref, ipar], color="r")
+                artists.extend([line_cil, line_cir, line_median])
 
             if first_time:
                 if lnl_range is None:
@@ -262,7 +265,7 @@ class Result:
                 else:
                     cur_lnl_range = lnl_range
                 for name, title, ax in zip(self.parnames, self.prettyparnames, axes):
-                    ax.set_title(title)
+                    ax.set_title(title, fontsize="medium")
                     mi, ma = self.parmin.get(name), self.parmax.get(name)
                     if self.parlog.get(name, False) and mi == 0.0:
                         mi = None
@@ -332,7 +335,12 @@ class Result:
 
         pool = core.RunnerPool(runners, distributed=False, logger=logger)
         name2output = asyncio.run(pool(best, plot=True))
-        for transform in self.rec.get_config("global_transforms", ()):
+        transforms: Iterable[core.Transform] = []
+        try:
+            transforms = self.rec.get_config("global_transforms")
+        except Exception as e:
+            logger.warning(f"Unable to get global transforms from database. {e}")
+        for transform in transforms:
             transform(best, name2output)
 
         logger.info("Building plots...")
@@ -352,7 +360,7 @@ class Result:
                 sharey=id2ax.get(id(plotter.sharey)),
             )
             plotter.plot(ax=ax)
-            ax.set_title(name[nprefix:])
+            ax.set_title(name[nprefix:], fontsize="medium")
             id2ax[id(plotter)] = ax
         return fig
 
