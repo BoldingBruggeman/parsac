@@ -80,7 +80,6 @@ class OutputPlotter(core.Plotter):
         else:
             vmin = min(self.values.min(), self.obs_values.min())
             vmax = max(self.values.max(), self.obs_values.max())
-            if self.logscale:        
             if not self.logscale:
                 norm = matplotlib.colors.Normalize(vmin, vmax)
             else:
