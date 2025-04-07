@@ -418,7 +418,9 @@ class Experiment:
                 dist = scipy.stats.loguniform(minimum, maximum)
             else:
                 dist = scipy.stats.uniform(minimum, maximum - minimum)
-            assert dist.support() == (minimum, maximum)
+            assert np.allclose(
+                dist.support(), (minimum, maximum), rtol=1e-14, atol=1e-14
+            )
         minimum, maximum = dist.support()
         kwargs: dict[str, Any] = {}
         if logscale:
