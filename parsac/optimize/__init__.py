@@ -139,6 +139,8 @@ class GaussianLikelihood(core.Transform):
         self.source = source
         self.name = source + ":lnl"
         self.obs_vals = np.asarray(obs_vals)
+        if self.obs_vals.size == 0:
+            raise Exception(f"{self.source}: no observations provided.")
         if not np.isfinite(self.obs_vals).all():
             raise Exception(f"{self.source}: observations contain non-finite values.")
         if estimate_sd is None:
@@ -147,6 +149,8 @@ class GaussianLikelihood(core.Transform):
         if not estimate_sd:
             assert sd is not None
             self.sd = np.asarray(sd, dtype=float)
+            if (self.sd <= 0).any():
+                raise Exception(f"{self.source}: standard deviation must be positive.")
             np.broadcast_shapes(self.sd.shape, self.obs_vals.shape)
         self.logscale = logscale
         self.minimum = minimum

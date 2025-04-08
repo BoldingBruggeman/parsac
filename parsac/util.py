@@ -120,8 +120,9 @@ def readVariableFromTextFile(
     zs: list[float] = []
     values: list[float] = []
     sds: list[float] = []
+    extra: list[int] = []
 
-    def parse_line(line: str) -> None:
+    def parse_line(iline: int, line: str) -> None:
         dt = datetime.datetime.fromisoformat(line[:19])
         data = line[20:].split()
         if format == TextFormat.DEPTH_EXPLICIT:
@@ -145,6 +146,8 @@ def readVariableFromTextFile(
             if not np.isfinite(sd):
                 raise Exception(f"Standard deviation {item} is not a valid number.")
             sds.append(sd)
+        if data:
+            extra.append(iline)
 
     with file.open() as f:
         for iline, line in enumerate(f):
@@ -153,9 +156,15 @@ def readVariableFromTextFile(
             line = line.split("#", 1)[0].strip()
             if line:
                 try:
-                    parse_line(line)
+                    parse_line(iline, line)
                 except Exception as e:
                     raise Exception(f"Error on line {iline+1} of {file}: {e}\n{line}")
+
+    if extra:
+        logger.warning(
+            f"{file}: {len(extra)} lines contains extra items that will be ignored."
+            f" First offending line: {extra[0]}"
+        )
 
     sds_ = np.array(sds) if sds else None
     zs_ = np.array(zs) if format == TextFormat.DEPTH_EXPLICIT else None
