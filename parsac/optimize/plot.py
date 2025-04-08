@@ -236,7 +236,7 @@ class Result:
 
                     artists.append(points)
 
-            iref, = (self.generations==-1).nonzero()[0]
+            iref = (self.generations==-1).nonzero()[0][0]
             for ipar, (name, lbound, rbound, ax) in enumerate(
                 zip(self.parnames, lci, uci, axes)
             ):
