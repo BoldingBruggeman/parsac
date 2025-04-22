@@ -418,6 +418,11 @@ class Experiment:
         """
         if isinstance(parameter, str):
             parameter = Parameter(parameter)
+        for p in self.parameters:
+            if p.parameter.name == parameter.name:
+                raise ValueError(
+                    f"Parameter {parameter.name} already added to the experiment."
+                )
         if maximum is None:
             assert isinstance(
                 minimum, scipy.stats.distributions.rv_frozen
@@ -521,20 +526,21 @@ class Experiment:
         return name2output
 
     async def batch_eval(
-        self, values: Sequence[Union[Mapping[str, float], np.ndarray]]
+        self,
+        values: Sequence[Union[Mapping[str, float], np.ndarray]],
+        return_exceptions: bool = False,
     ) -> list[Mapping[str, Any]]:
         assert self.pool is not None
         progress = tqdm.tqdm(
-            total=len(values), smoothing=0.5 / self.pool.nworkers, unit="eval"
+            total=len(values), unit="eval", smoothing=0.5 / self.pool.nworkers, disable=None
         )
 
-        async def eval_and_update(values):
-            result = await self.async_eval(values)
-            progress.update()
-            return result
-
-        tasks = [eval_and_update(v) for v in values]
-        return await asyncio.gather(*tasks)
+        tasks = []
+        for v in values:
+            task = asyncio.create_task(self.async_eval(v))
+            task.add_done_callback(lambda f: progress.update())
+            tasks.append(task)
+        return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
     def eval(self, values: Union[Mapping[str, float], np.ndarray]) -> Mapping[str, Any]:
         return asyncio.run(self.async_eval(values))

@@ -88,9 +88,7 @@ async def solve(
     logger.info("Evaluating initial population")
 
     # Evaluate fitness for initial population
-    tasks = [fn(trial) for trial in population]
-    fitness = np.empty((npop,))
-    fitness[:] = await asyncio.gather(*tasks)
+    fitness = await fn(population)
     if not np.isfinite(fitness).any():
         raise Exception(
             "Fitness function returned non-finite values"
@@ -154,9 +152,8 @@ async def solve(
 
     for igeneration in range(maxgen):
         logger.info(f"Starting generation {igeneration + 1}")
-        tasks = []
-        trials = []
-        for itarget in range(population.shape[0]):
+        trials = population.copy()
+        for itarget, trial in enumerate(trials):
             # Draw random vectors
             if random_ancestor:
                 # Randomly picked ancestor
@@ -178,7 +175,7 @@ async def solve(
                 # from that of the target vector. Otherwise there is no point
                 # evaluating the trial vector
                 cross[rng.integers(cross.size)] = True
-            trial = np.where(cross, mutant, population[itarget])
+            np.putmask(trial, cross, mutant)
 
             # Reflect parameter values if they have digressed beyond the specified
             # boundaries. This may need to be done multiple times, if the allowed
@@ -191,10 +188,7 @@ async def solve(
                 trial[too_small] += 2 * (minbounds - trial)[too_small]
                 trial[too_large] -= 2 * (trial - maxbounds)[too_large]
 
-            trials.append(trial)
-            tasks.append(fn(trial))
-
-        trial_fitnesses = await asyncio.gather(*tasks)
+        trial_fitnesses = await fn(trials)
         for itarget, (trial, trial_fitness) in enumerate(zip(trials, trial_fitnesses)):
             # Determine whether trial vector is better than target vector.
             # If so, replace target with trial.

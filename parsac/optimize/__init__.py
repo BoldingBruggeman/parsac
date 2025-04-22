@@ -61,7 +61,7 @@ class Optimization(core.Experiment):
         pop = self.sample_parameters(10 * len(self.parameters))
         minbounds, maxbounds = self.get_parameter_bounds(transform=True)
         result = await desolver.solve(
-            self.get_lnl,
+            self.get_lnls,
             minbounds,
             maxbounds,
             initial_population=pop,
@@ -72,15 +72,16 @@ class Optimization(core.Experiment):
         self.stop()
         return self.unpack_parameters(result)
 
-    async def get_lnl(self, values: np.ndarray) -> float:
+    async def get_lnls(self, values: np.ndarray) -> np.ndarray:
         """Calculate the log-likelihood of a parameter set."""
-        try:
-            results = await self.async_eval(values)
-        except Exception as e:
-            self.logger.debug(f"Error evaluating parameters: {e}")
-            return -np.inf
-        assert isinstance(results["lnl"], float)
-        return results["lnl"]
+        results = await self.batch_eval(values, return_exceptions=True)
+        lnls = np.full(len(values), -np.inf, dtype=float)
+        for i, r in enumerate(results):
+            if isinstance(r, Exception):
+                self.logger.debug(f"Error evaluating parameters: {r}")
+            else:
+                lnls[i] = r["lnl"]
+        return lnls
 
 
 class TotalLikelihood(core.Transform):
