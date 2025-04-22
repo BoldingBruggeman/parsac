@@ -21,6 +21,7 @@ import os
 import numpy as np
 import numpy.typing as npt
 import scipy.stats
+import tqdm
 
 try:
     import mpi4py.futures
@@ -468,9 +469,7 @@ class Experiment:
         config = self._config | dict(parameters=par_info, runners=self.runners)
         self.recorder.start(config, self.row_metadata | name2value, name2output)
         if record:
-            self.recorder.record(
-                exception=None, **name2value, **name2output, **self.row_metadata
-            )
+            self.recorder.record(**name2value, **name2output, **self.row_metadata)
         return name2output
 
     def stop(self) -> None:
@@ -495,7 +494,9 @@ class Experiment:
         return name2value
 
     async def async_eval(
-        self, values: Union[Mapping[str, float], np.ndarray]
+        self,
+        values: Union[Mapping[str, float], np.ndarray],
+        progress: Optional[tqdm.tqdm] = None,
     ) -> Mapping[str, Any]:
         """Evaluate the runners with the given parameter values
 
@@ -515,7 +516,14 @@ class Experiment:
             for transform in self.global_transforms:
                 transform(name2value, name2output)
             r.update(**name2output)
+        if progress is not None:
+            progress.update()
         return name2output
+
+    async def batch_eval(self, values: Iterable[Union[Mapping[str, float]]]):
+        progress = tqdm.tqdm(total=len(values))
+        tasks = [self.async_eval(v, progress) for v in values]
+        return await asyncio.gather(*tasks)
 
     def eval(self, values: Union[Mapping[str, float], np.ndarray]) -> Mapping[str, Any]:
         return asyncio.run(self.async_eval(values))

@@ -9,3 +9,4 @@ dependencies:
   - netcdf4
   - scipy
   - salib
+  - tqdm

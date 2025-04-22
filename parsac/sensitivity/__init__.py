@@ -49,8 +49,7 @@ class SensitivityAnalysis(core.Experiment):
 
         # Run
         self.logger.info(f"Evaluating targets for {X.shape[0]} parameter sets")
-        tasks = [self.async_eval(p) for p in X]
-        results = await asyncio.gather(*tasks)
+        results = await self.batch_eval(X)
         Y = np.empty((X.shape[0], len(self.targets)))
         for i, r in enumerate(results):
             Y[i, :] = [r[n] for n in self.targets]
