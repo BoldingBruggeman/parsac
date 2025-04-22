@@ -18,6 +18,32 @@ def _get_sqlite_type(value: Any) -> str:
         raise NotImplementedError(f"Unsupported type {type(value)}")
 
 
+class Record:
+    def __init__(self, conn: Optional[sqlite3.Connection], result_id: Optional[int]):
+        self.conn = conn
+        self.result_id = result_id
+
+    def __enter__(self) -> "Record":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        if exc_value is not None:
+            self.update(exception=repr(exc_value))
+
+    def update(self, **fields: Any):
+        if self.conn is None or self.result_id is None:
+            return
+        self.conn.execute(
+            f"""
+            UPDATE results
+            SET {', '.join(f'"{k}" = ?' for k in fields)}
+            WHERE id = ?
+        """,
+            list(fields.values()) + [self.result_id],
+        )
+        self.conn.commit()
+
+
 class Recorder:
     def __init__(
         self, file: Union[os.PathLike[Any], str], read_only: bool = False
@@ -78,13 +104,11 @@ class Recorder:
 
         conn.commit()
 
-    def record(self, exception: Optional[Exception], **fields: Any) -> None:
+    def record(self, **fields: Any) -> Optional[Record]:
         if self.run_id is None:
-            return
-        if exception is not None:
-            fields["exception"] = repr(exception)
+            return Record(self.conn, None)
         assert self.conn is not None
-        self.conn.execute(
+        cursor = self.conn.execute(
             f"""
             INSERT INTO results
             ("run_id"{''.join(f', "{k}"' for k in fields)})
@@ -93,6 +117,7 @@ class Recorder:
             [self.run_id] + list(fields.values()),
         )
         self.conn.commit()
+        return Record(self.conn, cursor.lastrowid)
 
     @property
     def headers(self) -> Sequence[str]:

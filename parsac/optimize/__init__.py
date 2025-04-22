@@ -77,7 +77,7 @@ class Optimization(core.Experiment):
         try:
             results = await self.async_eval(values)
         except Exception as e:
-            self.logger.error(f"Error evaluating parameters: {e}")
+            self.logger.debug(f"Error evaluating parameters: {e}")
             return -np.inf
         assert isinstance(results["lnl"], float)
         return results["lnl"]

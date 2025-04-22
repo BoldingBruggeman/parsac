@@ -122,7 +122,7 @@ async def solve(
             yield population[i]
             excluded.append(i)
 
-    def check_ready(igen: int) -> bool:
+    def check_ready(igen: int, nbad: int) -> bool:
         curminpar = population.min(axis=0)
         curmaxpar = population.max(axis=0)
         currange = curmaxpar - curminpar
@@ -133,13 +133,23 @@ async def solve(
         logger.info(f"  Range:     {', '.join([f'{v:.2e}' for v in currange])}")
         logger.info(f"  Tolerance: {', '.join([f'{v:.2e}' for v in tol])}")
         logger.info(f"  Fitness range: {frange}")
+        if nbad:
+            logger.warning(
+                f"Non-finite fitness for {nbad} of {npop} candidate population members."
+            )
 
         if callback is not None:
             callback(igen)
 
-        return (currange <= tol).all() and frange <= ftol
+        ready = (currange <= tol).all() and frange <= ftol
+        if ready:
+            logger.info(
+                "Optimization complete as parameter and fitness ranges"
+                " within specified tolerance"
+            )
+        return ready
 
-    if check_ready(0):
+    if check_ready(0, npop - np.isfinite(fitness).sum()):
         return population[ibest]
 
     for igeneration in range(maxgen):
@@ -197,7 +207,7 @@ async def solve(
         # Next default ancestor is current best
         ancestor = population[ibest]
 
-        if check_ready(igeneration + 1):
+        if check_ready(igeneration + 1, npop - np.isfinite(trial_fitnesses).sum()):
             break
     else:
         logger.warning(f"No convergence within the maximum {maxgen} generations.")

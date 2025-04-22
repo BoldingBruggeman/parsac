@@ -510,19 +510,11 @@ class Experiment:
         )
         assert self.pool is not None
         self.logger.debug(f"Running parameter set {name2value}.")
-        exception: Optional[Exception] = None
-        try:
+        with self.recorder.record(**name2value, **self.row_metadata) as r:
             name2output = await self.pool(name2value)
             for transform in self.global_transforms:
                 transform(name2value, name2output)
-        except Exception as e:
-            exception = e
-            name2output = {}
-            raise
-        finally:
-            self.recorder.record(
-                exception=exception, **name2value, **name2output, **self.row_metadata
-            )
+            r.update(**name2output)
         return name2output
 
     def eval(self, values: Union[Mapping[str, float], np.ndarray]) -> Mapping[str, Any]:
