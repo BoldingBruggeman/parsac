@@ -19,29 +19,34 @@ def _get_sqlite_type(value: Any) -> str:
 
 
 class Record:
-    def __init__(self, conn: Optional[sqlite3.Connection], result_id: Optional[int]):
+    def __init__(
+        self, conn: Optional[sqlite3.Connection], run_id: Optional[int], **fields: Any
+    ):
         self.conn = conn
-        self.result_id = result_id
+        self.run_id = run_id
+        self.fields = fields
 
     def __enter__(self) -> "Record":
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        if exc_value is not None:
-            self.update(exception=repr(exc_value))
-
-    def update(self, **fields: Any):
-        if self.conn is None or self.result_id is None:
+        if self.run_id is None:
             return
+        assert self.conn is not None
+        if exc_value is not None:
+            self.fields["exception"] = repr(exc_value)
         self.conn.execute(
             f"""
-            UPDATE results
-            SET {', '.join(f'"{k}" = ?' for k in fields)}
-            WHERE id = ?
+            INSERT INTO results
+            ("run_id"{''.join(f', "{k}"' for k in self.fields)})
+            VALUES (?{', ?' * len(self.fields)})
         """,
-            list(fields.values()) + [self.result_id],
+            [self.run_id] + list(self.fields.values()),
         )
         self.conn.commit()
+
+    def update(self, **fields: Any):
+        self.fields.update(fields)
 
 
 class Recorder:
@@ -105,19 +110,7 @@ class Recorder:
         conn.commit()
 
     def record(self, **fields: Any) -> Optional[Record]:
-        if self.run_id is None:
-            return Record(self.conn, None)
-        assert self.conn is not None
-        cursor = self.conn.execute(
-            f"""
-            INSERT INTO results
-            ("run_id"{''.join(f', "{k}"' for k in fields)})
-            VALUES (?{', ?' * len(fields)})
-        """,
-            [self.run_id] + list(fields.values()),
-        )
-        self.conn.commit()
-        return Record(self.conn, cursor.lastrowid)
+        return Record(self.conn, self.run_id, **fields)
 
     @property
     def headers(self) -> Sequence[str]:

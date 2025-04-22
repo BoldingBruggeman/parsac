@@ -478,7 +478,8 @@ class Experiment:
         config = self._config | dict(parameters=par_info, runners=self.runners)
         self.recorder.start(config, self.row_metadata | name2value, name2output)
         if record:
-            self.recorder.record(**name2value, **name2output, **self.row_metadata)
+            with self.recorder.record(**name2value, **self.row_metadata) as r:
+                r.update(**name2output)
         return name2output
 
     def stop(self) -> None:
