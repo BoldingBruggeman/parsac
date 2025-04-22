@@ -52,6 +52,9 @@ class Runner:
     def on_start(self) -> None:
         pass
 
+    def on_shutdown(self) -> None:
+        pass
+
 
 class RunnerPool:
     active: dict[str, Runner] = {}
@@ -150,6 +153,10 @@ class RunnerPool:
             The output of the runner.
         """
         return RunnerPool.active[name](name2value, **kwargs)
+
+    def shutdown(self):
+        """Shut down the pool and all runners."""
+        self.executor.shutdown(wait=True)
 
 
 class Metric:
@@ -433,7 +440,7 @@ class Experiment:
         self.priors.append(UnivariatePrior(target))
         return parameter
 
-    async def start(self, record: bool) -> None:
+    async def start(self, record: bool) -> Iterable[str]:
         """Start the optimization or sensitivity analysis.
 
         This starts all worker processes, performs a single evaluation with the
@@ -464,6 +471,12 @@ class Experiment:
             self.recorder.record(
                 exception=None, **name2value, **name2output, **self.row_metadata
             )
+        return name2output
+
+    def stop(self) -> None:
+        if self.pool is not None:
+            self.pool.shutdown()
+            self.pool = None
 
     def unpack_parameters(self, values: npt.NDArray[np.float64]) -> dict[str, float]:
         """Unpack the vector with parameter values into a dictionary
@@ -496,7 +509,7 @@ class Experiment:
             values if isinstance(values, Mapping) else self.unpack_parameters(values)
         )
         assert self.pool is not None
-        self.logger.info(f"Running parameter set {name2value}.")
+        self.logger.debug(f"Running parameter set {name2value}.")
         exception: Optional[Exception] = None
         try:
             name2output = await self.pool(name2value)

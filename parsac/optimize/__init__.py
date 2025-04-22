@@ -56,7 +56,7 @@ class Optimization(core.Experiment):
 
         if not self.total_lnl.components:
             raise Exception("No optimization targets defined.")
-        await super().start(record=True)
+        await self.start(record=True)
         self.row_metadata["generation"] = 0
         pop = self.sample_parameters(10 * len(self.parameters))
         minbounds, maxbounds = self.get_parameter_bounds(transform=True)
@@ -66,8 +66,10 @@ class Optimization(core.Experiment):
             maxbounds,
             initial_population=pop,
             callback=cb,
+            logger=self.logger.getChild("DE"),
             **kwargs,
         )
+        self.stop()
         return self.unpack_parameters(result)
 
     async def get_lnl(self, values: np.ndarray) -> float:

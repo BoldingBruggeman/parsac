@@ -79,13 +79,13 @@ async def solve(
             f" Its current shape is {population.shape}."
         )
         npop = population.shape[0]
-        logger.info(f"Population size: {npop}")
     else:
         if npop is None:
             npop = 10 * minbounds.size
         population = rng.uniform(minbounds, maxbounds, size=(npop,) + minbounds.shape)
 
-    logger.debug("Evaluating initial population")
+    logger.info(f"Population size: {npop}")
+    logger.info("Evaluating initial population")
 
     # Evaluate fitness for initial population
     tasks = [fn(trial) for trial in population]
@@ -122,7 +122,7 @@ async def solve(
             yield population[i]
             excluded.append(i)
 
-    def check_ready(igen: int, msg: str) -> bool:
+    def check_ready(igen: int) -> bool:
         curminpar = population.min(axis=0)
         curmaxpar = population.max(axis=0)
         currange = curmaxpar - curminpar
@@ -130,20 +130,20 @@ async def solve(
         tol = np.maximum(abstol, np.abs(curcent) * reltol)
         frange = fitness[ibest] - fitness.min()
 
-        logger.debug(msg)
-        logger.debug(f"  Range:     {', '.join([f'{v:.2e}' for v in currange])}")
-        logger.debug(f"  Tolerance: {', '.join([f'{v:.2e}' for v in tol])}")
-        logger.debug(f"  Fitness range: {frange}")
+        logger.info(f"  Range:     {', '.join([f'{v:.2e}' for v in currange])}")
+        logger.info(f"  Tolerance: {', '.join([f'{v:.2e}' for v in tol])}")
+        logger.info(f"  Fitness range: {frange}")
 
         if callback is not None:
             callback(igen)
 
         return (currange <= tol).all() and frange <= ftol
 
-    if check_ready(0, "Initial population"):
+    if check_ready(0):
         return population[ibest]
 
     for igeneration in range(maxgen):
+        logger.info(f"Starting generation {igeneration + 1}")
         tasks = []
         trials = []
         for itarget in range(population.shape[0]):
@@ -197,7 +197,7 @@ async def solve(
         # Next default ancestor is current best
         ancestor = population[ibest]
 
-        if check_ready(igeneration + 1, f"Finished generation {igeneration + 1}"):
+        if check_ready(igeneration + 1):
             break
     else:
         logger.warning(f"No convergence within the maximum {maxgen} generations.")
