@@ -108,6 +108,10 @@ class RunnerPool:
             self.executor = concurrent.futures.ProcessPoolExecutor(**kwargs)
             logger.info(f"Using {self.executor._max_workers} workers.")
 
+    @property
+    def nworkers(self) -> int:
+        return self.executor._max_workers
+
     async def __call__(
         self, name2value: Mapping[str, float], **kwargs
     ) -> dict[str, Any]:
@@ -494,9 +498,7 @@ class Experiment:
         return name2value
 
     async def async_eval(
-        self,
-        values: Union[Mapping[str, float], np.ndarray],
-        progress: Optional[tqdm.tqdm] = None,
+        self, values: Union[Mapping[str, float], np.ndarray]
     ) -> Mapping[str, Any]:
         """Evaluate the runners with the given parameter values
 
@@ -516,13 +518,22 @@ class Experiment:
             for transform in self.global_transforms:
                 transform(name2value, name2output)
             r.update(**name2output)
-        if progress is not None:
-            progress.update()
         return name2output
 
-    async def batch_eval(self, values: Iterable[Union[Mapping[str, float]]]):
-        progress = tqdm.tqdm(total=len(values))
-        tasks = [self.async_eval(v, progress) for v in values]
+    async def batch_eval(
+        self, values: Sequence[Union[Mapping[str, float], np.ndarray]]
+    ) -> list[Mapping[str, Any]]:
+        assert self.pool is not None
+        progress = tqdm.tqdm(
+            total=len(values), smoothing=0.5 / self.pool.nworkers, unit="eval"
+        )
+
+        async def eval_and_update(values):
+            result = await self.async_eval(values)
+            progress.update()
+            return result
+
+        tasks = [eval_and_update(v) for v in values]
         return await asyncio.gather(*tasks)
 
     def eval(self, values: Union[Mapping[str, float], np.ndarray]) -> Mapping[str, Any]:
