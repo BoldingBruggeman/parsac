@@ -469,7 +469,7 @@ class Experiment:
             maximum=[float(v) if np.isfinite(v) else None for v in parmax],
             logscale=[p.fwt == np.log for p in self.parameters],
         )
-        median = [p.fwt(p.dist.median()) for p in self.parameters]
+        median = np.array([p.fwt(p.dist.median()) for p in self.parameters])
         name2value = self.unpack_parameters(median)
         self.logger.info(
             "Running single initial evaluation with median parameter set (in serial)."
@@ -530,10 +530,13 @@ class Experiment:
         self,
         values: Sequence[Union[Mapping[str, float], np.ndarray]],
         return_exceptions: bool = False,
-    ) -> list[Mapping[str, Any]]:
+    ) -> list[Union[Mapping[str, Any], BaseException]]:
         assert self.pool is not None
         progress = tqdm.tqdm(
-            total=len(values), unit="eval", smoothing=0.5 / self.pool.nworkers, disable=None
+            total=len(values),
+            unit="eval",
+            smoothing=0.5 / self.pool.nworkers,
+            disable=None,
         )
 
         tasks = []

@@ -109,7 +109,7 @@ class Recorder:
 
         conn.commit()
 
-    def record(self, **fields: Any) -> Optional[Record]:
+    def record(self, **fields: Any) -> Record:
         return Record(self.conn, self.run_id, **fields)
 
     @property

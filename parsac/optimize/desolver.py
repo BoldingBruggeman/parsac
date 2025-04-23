@@ -16,7 +16,10 @@ import numpy.typing as npt
 
 
 async def solve(
-    fn: Callable[[npt.NDArray[np.float64]], Awaitable[float]],
+    fn: Callable[
+        [np.ndarray[tuple[int, int], np.dtype[np.float64]]],
+        Awaitable[np.ndarray[tuple[int], np.dtype[np.float64]]],
+    ],
     minbounds: npt.ArrayLike,
     maxbounds: npt.ArrayLike,
     *,
@@ -214,17 +217,11 @@ if __name__ == "__main__":
 
     allx = []
 
-    async def fn(x: np.ndarray) -> float:
-        allx.append(x)
-        return fitness(x[0], x[1])
+    async def fn(X: np.ndarray) -> np.ndarray:
+        allx.append(X)
+        return fitness(X[:, 0], X[:, 1])
 
-    @overload
-    def fitness(x: np.ndarray, y: np.ndarray) -> np.ndarray: ...
-    @overload
-    def fitness(x: float, y: float) -> float: ...
-    def fitness(
-        x: Union[float, np.ndarray], y: Union[float, np.ndarray]
-    ) -> Union[float, np.ndarray]:
+    def fitness(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         return 5 * (-np.sqrt(x**2 + y**2) + np.sin(x**2 + y**2))
 
     minbounds = np.array([-5, -5])
@@ -240,7 +237,7 @@ if __name__ == "__main__":
     fig, ax = plt.subplots()
     v = fitness(xs, ys)
     ax.contourf(xs, ys, v, levels=100)
-    allx = np.stack(allx, axis=-1)
-    ax.plot(allx[0], allx[1], ".k", alpha=0.25)
+    X = np.vstack(allx)
+    ax.plot(X[:, 0], X[:, 1], ".k", alpha=0.25)
     ax.plot(result[0], result[1], "ok", mfc="w")
     plt.show()

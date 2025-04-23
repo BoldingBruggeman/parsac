@@ -346,9 +346,9 @@ class Result:
         logger.info("Building plots...")
         name2plotter = _collect_plotters(name2output)
         nprefix = len(os.path.commonprefix(list(name2plotter)))
-        n = len(name2plotter)
-        nrows = int(np.ceil(np.sqrt(n)))
-        ncols = int(np.ceil(float(n) / nrows))
+        nplots = len(name2plotter)
+        nrows = int(np.ceil(np.sqrt(nplots)))
+        ncols = int(np.ceil(float(nplots) / nrows))
         fig = plt.figure()
         id2ax: dict[int, matplotlib.axes.Axes] = {}
         for i, (name, plotter) in enumerate(name2plotter.items()):
