@@ -151,6 +151,30 @@ class MVR(SensitivityAnalysis):
         return np.abs(analysis["beta"])
 
 
+class CV(SensitivityAnalysis):
+    """Ratio of coefficient of variation, based on Monte Carlo sampling"""
+
+    def __init__(self, n: Optional[int] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.n = n
+
+    def _sample(self) -> np.ndarray:
+        if len(self.parameters) > 1:
+            raise Exception("CV analysis is only meaningfull for a single parameter.")
+        return self.sample_parameters(self.n or 10 * len(self.parameters))
+
+    def _analyze(self, X: np.ndarray, y: np.ndarray) -> dict[str, Any]:
+        X_cv = np.std(X, axis=0) / np.mean(X, axis=0)
+        Y_cv = np.std(y, axis=0) / np.mean(y, axis=0)
+        cv_ratio = Y_cv / X_cv
+        for p, s in zip(self.parameters, cv_ratio):
+            self.logger.info(f"  {p.parameter.name}: {s:.5g}")
+        return {"cv_ratio": cv_ratio}
+
+    def _extract_sensitivity_metric(self, analysis: dict[str, Any]) -> np.ndarray:
+        return np.abs(analysis["cv_ratio"])
+
+
 class SALibAnalysis(SensitivityAnalysis):
     def __init__(self, *sampler_args, **sampler_kwargs):
         super().__init__()

@@ -72,7 +72,9 @@ class Optimization(core.Experiment):
         self.stop()
         return self.unpack_parameters(result)
 
-    async def get_lnls(self, values: np.ndarray) -> np.ndarray:
+    async def get_lnls(
+        self, values: np.ndarray[tuple[int, int], np.dtype[np.float64]]
+    ) -> np.ndarray:
         """Calculate the log-likelihood of a parameter set."""
         results = await self.batch_eval(values, return_exceptions=True)
         lnls = np.full(len(values), -np.inf, dtype=float)

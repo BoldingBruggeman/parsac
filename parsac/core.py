@@ -469,7 +469,7 @@ class Experiment:
             maximum=[float(v) if np.isfinite(v) else None for v in parmax],
             logscale=[p.fwt == np.log for p in self.parameters],
         )
-        median = np.array([p.fwt(p.dist.median()) for p in self.parameters])
+        median = [p.fwt(p.dist.median()) for p in self.parameters]
         name2value = self.unpack_parameters(median)
         self.logger.info(
             "Running single initial evaluation with median parameter set (in serial)."
@@ -487,7 +487,7 @@ class Experiment:
             self.pool.shutdown()
             self.pool = None
 
-    def unpack_parameters(self, values: npt.NDArray[np.float64]) -> dict[str, float]:
+    def unpack_parameters(self, values: Sequence[float]) -> dict[str, float]:
         """Unpack the vector with parameter values into a dictionary
         and add any dynamically calculated parameters.
         """
@@ -504,7 +504,8 @@ class Experiment:
         return name2value
 
     async def async_eval(
-        self, values: Union[Mapping[str, float], np.ndarray]
+        self,
+        values: Union[Mapping[str, float], Sequence[float]],
     ) -> Mapping[str, Any]:
         """Evaluate the runners with the given parameter values
 
@@ -528,7 +529,7 @@ class Experiment:
 
     async def batch_eval(
         self,
-        values: Sequence[Union[Mapping[str, float], np.ndarray]],
+        values: Sequence[Union[Mapping[str, float], Sequence[float]]],
         return_exceptions: bool = False,
     ) -> list[Union[Mapping[str, Any], BaseException]]:
         assert self.pool is not None
@@ -546,7 +547,9 @@ class Experiment:
             tasks.append(task)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
-    def eval(self, values: Union[Mapping[str, float], np.ndarray]) -> Mapping[str, Any]:
+    def eval(
+        self, values: Union[Mapping[str, float], Sequence[float]]
+    ) -> Mapping[str, Any]:
         return asyncio.run(self.async_eval(values))
 
 
