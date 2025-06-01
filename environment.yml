@@ -1,0 +1,12 @@
+name: parsac
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.9
+  - numpy
+  - pyyaml
+  - matplotlib
+  - netcdf4
+  - scipy
+  - salib
+  - tqdm

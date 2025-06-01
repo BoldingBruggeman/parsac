@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "parsac"
+dynamic = ["version"]
+authors = [
+  {name = "Jorn Bruggeman", email = "jorn@bolding-bruggeman.com"}
+]
+description = "Parallel Sensitivity Analysis and Calibration"
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering",
+  "License :: OSI Approved :: GNU General Public License (GPL)",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/BoldingBruggeman/parsac"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["parsac"]
+
+[tool.hatch.version]
+#source = "vcs"
+path = "parsac/__init__.py"

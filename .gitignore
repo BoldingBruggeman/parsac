@@ -1,9 +1,5 @@
-*.nc
-*.png
-*.db
 *.pyc
-*.whl
-*.egg-info/
-Licenses/
-*.ppjob
-build/
+*.nc
+*.cache
+*.db
+*.png
