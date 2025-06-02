@@ -26,5 +26,4 @@ classifiers = [
 only-include = ["parsac"]
 
 [tool.hatch.version]
-#source = "vcs"
-path = "parsac/__init__.py"
+source = "vcs"
