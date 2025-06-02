@@ -25,6 +25,7 @@ jobs:
           environment-file: environment.yml
           activate-environment: parsac
       - run: pip install -v .
+      - run: python -c "import parsac; print(parsac.__version__)"
       - uses: actions/checkout@v4
         with:
           repository: 'gotm-model/code'
