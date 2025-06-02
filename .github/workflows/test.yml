@@ -18,6 +18,8 @@ jobs:
       steps:
       - name: Clone
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
