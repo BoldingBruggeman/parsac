@@ -3,18 +3,18 @@ import parsac.optimize
 from parsac.util import TextFormat
 
 if __name__ == "__main__":
-    job = parsac.optimize.Optimization()
+    experiment = parsac.optimize.Optimization()
 
     sim = parsac.job.gotm.Simulation("./nns_annual", executable="gotm")
 
-    job.add_parameter(
+    experiment.add_parameter(
         sim.get_parameter("gotm.yaml", "turbulence/turb_param/k_min"),
         1e-8,
         1e-4,
         logscale=True,
     )
 
-    job.add_target(
+    experiment.add_target(
         sim.request_comparison(
             "result.nc",
             "temp[:,-1]",
@@ -23,4 +23,4 @@ if __name__ == "__main__":
         )
     )
 
-    p = job.run(reltol=0.00001)
+    p = experiment.run(reltol=0.00001)

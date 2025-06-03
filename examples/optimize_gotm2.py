@@ -3,11 +3,11 @@ import parsac.optimize
 from parsac.util import TextFormat
 
 if __name__ == "__main__":
-    job = parsac.optimize.Optimization()
+    experiment = parsac.optimize.Optimization()
 
     sim = parsac.job.gotm.Simulation("./nns_annual", executable="gotm")
 
-    job.add_parameter(
+    experiment.add_parameter(
         sim.get_parameter("gotm.yaml", "turbulence/turb_param/k_min"),
         1e-8,
         1e-4,
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # Estimate a single scale factor for both wind components
     u10_scale = sim.get_parameter("gotm.yaml", "surface/u10/scale_factor", default=1.0)
     v10_scale = sim.get_parameter("gotm.yaml", "surface/v10/scale_factor", default=1.0)
-    job.add_parameter(u10_scale, 0.0, 2.0)
+    experiment.add_parameter(u10_scale, 0.0, 2.0)
     v10_scale.infer(lambda x: x, u10_scale)
 
     # Record additional diagnostics for each model evaluation
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     sim.record_output("result.nc", "temp[:,-1].max()")
     sim.record_output("result.nc", "temp[:,-1].min()")
 
-    job.add_target(
+    experiment.add_target(
         sim.request_comparison(
             "result.nc",
             "temp[:,-1]",
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         ),
         sd=0.5,
     )
-    job.add_target(
+    experiment.add_target(
         sim.request_comparison(
             "result.nc",
             "temp",
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         ),
         sd=0.5,
     )
-    job.add_target(
+    experiment.add_target(
         sim.request_comparison(
             "result.nc",
             "salt",
@@ -55,4 +55,4 @@ if __name__ == "__main__":
         ),
     )
 
-    p = job.run(reltol=0.01)
+    p = experiment.run(reltol=0.01)
