@@ -176,8 +176,8 @@ class CV(SensitivityAnalysis):
 
 
 class SALibAnalysis(SensitivityAnalysis):
-    def __init__(self, *sampler_args, **sampler_kwargs):
-        super().__init__()
+    def __init__(self, *sampler_args, max_workers: Optional[int] = None, **sampler_kwargs):
+        super().__init__(max_workers=max_workers)
         self.sampler_args = sampler_args
         self.sampler_kwargs = sampler_kwargs
         self.problem = {}
