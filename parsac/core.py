@@ -135,7 +135,14 @@ class RunnerPool:
         """
         logging.getLogger().setLevel(logging.WARNING)
         for r in runners:
-            r.on_start()
+            try:
+                r.on_start()
+            except Exception as e:
+                logging.getLogger().error(
+                    f"Error starting runner {r.name}: {e}",
+                    exc_info=True,
+                )
+                raise
             RunnerPool.active[r.name] = r
 
     @staticmethod
