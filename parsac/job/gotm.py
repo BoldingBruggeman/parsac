@@ -456,6 +456,8 @@ class Simulation(core.Runner):
         if self.work_dir is not None:
             self.work_dir.mkdir(parents=True, exist_ok=True)
         else:
+            if self.tempdir is not None:
+                Path(self.tempdir).mkdir(parents=True, exist_ok=True)
             self.work_dir = Path(tempfile.mkdtemp(prefix="gotmopt", dir=self.tempdir))
             atexit.register(shutil.rmtree, self.work_dir, True)
 
