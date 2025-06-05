@@ -39,6 +39,12 @@ python -m parsac.optimize.plot <DBFILE>
 Here, `<DBFILE>` is the result database created by the optimization.
 By default, it has the name of the run script, with `.results.db` appended instead of `.py`.
 
+To write the full set of results to a tab-separated text file, you can use the following:
+
+```
+python -m parsac.record <DBFILE> --dump <OUTFILE>
+```
+
 ### On HPC clusters
 
 Parsac uses MPI for communication, which it accesse via [mpi4py](https://mpi4py.readthedocs.io/en/stable/). Therefore, mpi4py needs to be installed in your conda environment. If your system has MPI libraries installed,
