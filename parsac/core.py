@@ -218,6 +218,8 @@ class Calculator:
             final_kwargs[k] = v
         result = self.fn(*final_args, **final_kwargs)
         for name, value in zip(self.returns, result):
+            if isinstance(value, (np.ndarray, np.generic)):
+                value = value.item()
             name2value[name] = value
         self.ready = True
 
