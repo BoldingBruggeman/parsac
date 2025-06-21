@@ -355,6 +355,13 @@ class Simulation(core.Runner):
         if not original.is_file():
             raise Exception(f"File {file} not found.")
         try:
+            file = original.resolve().relative_to(self.setup_dir.resolve())
+        except ValueError:
+            raise Exception(
+                f"File {file} must be in the setup directory {self.setup_dir}"
+                " to allow the parameters it contains to be varied."
+            )
+        try:
             initial_value = util.YAMLFile(original)[variable_path]
         except KeyError:
             if default is not None:
