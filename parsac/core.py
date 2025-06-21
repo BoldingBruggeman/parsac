@@ -522,7 +522,7 @@ class Experiment:
             values: The parameter values to evaluate.
 
         Returns:
-            A dictionary with the combind output of all runners.
+            A dictionary with the combined output of all runners.
         """
         name2value = (
             values if isinstance(values, Mapping) else self.unpack_parameters(values)
