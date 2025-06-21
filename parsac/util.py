@@ -360,24 +360,38 @@ class YAMLFile:
         """
         self.file = Path(file)
         with self.file.open(encoding="utf-8") as f:
-            self.data = yaml.safe_load(f)
+            self._data = yaml.safe_load(f)
 
     def save(self) -> None:
         with self.file.open("w", encoding="utf-8") as f:
-            yaml.safe_dump(self.data, f, default_flow_style=False)
+            yaml.safe_dump(self._data, f, default_flow_style=False)
 
     def __getitem__(self, key: str) -> Any:
         path_comps = key.split("/")
-        target_dict = self.data
+        target = self._data
         for comp in path_comps:
-            target_dict = target_dict[comp]
-        return target_dict
+            if comp == "":
+                continue
+            if not isinstance(target, dict):
+                raise KeyError(f"Key {key} not found in {self.file}.")
+            target = target[comp]
+        return target
 
     def __setitem__(self, key: str, value: Any) -> None:
         path_comps = key.split("/")
-        target_dict = self.data
-        for i, comp in enumerate(path_comps[:-1]):
-            if comp not in target_dict:
-                target_dict[comp] = {}
-            target_dict = target_dict[comp]
-        target_dict[path_comps[-1]] = value
+        target = self._data
+        ilast = len(path_comps) - 1
+        for i, comp in enumerate(path_comps):
+            if comp == "":
+                continue
+            if not isinstance(target, dict):
+                raise KeyError(
+                    f"Cannot set {key} in {self.file}"
+                    f" because /{'/'.join(path_comps[:i])} is not a dictionary."
+                )
+            if i == ilast:
+                target[comp] = value
+            else:
+                if comp not in target:
+                    target[comp] = {}
+                target = target[comp]
