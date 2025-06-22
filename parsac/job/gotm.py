@@ -396,7 +396,7 @@ class Simulation(core.Runner):
             obs_file_format: format of the observations file
             spinupyears: number of years to skip from the beginning of the simulation
                 when comparing model results to the observations
-            mindepth: minimum depth of observations; shallowed observations are ignored
+            mindepth: minimum depth of observations; shallower observations are ignored
             maxdepth: maximum depth of observations; deeper observations are ignored
         """
         output_file = Path(output_file)

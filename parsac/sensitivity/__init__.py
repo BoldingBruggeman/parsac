@@ -71,7 +71,7 @@ class SensitivityAnalysis(core.Experiment):
             if len(set(work_dirs)) != len(work_dirs):
                 raise Exception(
                     "The work_dirs format string must produce unique directories"
-                     " for each member i, for instance with '{i:03}'."
+                    " for each member i, for instance with '{i:03}'."
                 )
         results = await self.batch_eval(X, work_dirs)
         Y = np.empty((X.shape[0], len(self.targets)))
@@ -109,7 +109,7 @@ class SensitivityAnalysis(core.Experiment):
 class MVR(SensitivityAnalysis):
     """Sensitivity analysis based on Monte Carlo sampling and linear
     regression, as described in by Saltelli et al.
-    (https://dx.doi.org/10.1002/9780470725184, section 1.2.5)
+    (https://doi.org/10.1002/9780470725184, section 1.2.5)
     """
 
     def __init__(self, n: Optional[int] = None, **kwargs):
@@ -233,9 +233,9 @@ class SALibAnalysis(SensitivityAnalysis):
 class Sobol(SALibAnalysis):
     """Sobol’ Sensitivity Analysis
 
-    https://dx.doi.org/10.1016/S0378-4754(00)00270-6
-    https://dx.doi.org/10.1016/S0010-4655(02)00280-1
-    https://dx.doi.org/10.1016/j.cpc.2009.09.018
+    https://doi.org/10.1016/S0378-4754(00)00270-6
+    https://doi.org/10.1016/S0010-4655(02)00280-1
+    https://doi.org/10.1016/j.cpc.2009.09.018
     """
 
     _sampler = staticmethod(SALib.sample.sobol.sample)
@@ -246,8 +246,8 @@ class Sobol(SALibAnalysis):
 class Morris(SALibAnalysis):
     """Method of Morris
 
-    https://dx.doi.org/10.1080/00401706.1991.10484804
-    https://dx.doi.org/10.1016/j.envsoft.2006.10.004
+    https://doi.org/10.1080/00401706.1991.10484804
+    https://doi.org/10.1016/j.envsoft.2006.10.004
     """
 
     _sampler = staticmethod(SALib.sample.morris.sample)

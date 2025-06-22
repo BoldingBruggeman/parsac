@@ -469,6 +469,9 @@ class Experiment:
             minimum: The minimum value of the parameter.
             maximum: The maximum value of the parameter.
             logscale: Whether to vary the parameter value on a logarithmic scale.
+
+        Returns:
+            The parameter object that was added to the experiment.
         """
         if isinstance(parameter, str):
             parameter = Parameter(parameter)

@@ -128,7 +128,8 @@ class GaussianLikelihood(core.Transform):
                 before calculating the likelihood. This implies the distribution
                 of observations around the modelled values is log-normal.
             minimum: The minimum allowed value of the modelled and observed
-                values. Lower values will be clipped to this value.
+                values. Lower values will be clipped to this value. This argument
+                must be provided if logscale is True. It then must be greater than 0.0.
             estimate_scale_factor: Whether to estimate the scale factor with which
                 model values are multiplied before comparing to observations.
             min_scale_factor: Lower bound of the estimated scale factor.
