@@ -400,7 +400,16 @@ class Simulation(core.Runner):
             maxdepth: maximum depth of observations; deeper observations are ignored
         """
         output_file = Path(output_file)
+        original = self.setup_dir / output_file
         obs_file = Path(obs_file)
+        try:
+            output_file = original.resolve().relative_to(self.setup_dir.resolve())
+        except ValueError:
+            raise Exception(
+                f"Output file {output_file} must be in the setup directory {self.setup_dir}"
+                " for its contents to vary when changing parameters."
+            )
+
         name = f"{self.name}:{output_file}:{output_expression}={obs_file.relative_to(self.setup_dir)}"
 
         self.logger.debug(f"Reading observations for variable {name} from {obs_file}.")
