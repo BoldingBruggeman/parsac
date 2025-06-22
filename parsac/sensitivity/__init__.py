@@ -1,5 +1,6 @@
 import asyncio
-from typing import Optional, Any
+from typing import Optional, Any, Iterable, Union
+import os
 
 import numpy as np
 import numpy.linalg
@@ -34,10 +35,26 @@ class SensitivityAnalysis(core.Experiment):
         self.runners[runner.name] = runner
 
     def run(self, **kwargs):
-        """Run the sensitivity analysis"""
-        return asyncio.run(self.run_async())
+        """Run the sensitivity analysis.
 
-    async def run_async(self, **kwargs):
+        Args:
+            **kwargs: Additional keyword arguments to pass to run_async.
+        """
+        return asyncio.run(self.run_async(**kwargs))
+
+    async def run_async(
+        self,
+        work_dirs: Union[Iterable[Union[os.PathLike[Any], str]], str, None] = None,
+        **kwargs,
+    ):
+        """Run the sensitivity analysis asynchronously.
+
+        Args:
+            work_dirs: A list of directories to use for each job, or a format string
+                that will be formatted with the index of the job. If None, temporary
+                directories will be used for all jobs.
+            **kwargs: Additional keyword arguments to pass to the analysis method.
+        """
         if not self.parameters:
             raise Exception("No parameters have been added")
         self.targets.extend(await self.start(record=False))
@@ -49,13 +66,22 @@ class SensitivityAnalysis(core.Experiment):
 
         # Run
         self.logger.info(f"Evaluating targets for {X.shape[0]} parameter sets")
-        results = await self.batch_eval(X)
+        if isinstance(work_dirs, str):
+            work_dirs = [work_dirs.format(i=i) for i in range(X.shape[0])]
+        results = await self.batch_eval(X, work_dirs)
         Y = np.empty((X.shape[0], len(self.targets)))
         for i, r in enumerate(results):
             Y[i, :] = [r[n] for n in self.targets]
         self.stop()
 
         # Analyze
+        no_var = Y.min(axis=0) == Y.max(axis=0)
+        if no_var.any():
+            bad_targets = [name for name, nv in zip(self.targets, no_var) if nv]
+            raise Exception(
+                f"No variation in detected in {', '.join(bad_targets)}."
+                " Cannot perform sensitivity analysis."
+            )
         sensitivities = np.full((len(self.parameters), len(self.targets)), -1.0)
         keep = np.std(X, axis=0) > 0
         X = X[:, keep]
@@ -176,7 +202,9 @@ class CV(SensitivityAnalysis):
 
 
 class SALibAnalysis(SensitivityAnalysis):
-    def __init__(self, *sampler_args, max_workers: Optional[int] = None, **sampler_kwargs):
+    def __init__(
+        self, *sampler_args, max_workers: Optional[int] = None, **sampler_kwargs
+    ):
         super().__init__(max_workers=max_workers)
         self.sampler_args = sampler_args
         self.sampler_kwargs = sampler_kwargs

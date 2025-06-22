@@ -3,9 +3,7 @@ from pathlib import Path
 import os
 import asyncio
 import enum
-import re
 import logging
-import shutil
 
 from matplotlib import pyplot as plt
 import matplotlib.artist
@@ -324,17 +322,8 @@ class Result:
                 "Worker configurations for best parameter set will be"
                 f" created in {target_dir}"
             )
-            dir = Path(target_dir)
-            for r in runners.values():
-                r.work_dir = dir / re.sub(r"[^\w()]", "_", r.name)
-                if r.work_dir.exists():
-                    logger.warning(
-                        f"Directory {r.work_dir} already exists and will be overwritten."
-                    )
-                    shutil.rmtree(r.work_dir)
-
         pool = core.RunnerPool(runners, distributed=False, logger=logger)
-        name2output = asyncio.run(pool(best, plot=True))
+        name2output = asyncio.run(pool(best, work_dir=target_dir, plot=True))
         transforms: Iterable[core.Transform] = []
         try:
             transforms = self.rec.get_config("global_transforms")

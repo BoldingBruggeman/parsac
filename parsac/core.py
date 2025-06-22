@@ -17,9 +17,12 @@ import sys
 import concurrent.futures
 from pathlib import Path
 import os
+import re
+import tempfile
+import shutil
+import atexit
 
 import numpy as np
-import numpy.typing as npt
 import scipy.stats
 import tqdm
 
@@ -40,21 +43,41 @@ class Transform:
 
 
 class Runner:
-    def __init__(self, name: str, work_dir: Union[os.PathLike[str], str, None] = None):
+    def __init__(self, name: str):
         self.name = name
         self.transforms: list[Transform] = []
-        if work_dir is not None:
-            work_dir = Path(work_dir)
-        self.work_dir = work_dir
+        self.__last_work_dir: Optional[Path] = None
+        self.__final_work_dir: Optional[Path] = None
+        self.temp_dir: Union[os.PathLike[Any], str, None] = None
 
     def __call__(self, name2value: Mapping[str, float]) -> Mapping[str, Any]:
         raise NotImplementedError
 
     def on_start(self) -> None:
-        pass
+        self._final_work_dir = None
 
     def on_shutdown(self) -> None:
         pass
+
+    def prepare_work_dir(self, work_dir: Optional[Path]) -> Path:
+        if self._final_work_dir is not None and self._last_work_dir == work_dir:
+            return self._final_work_dir
+        self._last_work_dir = work_dir
+        if work_dir is not None:
+            if work_dir.exists():
+                self.logger.warning(
+                    f"Directory {work_dir} already exists and will be overwritten."
+                )
+                shutil.rmtree(work_dir)
+            work_dir.mkdir(parents=True, exist_ok=False)
+        else:
+            if self.temp_dir is not None:
+                Path(self.temp_dir).mkdir(parents=True, exist_ok=True)
+            work_dir = Path(tempfile.mkdtemp(prefix="parsac", dir=self.temp_dir))
+            atexit.register(shutil.rmtree, work_dir, True)
+
+        self._final_work_dir = work_dir
+        return work_dir
 
 
 class RunnerPool:
@@ -113,12 +136,29 @@ class RunnerPool:
         return self.executor._max_workers
 
     async def __call__(
-        self, name2value: Mapping[str, float], **kwargs
+        self,
+        name2value: Mapping[str, float],
+        work_dir: Union[os.PathLike[Any], str, None] = None,
+        **kwargs,
     ) -> dict[str, Any]:
-        futures = [
-            self.executor.submit(self._run, r, name2value, **kwargs)
-            for r in self.runners
-        ]
+        """Run all runners with the given parameter values.
+
+        Args:
+            name2value: The parameter values to use for the runners.
+            work_dir: The directory to use for the runners. If None, a temporary
+                directory will be created for each runner. If not None, it will
+                be created only if one or more runners require a work directory.
+            **kwargs: Additional keyword arguments to pass to the runners."""
+        futures = []
+        root_work_dir = None if work_dir is None else Path(work_dir)
+        runner_work_dir: Optional[Path] = None
+        for r in self.runners:
+            if work_dir is not None:
+                runner_work_dir = root_work_dir / re.sub(r"[^\w()]", "_", r)
+            future = self.executor.submit(
+                self._run, r, name2value, work_dir=runner_work_dir, **kwargs
+            )
+            futures.append(future)
         results = await asyncio.gather(*map(asyncio.wrap_future, futures))
         name2output: dict[str, Any] = {}
         for result in results:
@@ -513,13 +553,13 @@ class Experiment:
         return name2value
 
     async def async_eval(
-        self,
-        values: Union[Mapping[str, float], Sequence[float]],
+        self, values: Union[Mapping[str, float], Sequence[float]], **kwargs
     ) -> Mapping[str, Any]:
         """Evaluate the runners with the given parameter values
 
         Args:
             values: The parameter values to evaluate.
+            kwargs: extra arguments to pass to RunnerPool
 
         Returns:
             A dictionary with the combined output of all runners.
@@ -530,7 +570,7 @@ class Experiment:
         assert self.pool is not None
         self.logger.debug(f"Running parameter set {name2value}.")
         with self.recorder.record(**name2value, **self.row_metadata) as r:
-            name2output = await self.pool(name2value)
+            name2output = await self.pool(name2value, **kwargs)
             for transform in self.global_transforms:
                 transform(name2value, name2output)
             r.update(**name2output)
@@ -539,6 +579,7 @@ class Experiment:
     async def batch_eval(
         self,
         values: Sequence[Union[Mapping[str, float], Sequence[float]]],
+        work_dirs: Optional[Iterable[Union[os.PathLike[Any], str, None]]] = None,
         return_exceptions: bool = False,
     ) -> list[Union[Mapping[str, Any], BaseException]]:
         assert self.pool is not None
@@ -548,10 +589,12 @@ class Experiment:
             smoothing=0.5 / self.pool.nworkers,
             disable=None,
         )
+        if work_dirs is None:
+            work_dirs = [None] * len(values)
 
         tasks = []
-        for v in values:
-            task = asyncio.create_task(self.async_eval(v))
+        for v, wd in zip(values, work_dirs):
+            task = asyncio.create_task(self.async_eval(v, work_dir=wd))
             task.add_done_callback(lambda f: progress.update())
             tasks.append(task)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)

@@ -102,7 +102,22 @@ class Recorder:
                 )
             """
             )
-
+        else:
+            found_columns = frozenset(self.headers)
+            expected_columns = set(required)
+            expected_columns |= frozenset(optional)
+            expected_columns |= frozenset({"exception", "id", "run_id"})
+            if found_columns != expected_columns:
+                missing = expected_columns - found_columns
+                unexpected = found_columns - expected_columns
+                error = "Result columns have changed."
+                if missing:
+                    error += f" Missing columns: {', '.join(missing)}."
+                if unexpected:
+                    error += f" Unexpected columns: {', '.join(unexpected)}."
+                raise Exception(
+                    f"{error} To continue anyway, delete database {self.file} first."
+                )
         cursor = conn.execute("INSERT INTO runs DEFAULT VALUES")
         self.run_id = cursor.lastrowid
         assert self.run_id is not None

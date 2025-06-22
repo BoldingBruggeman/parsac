@@ -12,9 +12,7 @@ from pathlib import Path
 import os
 import logging
 import datetime
-import tempfile
 import shutil
-import atexit
 
 import numpy as np
 import netCDF4
@@ -297,8 +295,6 @@ class Simulation(core.Runner):
                 working directory
             exclude_dirs: patterns to exclude directories from being copied to
                 the working directory
-            work_dir: working directory for the simulation.
-                If None, a temporary directory is created.
             logger: logger to use for diagnostic messages
             args: additional arguments to pass to the GOTM executable
         """
@@ -307,7 +303,7 @@ class Simulation(core.Runner):
         if not setup_dir.is_dir():
             raise Exception(f"GOTM setup directory {setup_dir} does not exist.")
         self.setup_dir = setup_dir
-        super().__init__(f"gotm({setup_dir})", work_dir=work_dir)
+        super().__init__(f"gotm({setup_dir})")
         abs_exe = Path(executable).resolve()
         if abs_exe.is_file():
             executable = abs_exe
@@ -315,7 +311,6 @@ class Simulation(core.Runner):
             if shutil.which(executable) is None:
                 raise Exception(f"Executable {executable} not found.")
         self.executable = executable
-        self.tempdir = None
         self.symlink = False
         self.exclude_files = exclude_files
         self.exclude_dirs = exclude_dirs
@@ -460,18 +455,16 @@ class Simulation(core.Runner):
         return core.Comparison(name, self, values, sd=sds)
 
     def on_start(self) -> None:
-        if self.work_dir is not None:
-            self.work_dir.mkdir(parents=True, exist_ok=True)
-        else:
-            if self.tempdir is not None:
-                Path(self.tempdir).mkdir(parents=True, exist_ok=True)
-            self.work_dir = Path(tempfile.mkdtemp(prefix="gotmopt", dir=self.tempdir))
-            atexit.register(shutil.rmtree, self.work_dir, True)
+        super().on_start()
+        self.output2extractor.clear()
 
-        self.logger.info(f"Copying model setup to {self.work_dir}...")
+    def prepare_work_dir(self, work_dir: Optional[Path]) -> Path:
+        work_dir = super().prepare_work_dir(work_dir)
+
+        self.logger.info(f"Copying model setup to {work_dir}...")
         util.copy_directory(
             self.setup_dir,
-            self.work_dir,
+            work_dir,
             exclude_files=self.exclude_files,
             exclude_dirs=self.exclude_dirs,
             symlink=self.symlink,
@@ -480,12 +473,12 @@ class Simulation(core.Runner):
 
         for _, file, _ in self.parameters:
             if file not in self.parsed_yaml:
-                local_file = self.work_dir / file
+                local_file = work_dir / file
                 bck = util.backup_file(local_file)
                 self.logger.info(f"Backed up {file} to {bck.name}.")
                 self.parsed_yaml[file] = util.YAMLFile(local_file)
 
-        self.output2extractor.clear()
+        return work_dir
 
     def record_output(
         self, output_file: Union[os.PathLike[str], str], output_expression: str
@@ -510,10 +503,11 @@ class Simulation(core.Runner):
     def __call__(
         self,
         name2value: Mapping[str, float],
+        work_dir: Optional[Path] = None,
         plot: bool = False,
         show_output: bool = False,
     ) -> Mapping[str, Any]:
-        assert self.work_dir is not None
+        work_dir = self.prepare_work_dir(work_dir)
 
         update_yaml: set[util.YAMLFile] = set()
         for name, file, path in self.parameters:
@@ -526,7 +520,7 @@ class Simulation(core.Runner):
 
         util.run_program(
             self.executable,
-            self.work_dir,
+            work_dir,
             logger=self.logger,
             show_output=show_output,
             args=self.args,
@@ -534,7 +528,7 @@ class Simulation(core.Runner):
 
         outputpath2nc: dict[Path, util.NcDict] = {}
         for output in self.outputs:
-            ncpath = self.work_dir / output.file
+            ncpath = work_dir / output.file
             if not ncpath.is_file():
                 raise Exception(f"Output file {ncpath} was not created.")
             outputpath2nc[output.file] = util.NcDict(ncpath)
