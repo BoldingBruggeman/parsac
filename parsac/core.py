@@ -7,6 +7,7 @@ from typing import (
     TypeVar,
     Mapping,
     NamedTuple,
+    Tuple,
     TYPE_CHECKING,
     Sequence,
 )
@@ -59,9 +60,13 @@ class Runner:
     def on_shutdown(self) -> None:
         pass
 
-    def prepare_work_dir(self, work_dir: Optional[Path]) -> Path:
+    def prepare_work_dir(self, work_dir: Optional[Path]) -> Tuple[Path, bool]:
+        """Prepare a work directory. It will reuse an existing work directory
+        (wihtout emptying it), unless you provide an explicit directory path
+        that is different from the previous call.
+        """
         if self._final_work_dir is not None and self._last_work_dir == work_dir:
-            return self._final_work_dir
+            return self._final_work_dir, False
         self._last_work_dir = work_dir
         if work_dir is not None:
             if work_dir.exists():
@@ -73,11 +78,11 @@ class Runner:
         else:
             if self.temp_dir is not None:
                 Path(self.temp_dir).mkdir(parents=True, exist_ok=True)
-            work_dir = Path(tempfile.mkdtemp(prefix="parsac", dir=self.temp_dir))
+            work_dir = Path(tempfile.mkdtemp(prefix="parsac_", dir=self.temp_dir))
             atexit.register(shutil.rmtree, work_dir, True)
 
         self._final_work_dir = work_dir
-        return work_dir
+        return work_dir, True
 
 
 class RunnerPool:

@@ -7,6 +7,7 @@ from typing import (
     NamedTuple,
     TYPE_CHECKING,
     Sequence,
+    Tuple
 )
 from pathlib import Path
 import os
@@ -458,27 +459,28 @@ class Simulation(core.Runner):
         super().on_start()
         self.output2extractor.clear()
 
-    def prepare_work_dir(self, work_dir: Optional[Path]) -> Path:
-        work_dir = super().prepare_work_dir(work_dir)
+    def prepare_work_dir(self, work_dir: Optional[Path]) -> Tuple[Path, bool]:
+        work_dir, new = super().prepare_work_dir(work_dir)
 
-        self.logger.info(f"Copying model setup to {work_dir}...")
-        util.copy_directory(
-            self.setup_dir,
-            work_dir,
-            exclude_files=self.exclude_files,
-            exclude_dirs=self.exclude_dirs,
-            symlink=self.symlink,
-            logger=self.logger,
-        )
+        if new:
+            self.logger.info(f"Copying model setup to {work_dir}...")
+            util.copy_directory(
+                self.setup_dir,
+                work_dir,
+                exclude_files=self.exclude_files,
+                exclude_dirs=self.exclude_dirs,
+                symlink=self.symlink,
+                logger=self.logger,
+            )
 
-        for _, file, _ in self.parameters:
-            if file not in self.parsed_yaml:
-                local_file = work_dir / file
-                bck = util.backup_file(local_file)
-                self.logger.info(f"Backed up {file} to {bck.name}.")
-                self.parsed_yaml[file] = util.YAMLFile(local_file)
+            for _, file, _ in self.parameters:
+                if file not in self.parsed_yaml:
+                    local_file = work_dir / file
+                    bck = util.backup_file(local_file)
+                    self.logger.info(f"Backed up {file} to {bck.name}.")
+                    self.parsed_yaml[file] = util.YAMLFile(local_file)
 
-        return work_dir
+        return work_dir, new
 
     def record_output(
         self, output_file: Union[os.PathLike[str], str], output_expression: str
@@ -507,7 +509,7 @@ class Simulation(core.Runner):
         plot: bool = False,
         show_output: bool = False,
     ) -> Mapping[str, Any]:
-        work_dir = self.prepare_work_dir(work_dir)
+        work_dir, _ = self.prepare_work_dir(work_dir)
 
         update_yaml: set[util.YAMLFile] = set()
         for name, file, path in self.parameters:
