@@ -68,6 +68,11 @@ class SensitivityAnalysis(core.Experiment):
         self.logger.info(f"Evaluating targets for {X.shape[0]} parameter sets")
         if isinstance(work_dirs, str):
             work_dirs = [work_dirs.format(i=i) for i in range(X.shape[0])]
+            if len(set(work_dirs)) != len(work_dirs):
+                raise Exception(
+                    "The work_dirs format string must produce unique directories"
+                     " for each member i, for instance with '{i:03}'."
+                )
         results = await self.batch_eval(X, work_dirs)
         Y = np.empty((X.shape[0], len(self.targets)))
         for i, r in enumerate(results):

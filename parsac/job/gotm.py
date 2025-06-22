@@ -7,7 +7,7 @@ from typing import (
     NamedTuple,
     TYPE_CHECKING,
     Sequence,
-    Tuple
+    Tuple,
 )
 from pathlib import Path
 import os
