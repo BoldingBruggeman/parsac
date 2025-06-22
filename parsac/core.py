@@ -62,7 +62,7 @@ class Runner:
 
     def prepare_work_dir(self, work_dir: Optional[Path]) -> Tuple[Path, bool]:
         """Prepare a work directory. It will reuse an existing work directory
-        (wihtout emptying it), unless you provide an explicit directory path
+        (without emptying it), unless you provide an explicit directory path
         that is different from the previous call.
         """
         if self._final_work_dir is not None and self._last_work_dir == work_dir:

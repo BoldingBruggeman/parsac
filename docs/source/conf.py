@@ -39,7 +39,11 @@ napoleon_include_special_with_doc = True
 # -- Extension configuration -------------------------------------------------
 autoclass_content = "both"
 
-intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+}
 
 apidoc_modules = [
     {"path": "../../parsac", "destination": "api", "separate_modules": True},
