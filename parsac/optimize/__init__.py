@@ -296,7 +296,7 @@ class ComparisonPlotter(core.Plotter):
 
 
 class ModelVsObservationPlotter(core.Plotter):
-    """Correlation plot showing model versus observations."""
+    """Correlation plot showing model (y) versus observations (x)."""
 
     def __init__(self, model_vals: np.ndarray, obs_vals: np.ndarray):
         super().__init__()
@@ -305,13 +305,9 @@ class ModelVsObservationPlotter(core.Plotter):
 
     def plot(self, ax: "matplotlib.axes.Axes", logger: logging.Logger) -> None:
         ax.plot(self.obs_vals, self.model_vals, ".")
+        ax.axis("tight")
         ax.grid(True)
-        mi, ma = min(self.obs_vals.min(), self.model_vals.min()), max(
-            self.obs_vals.max(), self.model_vals.max()
-        )
-        ax.set_xlim(mi, ma)
-        ax.set_ylim(mi, ma)
-        ax.plot((mi, ma), (mi, ma), "-k")
+        ax.axline((0.0, 0.0), slope=1.0, color="k")
         ax.set_xlabel("observation")
         ax.set_ylabel("model")
 
@@ -327,14 +323,11 @@ class HistogramPlotter(core.Plotter):
 
     def plot(self, ax: "matplotlib.axes.Axes", logger: logging.Logger) -> None:
         diff = self.model_vals - self.obs_vals
-        var_obs = ((self.obs_vals - self.obs_vals.mean()) ** 2).mean()
-        var_mod = ((self.model_vals - self.model_vals.mean()) ** 2).mean()
-        cov = (
-            (self.obs_vals - self.obs_vals.mean())
-            * (self.model_vals - self.model_vals.mean())
-        ).mean()
-        cor = cov / np.sqrt(var_obs * var_mod)
-        bias = (self.model_vals - self.obs_vals).mean()
+        cov = np.cov(self.model_vals, self.obs_vals, ddof=0)
+        sd_mod = np.sqrt(cov[0, 0])
+        sd_obs = np.sqrt(cov[1, 1])
+        cor = cov[0, 1] / (sd_obs * sd_mod)
+        bias = diff.mean()
         mae = np.abs(diff).mean()
         rmse = np.sqrt((diff**2).mean())
         n, bins, patches = ax.hist(diff, 100, density=True)
@@ -342,9 +335,9 @@ class HistogramPlotter(core.Plotter):
         logger.info(f"{self.name}")
         logger.info(f"  model bias: {bias:.4g}")
         logger.info(f"  mean absolute error: {mae:.4g}")
-        logger.info(f"  rmse: {rmse:.4g}")
-        logger.info(f"  cor: {cor:.4g}")
-        logger.info(f"  s.d. mod: {np.sqrt(var_mod):.4g}")
-        logger.info(f"  s.d. obs: {np.sqrt(var_obs):.4g}")
+        logger.info(f"  root mean square error: {rmse:.4g}")
+        logger.info(f"  correlation: {cor:.4g}")
+        logger.info(f"  s.d. mod: {sd_mod:.4g}")
+        logger.info(f"  s.d. obs: {sd_obs:.4g}")
         y = (1.0 / np.sqrt(2 * np.pi) / rmse) * np.exp((-0.5 / rmse**2) * bins**2)
         ax.plot(bins, y, "r--", linewidth=2)
