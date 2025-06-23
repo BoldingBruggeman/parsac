@@ -207,12 +207,11 @@ class MVR(SensitivityAnalysis):
 class Compressor:
     def __init__(self, X: np.ndarray):
         self.keep = X.min(axis=0) != X.max(axis=0)
-        self.n = X.shape[1]
         self.X = X[:, self.keep]
 
     def expand(self, x: np.ndarray, fill_value=np.nan) -> np.ndarray:
         """Expand a vector to the full parameter set."""
-        res = np.full_like(x, fill_value, shape=(self.n,))
+        res = np.full_like(x, fill_value, shape=self.keep.shape)
         res[self.keep] = x
         return res
 

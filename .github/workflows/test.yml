@@ -35,10 +35,16 @@ jobs:
           path: 'gotm'
           submodules: 'recursive'
       - run: python -m unittest discover -v -s test
-      - run: |
+      - name: Build GOTM
+        run: |
           conda install -c conda-forge fortran-compiler cmake netcdf-fortran ninja
-          cmake -S gotm -B gotm/build -G Ninja
+          cmake -S gotm -B gotm/build -G Ninja -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX
           cmake --build gotm/build --target install
+      - name: Test optimization
+        run: |
           cd examples
-          export PATH="$PATH:$HOME/local/gotm/bin"
           python optimize_gotm.py
+      - name: Test sensitivity analysis
+        run: |
+          cd examples
+          python sensitivity_gotm.py
