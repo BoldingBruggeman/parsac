@@ -22,15 +22,15 @@ del yaml.loader.Loader.yaml_implicit_resolvers["O"]
 
 
 # YAML: when dumping, represent None by an empty string
-def none_representer(self: yaml.SafeDumper, _: None) -> Any:
+def _none_representer(self: yaml.SafeDumper, _: None) -> Any:
     return self.represent_scalar("tag:yaml.org,2002:null", "")
 
 
-yaml.SafeDumper.add_representer(type(None), none_representer)
+yaml.SafeDumper.add_representer(type(None), _none_representer)
 
 
 def backup_file(file: Path) -> Path:
-    """Create a backup of a file by copying it to a new file with a .bck suffix.
+    """Create a backup of a file by copying it to a new file with a ``.bck`` suffix.
 
     Args:
         file: Path to the file to backup.
@@ -57,15 +57,15 @@ def copy_directory(
     symlink: bool = False,
     logger: Optional[logging.Logger] = None,
 ) -> None:
-    """Copy files from src_dir to dst_dir, excluding files and directories
-    that match the patterns in exclude_files and exclude_dirs, respectively.
+    """Copy files from ``src_dir`` to ``dst_dir``, excluding files and directories
+    that match the patterns in ``exclude_files`` and ``exclude_dirs``, respectively.
 
     Args:
-        src_dir: Source directory.
-        dst_dir: Destination directory.
-        exclude_files: Patterns for files to exclude.
-        exclude_dirs: Patterns for directories to exclude.
-        symlink: Whether to create symlinks instead of copying files.
+        src_dir: source directory.
+        dst_dir: destination directory.
+        exclude_files: patterns for files to exclude.
+        exclude_dirs: patterns for directories to exclude.
+        symlink: whether to create symlinks instead of copying files.
         logger: Logger to use for diagnostic messages.
     """
     logger = logger or logging.getLogger()
@@ -89,9 +89,28 @@ def copy_directory(
 
 
 class TextFormat(enum.Enum):
+    """Formats of text-based files with observations."""
+
     DEPTH_EXPLICIT = 0
+    """A whitespace-separated text file with the following columns:
+
+    - date + time, for instance ``2023-10-01 12:00:00``
+    - depth (negative, below surface)
+    - variable value
+    - standard deviation (optional)
+    """
+
     DEPTH_INDEPENDENT = 1
+    """A whitespace-separated text file with the following columns:
+
+    - date + time, for instance ``2023-10-01 12:00:00``
+    - variable value
+    - standard deviation (optional)
+    """
+
     GOTM_PROFILES = 2
+    """A text file in `GOTM profile format
+    <https://github.com/fabm-model/fabm/wiki/GOTM#depth-dependent-variables>`__."""
 
 
 def readVariableFromTextFile(
@@ -172,9 +191,17 @@ def readVariableFromTextFile(
 
 
 class NcDict(Mapping[str, np.ndarray]):
+    """A dictionary-like interface to a NetCDF file.
+
+    The file is opened  when the object is created.
+    It closed when the object is finalized (when used within a ``with`` statement)
+    or when :meth:`finalize` is called."""
+
     def __init__(self, file: Union[os.PathLike[str], str]):
-        """Create a dictionary-like interface to a NetCDF file. The file is
-        opened  when the object is created and closed when it is finalized."""
+        """
+        Args:
+            file: Path to the NetCDF file.
+        """
         self.file = Path(file)
         self.nc = netCDF4.Dataset(self.file)
         self.nc.set_auto_mask(False)
@@ -182,6 +209,7 @@ class NcDict(Mapping[str, np.ndarray]):
         self.dimensions: Optional[set[str]] = None
 
     def finalize(self) -> None:
+        """Close the NetCDF file."""
         self.nc.close()
 
     def __getitem__(self, key: str) -> np.ndarray:
@@ -257,10 +285,10 @@ def readVariableFromNcFile(
     maxdepth: float = np.inf,
     time_name: str = "time",
 ) -> tuple[Sequence[datetime.datetime], Optional[np.ndarray], np.ndarray]:
-    """Read a variable from a netCDF file.
+    """Read a variable from a NetCDF file.
 
     Args:
-        file: Path to the netCDF file.
+        file: Path to the NetCDF file.
         expression: Expression to evaluate.
         depth_expression: Expression to evaluate for depth.
         logger: Logger to use for diagnostic messages.
@@ -351,10 +379,14 @@ def run_program(
 
 
 class YAMLFile:
-    def __init__(self, file: Union[os.PathLike[str], str]):
-        """Create a dictionary-like interface to a YAML file. The file is
-        parsed when the object is created.
+    """A dictionary-like interface to a YAML file.
+    The file is parsed when the object is created.
+    The data can subsequently be accessed using the ``[]`` operator,
+    for instance ``value = data["key/subkey"]`` or ``data["key/subkey"] = new_value``.
+    """
 
+    def __init__(self, file: Union[os.PathLike[str], str]):
+        """
         Args:
             file: Path to the YAML file.
         """
@@ -363,6 +395,7 @@ class YAMLFile:
             self._data = yaml.safe_load(f)
 
     def save(self) -> None:
+        """Save the current data to the YAML file."""
         with self.file.open("w", encoding="utf-8") as f:
             yaml.safe_dump(self._data, f, default_flow_style=False)
 

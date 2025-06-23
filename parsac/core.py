@@ -415,6 +415,20 @@ class Experiment:
         seed: Optional[Union[int, Sequence[int]]] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
+        """Initialize the experiment.
+        
+        Args:
+            db_file: The file to store the results in. If ``None``, a file with
+                the same name as the script will be created with the suffix
+                ".results.db".
+            distributed: Whether to run the experiment in distributed mode
+                using MPI. If ``None``, distributed mode is activated if variable
+                ``MPI4PY_FUTURES_MAX_WORKERS`` is present in the environment.
+            max_workers: The maximum number of workers to use. If ``None``, it will
+                be set to the number of available CPUs.
+            seed: The random seed to use for sampling parameters.
+            logger: A custom logger to use for logging messages.
+        """
         logging.basicConfig(level=logging.INFO)
         self.parameters: list[_TargetedParameter] = []
         self.runners: dict[str, Runner] = {}

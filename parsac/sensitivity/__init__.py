@@ -1,6 +1,7 @@
 import asyncio
 from typing import Optional, Any, Iterable, Union
 import os
+from pathlib import Path
 
 import numpy as np
 import numpy.linalg
@@ -21,8 +22,8 @@ class SensitivityAnalysis(core.Experiment):
     by calling :meth:`~parsac.core.Experiment.add_parameter`,
     and add jobs that calculate target metrics by calling
     :meth:`add_job`. These target metrics should be
-    scalar outputs of the job. They are generally requested by
-    calling job-specific methods, such as
+    scalar outputs of the job. Some jobs may require you to specify
+    explicitly which outputs to record by calling methods such as
     :meth:`parsac.job.gotm.Simulation.record_output`.
     """
 
@@ -42,7 +43,7 @@ class SensitivityAnalysis(core.Experiment):
             assert runner is self.runners[runner.name]
         self.runners[runner.name] = runner
 
-    def run(self, **kwargs):
+    def run(self, **kwargs) -> Union[np.ndarray, dict[str, Any]]:
         """Run the sensitivity analysis.
 
         Args:
@@ -53,15 +54,25 @@ class SensitivityAnalysis(core.Experiment):
     async def run_async(
         self,
         work_dirs: Union[Iterable[Union[os.PathLike[Any], str]], str, None] = None,
+        return_details: bool = False,
         **kwargs,
-    ):
+    ) -> Union[np.ndarray, dict[str, Any]]:
         """Run the sensitivity analysis asynchronously.
 
         Args:
-            work_dirs: A list of directories to use for each job, or a format string
-                that will be formatted with the index of the job. If ``None``, temporary
-                directories will be used for all jobs.
+            work_dirs: A list of directories to use to store setups and results per
+                parameter set, or a format string with a single placeholder that incorporates
+                the parameter set index ``i``, for instance, ``workdirs="{i:03}"`` to place results
+                in directories ``000``, ``001``, ... If this argument is not provided, temporary
+                directories will be used to store results while evaluating the parameter sets.
+            return_details: If ``True``, return a dictionary with all results from the analysis.
             **kwargs: Additional keyword arguments to pass to the analysis method.
+
+        Returns:
+            If ``return_details`` is ``False``, an array that specifies the sensitivity
+            of each target (second dimension) to each parameter (first dimension).
+            If ``return_details`` is ``True``, a dictionary with raw results of the analysis
+            (values) for each target (keys).
         """
         if not self.parameters:
             raise Exception("No parameters have been added")
@@ -88,21 +99,26 @@ class SensitivityAnalysis(core.Experiment):
         self.stop()
 
         # Analyze
-        no_var = Y.min(axis=0) == Y.max(axis=0)
-        if no_var.any():
-            bad_targets = [name for name, nv in zip(self.targets, no_var) if nv]
-            raise Exception(
-                f"No variation in detected in {', '.join(bad_targets)}."
-                " Cannot perform sensitivity analysis."
-            )
-        sensitivities = np.full((len(self.parameters), len(self.targets)), -1.0)
-        keep = np.std(X, axis=0) > 0
-        X = X[:, keep]
+        analyses: dict[str, Any] = {}
+        sensitivities = np.full((len(self.parameters), len(self.targets)), np.nan)
+        self.logger.info(
+            "Sensitivities per target and parameter (higher means more sensitive):"
+        )
         for j, n in enumerate(self.targets):
+            if Y[:, j].min() == Y[:, j].max():
+                self.logger.warning(
+                    f"{n}: skipping because no variation in target detected."
+                )
+                continue
             self.logger.info(n)
-            analyis = self._analyze(X, Y[:, j], **kwargs)
-            sensitivities[keep, j] = self._extract_sensitivity_metric(analyis)
-        return sensitivities
+            analysis = self._analyze(X, Y[:, j], **kwargs)
+            sens = self._extract_sensitivity_metric(analysis)
+            assert len(sens) == len(self.parameters)
+            for p, s in sorted(zip(self.parameters, sens), key=lambda x: -abs(x[1])):
+                self.logger.info(f"  {p.parameter.name}: {s:.5g}")
+            analyses[n] = analysis
+            sensitivities[:, j] = sens
+        return analyses if return_details else sensitivities
 
     def _sample(self) -> np.ndarray:
         raise NotImplementedError
@@ -116,8 +132,8 @@ class SensitivityAnalysis(core.Experiment):
 
 class MVR(SensitivityAnalysis):
     """Sensitivity analysis based on Monte Carlo sampling and linear
-    regression, as described in by Saltelli et al.
-    (https://doi.org/10.1002/9780470725184, section 1.2.5)
+    regression, as described by `Saltelli et al.
+    <https://doi.org/10.1002/9780470725184>`__ (section 1.2.5)
     """
 
     def __init__(self, n: Optional[int] = None, **kwargs):
@@ -128,8 +144,9 @@ class MVR(SensitivityAnalysis):
         return self.sample_parameters(self.n or 10 * len(self.parameters))
 
     def _analyze(self, X: np.ndarray, y: np.ndarray) -> dict[str, Any]:
-        parnames = [p.parameter.name for p in self.parameters]
-        assert X.shape == (y.shape[0], len(parnames))
+        comp = Compressor(X)
+        X = comp.X
+
         n, k = X.shape
         if n < k + 2:
             raise Exception(
@@ -174,24 +191,38 @@ class MVR(SensitivityAnalysis):
         P = scipy.stats.t.cdf(abs(t), n - k - 1)
         p = 2 * (1 - P)
 
-        self.logger.info(f"  Model fit: R2 = {R2[0]:.5f}, F = {F[0]:.5g}")
-        self.logger.info("  Regression coefficients:")
-        for curname, curbeta, curse_beta, curt, curp in sorted(
-            zip(parnames, beta, se_beta, t, p), key=lambda x: -abs(x[1])
-        ):
-            self.logger.info(
-                f"    {curname}: beta = {curbeta:.5g} (s.e. {curse_beta:.5g}),"
-                f" p={curp:.5f} for beta=0"
-            )
-
-        return {"beta": beta, "se_beta": se_beta, "t": t, "p": p, "R2": R2, "F": F}
+        return {
+            "beta": comp.expand(beta, 0.0),
+            "se_beta": comp.expand(se_beta, 0.0),
+            "t": comp.expand(t, 0.0),
+            "p": comp.expand(p, 1.0),
+            "R2": R2,
+            "F": F,
+        }
 
     def _extract_sensitivity_metric(self, analysis: dict[str, Any]) -> np.ndarray:
         return np.abs(analysis["beta"])
 
 
+class Compressor:
+    def __init__(self, X: np.ndarray):
+        self.keep = X.min(axis=0) != X.max(axis=0)
+        self.n = X.shape[1]
+        self.X = X[:, self.keep]
+
+    def expand(self, x: np.ndarray, fill_value=np.nan) -> np.ndarray:
+        """Expand a vector to the full parameter set."""
+        res = np.full_like(x, fill_value, shape=(self.n,))
+        res[self.keep] = x
+        return res
+
+
 class CV(SensitivityAnalysis):
-    """Ratio of coefficient of variation, based on Monte Carlo sampling."""
+    """Ratio of coefficients of variation of each target metric and input parameter,
+    based on Monte Carlo sampling.
+
+    This analysis is only meaningful when performed for one parameter at a time.
+    """
 
     def __init__(self, n: Optional[int] = None, **kwargs):
         super().__init__(**kwargs)
@@ -199,26 +230,49 @@ class CV(SensitivityAnalysis):
 
     def _sample(self) -> np.ndarray:
         if len(self.parameters) > 1:
-            raise Exception("CV analysis is only meaningfull for a single parameter.")
+            raise Exception("CV analysis is only meaningful for a single parameter.")
         return self.sample_parameters(self.n or 10 * len(self.parameters))
 
     def _analyze(self, X: np.ndarray, y: np.ndarray) -> dict[str, Any]:
+        comp = Compressor(X)
+        X = comp.X
+
         X_cv = np.std(X, axis=0) / np.mean(X, axis=0)
         Y_cv = np.std(y, axis=0) / np.mean(y, axis=0)
-        cv_ratio = Y_cv / X_cv
-        for p, s in zip(self.parameters, cv_ratio):
-            self.logger.info(f"  {p.parameter.name}: {s:.5g}")
-        return {"cv_ratio": cv_ratio}
+        return {"cv_ratio": comp.expand(Y_cv / X_cv, 0.0)}
 
     def _extract_sensitivity_metric(self, analysis: dict[str, Any]) -> np.ndarray:
         return np.abs(analysis["cv_ratio"])
 
 
 class SALibAnalysis(SensitivityAnalysis):
+    """Sensitivity analysis based on SALib."""
+
     def __init__(
-        self, *sampler_args, max_workers: Optional[int] = None, **sampler_kwargs
+        self,
+        *sampler_args,
+        db_file: Optional[Union[str, Path]] = None,
+        distributed: Optional[bool] = None,
+        max_workers: Optional[int] = None,
+        **sampler_kwargs,
     ):
-        super().__init__(max_workers=max_workers)
+        """Initialize a SALib-based sensitivity analysis.
+
+        Args:
+            sampler_args: Positional arguments to pass to the SALib sampler.
+            db_file: The file to store the results in. If ``None``, a file with
+                the same name as the script will be created with the suffix
+                ".results.db".
+            distributed: Whether to run the experiment in distributed mode
+                using MPI. If ``None``, distributed mode is activated if variable
+                ``MPI4PY_FUTURES_MAX_WORKERS`` is present in the environment.
+            max_workers: The maximum number of workers to use. If ``None``, it will
+                be set to the number of available CPUs.
+            sampler_kwargs: Keyword arguments to pass to the SALib sampler.
+        """
+        super().__init__(
+            db_file=db_file, distributed=distributed, max_workers=max_workers
+        )
         self.sampler_args = sampler_args
         self.sampler_kwargs = sampler_kwargs
         self.problem = {}
@@ -230,16 +284,15 @@ class SALibAnalysis(SensitivityAnalysis):
         return self._sampler(self.problem, *self.sampler_args, **self.sampler_kwargs)
 
     def _analyze(self, X: np.ndarray, y: np.ndarray, **kwargs) -> dict[str, Any]:
-        analyis = self._analyzer(self.problem, y, **kwargs)
-        self.logger.info(analyis)
-        return analyis
+        return self._analyzer(self.problem, y, **kwargs)
 
     def _extract_sensitivity_metric(self, analysis):
         return analysis[self._metric_name]
 
 
 class Sobol(SALibAnalysis):
-    """Sobol’ Sensitivity Analysis
+    """Sobol’ Sensitivity Analysis, using :func:`SALib.sample.sobol.sample`
+    and :func:`SALib.analyze.sobol.analyze`.
 
     https://doi.org/10.1016/S0378-4754(00)00270-6
     https://doi.org/10.1016/S0010-4655(02)00280-1
@@ -252,7 +305,8 @@ class Sobol(SALibAnalysis):
 
 
 class Morris(SALibAnalysis):
-    """Method of Morris
+    """Method of Morris, using :func:`SALib.sample.morris.sample`
+    and :func:`SALib.analyze.morris.analyze`.
 
     https://doi.org/10.1080/00401706.1991.10484804
     https://doi.org/10.1016/j.envsoft.2006.10.004
@@ -262,6 +316,4 @@ class Morris(SALibAnalysis):
     _metric_name = "mu_star"
 
     def _analyze(self, X: np.ndarray, y: np.ndarray, **kwargs) -> dict[str, Any]:
-        analyis = SALib.analyze.morris.analyze(self.problem, X, y, **kwargs)
-        self.logger.info(analyis)
-        return analyis
+        return SALib.analyze.morris.analyze(self.problem, X, y, **kwargs)

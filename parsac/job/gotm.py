@@ -270,12 +270,17 @@ class Simulation(core.Runner):
     """A simulation with GOTM (General Ocean Turbulence Model).
 
     Call :meth:`get_parameter` to select a configurable
-    parameter from a YAML file. This parameter can subsequently be targeted in calibration
-    or sensitivity analysis. Call :meth:`request_comparison` to link a model output
-    to observations. This can subsequently contribute to the objective function
-    (likelihood) when performing optimization. Call :meth:`record_output` to record
-    additional model outputs. These can be used as additional diagnostics when
-    performing  optimization, or as targets in sensitivity analysis.
+    parameter from a YAML file. This parameter can subsequently be targeted in
+    optimization or sensitivity analysis.
+    
+    Call :meth:`request_comparison` to link a model output to observations.
+    This can subsequently contribute to the objective function (likelihood)
+    when performing optimization.
+    
+    Call :meth:`record_output` to record specific model outputs. These serve
+    as target metrics to assess the sensitivity of when performing sensitivity
+    analysis. When performing optimization, these outputs will be recorded as
+    diagnostics accompanying each evaluated parameter set.
     """
 
     def __init__(
@@ -394,9 +399,10 @@ class Simulation(core.Runner):
         output_file: Union[os.PathLike[str], str],
         output_expression: str,
         obs_file: Union[os.PathLike[str], str],
+        *,
+        obs_file_format: util.TextFormat = util.TextFormat.DEPTH_EXPLICIT,
         obs_variable: Optional[str] = None,
         obs_depth_variable: Optional[str] = None,
-        obs_file_format: util.TextFormat = util.TextFormat.DEPTH_EXPLICIT,
         spinupyears: int = 0,
         mindepth: float = -np.inf,
         maxdepth: float = np.inf,
@@ -405,14 +411,19 @@ class Simulation(core.Runner):
         Request comparison of model results and observations for a particular variable.
 
         Args:
-            output_file: path to the output file (relative to the setup directory)
+            output_file: path to the NetCDF output file
+                (relative to the setup directory)
             output_expression: expression to evaluate in the output file.
                 It should produce the model equivalent of the provided observations.
                 It can reference variables from the output file as well as numpy functions.
-            obs_file: path to the file with observations (relative to the current working directory)
-            obs_variable: variable name in the NetCDF file with observations
-            obs_depth_variable: name of depth variable in the NetCDF file with observations
+            obs_file: path to the file with observations
+                (relative to the current working directory)
             obs_file_format: format of the observations file
+                Used only if ``obs_file`` is a whitespace-separated text file.
+            obs_variable: variable name in the NetCDF file with observations
+                Used only if ``obs_file`` is a NetCDF file.
+            obs_depth_variable: name of depth variable in the NetCDF file with observations
+                Used only if ``obs_file`` is a NetCDF file.
             spinupyears: number of years to skip from the beginning of the simulation
                 when comparing model results to the observations
             mindepth: minimum depth of observations; shallower observations are ignored
