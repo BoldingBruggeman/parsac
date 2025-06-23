@@ -65,7 +65,7 @@ class OutputPlotter(core.Plotter):
         if zs is not None:
             previous["tz"] = self
 
-    def plot(self, ax: "matplotlib.axes.Axes") -> None:
+    def plot(self, ax: "matplotlib.axes.Axes", logger: logging.Logger) -> None:
         """Plot model output versus observations."""
         import matplotlib.colors
 

@@ -234,7 +234,7 @@ class Result:
 
                     artists.append(points)
 
-            iref = (self.generations==-1).nonzero()[0][0]
+            iref = (self.generations == -1).nonzero()[0][0]
             for ipar, (name, lbound, rbound, ax) in enumerate(
                 zip(self.parnames, lci, uci, axes)
             ):
@@ -308,7 +308,7 @@ class Result:
         self,
         target_dir: Union[str, os.PathLike[Any], None] = None,
         logger: Optional[logging.Logger] = None,
-    ) -> matplotlib.figure.Figure:
+    ) -> list[matplotlib.figure.Figure]:
         logger = logger or logging.getLogger(__name__)
 
         logger.info("Evaluating best parameter set...")
@@ -333,34 +333,41 @@ class Result:
             transform(best, name2output)
 
         logger.info("Building plots...")
-        name2plotter = _collect_plotters(name2output)
-        nprefix = len(os.path.commonprefix(list(name2plotter)))
-        nplots = len(name2plotter)
-        nrows = int(np.ceil(np.sqrt(nplots)))
-        ncols = int(np.ceil(float(nplots) / nrows))
-        fig = plt.figure()
-        id2ax: dict[int, matplotlib.axes.Axes] = {}
-        for i, (name, plotter) in enumerate(name2plotter.items()):
-            ax = fig.add_subplot(
-                nrows,
-                ncols,
-                i + 1,
-                sharex=id2ax.get(id(plotter.sharex)),
-                sharey=id2ax.get(id(plotter.sharey)),
-            )
-            plotter.plot(ax=ax)
-            ax.set_title(name[nprefix:], fontsize="medium")
-            id2ax[id(plotter)] = ax
-        return fig
+        figs: list[matplotlib.figure.Figure] = []
+        for category, name2plotter in _collect_plotters(name2output).items():
+            nprefix = len(os.path.commonprefix(list(name2plotter)))
+            nplots = len(name2plotter)
+            nrows = int(np.ceil(np.sqrt(nplots)))
+            ncols = int(np.ceil(float(nplots) / nrows))
+            fig = plt.figure()
+            id2ax: dict[int, matplotlib.axes.Axes] = {}
+            for i, (name, plotter) in enumerate(name2plotter.items()):
+                ax = fig.add_subplot(
+                    nrows,
+                    ncols,
+                    i + 1,
+                    sharex=id2ax.get(id(plotter.sharex)),
+                    sharey=id2ax.get(id(plotter.sharey)),
+                )
+                plotter.plot(ax, logger)
+                ax.set_title(name[nprefix:], fontsize="medium")
+                id2ax[id(plotter)] = ax
+            figs.append(fig)
+        return figs
 
 
-def _collect_plotters(name2output: Mapping[str, Any]) -> dict[str, core.Plotter]:
+def _collect_plotters(
+    name2output: Mapping[str, Any],
+) -> dict[str, dict[str, core.Plotter]]:
     """Collect plotters from the output."""
-    name2plotter = {}
+    category2name2plotter = {}
     for name, output in name2output.items():
         if isinstance(output, core.Plotter):
-            name2plotter[name.rsplit(":", 1)[0]] = output
-    return name2plotter
+            name, category = name.rsplit(":", 1)
+            if category not in category2name2plotter:
+                category2name2plotter[category] = {}
+            category2name2plotter[category][name] = output
+    return category2name2plotter
 
 
 if __name__ == "__main__":
