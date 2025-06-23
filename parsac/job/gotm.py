@@ -20,6 +20,7 @@ import netCDF4
 
 from .. import core
 from .. import util
+from .. import optimize
 
 if TYPE_CHECKING:
     import matplotlib.axes
@@ -33,7 +34,7 @@ class Output(NamedTuple):
     zs: Optional[np.ndarray] = None
 
 
-class OutputPlotter(core.Plotter):
+class OutputPlotter(optimize.ComparisonPlotter):
     """This class encapsulates the model output and observations necessary to
     produce a comparison plot for single variable. It also provides one method
     `plot` to plot the data in a matplotlib axes object.
@@ -196,7 +197,7 @@ class OutputExtractor:
                 values = wrappednc.eval(self.compiled_expression)
                 z = None if self.zs is None else self._get_z(wrappednc)
                 plotter = OutputPlotter(times, z, values, self.times, self.zs, previous)
-                name2output[self.name + core.Plotter.POSTFIX] = plotter
+                name2output[self.name + plotter.POSTFIX] = plotter
 
             values = self._interpolate(values, wrappednc)
 

@@ -265,12 +265,13 @@ class GaussianLikelihood(core.Transform):
         # Omitting constant terms in the log likelihood = -n*ln(2*pi)/2
         name2output[self.name] = (-np.log(sd) - diff2 / (2 * sd * sd)).sum()
 
-        if self.source + core.Plotter.POSTFIX in name2output:
-            plotter: core.Plotter = name2output[self.source + core.Plotter.POSTFIX]
-            plotter.obs_values = obs_vals_nontf
-            plotter.scale_factor = scale
-            plotter.logscale = self.logscale
-            plotter.sd = np.broadcast_to(sd, obs_vals.shape)
+        cmp_plot = name2output.get(self.source + ComparisonPlotter.POSTFIX)
+        if cmp_plot is not None:
+            assert isinstance(cmp_plot, ComparisonPlotter)
+            cmp_plot.obs_values = obs_vals_nontf
+            cmp_plot.scale_factor = scale
+            cmp_plot.logscale = self.logscale
+            cmp_plot.sd = np.broadcast_to(sd, obs_vals.shape)
 
             name2output[self.source + ":mvo"] = ModelVsObservationPlotter(
                 model_vals,
@@ -281,6 +282,17 @@ class GaussianLikelihood(core.Transform):
                 model_vals,
                 obs_vals,
             )
+
+
+class ComparisonPlotter(core.Plotter):
+    POSTFIX = ":cmp"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.obs_values: Optional[np.ndarray] = None
+        self.scale_factor = 1.0
+        self.sd: Optional[np.ndarray] = None
+        self.logscale = False
 
 
 class ModelVsObservationPlotter(core.Plotter):

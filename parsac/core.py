@@ -417,7 +417,7 @@ class Experiment:
         logger: Optional[logging.Logger] = None,
     ) -> None:
         """Initialize the experiment.
-        
+
         Args:
             db_file: The file to store the results in. If ``None``, a file with
                 the same name as the script will be created with the suffix
@@ -631,15 +631,9 @@ class Experiment:
 
 
 class Plotter:
-    POSTFIX = ":plotter"
-
     def __init__(
         self, sharex: Optional["Plotter"] = None, sharey: Optional["Plotter"] = None
     ):
-        self.obs_values: Optional[np.ndarray] = None
-        self.scale_factor = 1.0
-        self.sd: Optional[np.ndarray] = None
-        self.logscale = False
         self.sharex = sharex
         self.sharey = sharey
 
