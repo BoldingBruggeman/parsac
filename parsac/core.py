@@ -78,9 +78,10 @@ class Runner:
                 shutil.rmtree(work_dir)
             work_dir.mkdir(parents=True, exist_ok=False)
         else:
-            if self.temp_dir is not None:
-                Path(self.temp_dir).mkdir(parents=True, exist_ok=True)
-            work_dir = Path(tempfile.mkdtemp(prefix="parsac_", dir=self.temp_dir))
+            temp_dir = getattr(self, "temp_dir", getattr(self, "tempdir", None))
+            if temp_dir is not None:
+                Path(temp_dir).mkdir(parents=True, exist_ok=True)
+            work_dir = Path(tempfile.mkdtemp(prefix="parsac_", dir=temp_dir))
             atexit.register(shutil.rmtree, work_dir, True)
 
         self._final_work_dir = work_dir
@@ -642,5 +643,5 @@ class Plotter:
         self.sharex = sharex
         self.sharey = sharey
 
-    def plot(self, ax: "matplotlib.axes.Axes") -> None:
+    def plot(self, ax: "matplotlib.axes.Axes", logger: logging.Logger) -> None:
         raise NotImplementedError
