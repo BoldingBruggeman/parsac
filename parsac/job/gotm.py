@@ -267,44 +267,47 @@ class OutputExtractor:
 
 
 class Simulation(core.Runner):
+    """A simulation with GOTM (General Ocean Turbulence Model).
+
+    Call :meth:`get_parameter` to select a configurable
+    parameter from a YAML file. This parameter can subsequently be targeted in calibration
+    or sensitivity analysis. Call :meth:`request_comparison` to link a model output
+    to observations. This can subsequently contribute to the objective function
+    (likelihood) when performing optimization. Call :meth:`record_output` to record
+    additional model outputs. These can be used as additional diagnostics when
+    performing  optimization, or as targets in sensitivity analysis.
+    """
+
     def __init__(
         self,
         setup_dir: Union[os.PathLike[str], str],
+        *,
         executable: Union[os.PathLike[str], str] = "gotm",
         exclude_files: Iterable[str] = ("*.nc", "*.cache"),
         exclude_dirs: Iterable[str] = ("*",),
-        work_dir: Union[os.PathLike[str], str, None] = None,
-        logger: Optional[logging.Logger] = None,
         args: Iterable[str] = (),
+        **kwargs: Any,
     ):
         """
-        Set up a GOTM simulation.
-
-        Call `get_parameter` to select a configurable
-        parameter from a YAML file. This parameter can subsequently be targeted in calibration
-        or sensitivity analysis. Call `request_comparison` to link a model output
-        to observations. This can subsequently contribute to the objective function
-        (likelihood) in calibration. Call `record_output` to record additional
-        model outputs. These can be used as additional diagnostics in calibration
-        or as targets in sensitivity analysis.
-
         Args:
             setup_dir: path to the GOTM setup directory
             executable: path to the GOTM executable
-                (relative to the current working directory)
+                It can be an absolute path, a path relative to the current working
+                directory, or the name of the executable available via the ``PATH``
+                environment variable.
             exclude_files: patterns to exclude files from being copied to the
                 working directory
             exclude_dirs: patterns to exclude directories from being copied to
                 the working directory
-            logger: logger to use for diagnostic messages
             args: additional arguments to pass to the GOTM executable
+            kwargs: additional keyword arguments to pass to the parent class
+                :class:`parsac.core.Runner`.
         """
-        logging.basicConfig(level=logging.INFO)
         setup_dir = Path(setup_dir)
         if not setup_dir.is_dir():
             raise Exception(f"GOTM setup directory {setup_dir} does not exist.")
         self.setup_dir = setup_dir
-        super().__init__(f"gotm({setup_dir})")
+        super().__init__(f"gotm({setup_dir})", **kwargs)
         abs_exe = Path(executable).resolve()
         if abs_exe.is_file():
             executable = abs_exe
@@ -318,7 +321,6 @@ class Simulation(core.Runner):
         self.parameters: list[tuple[str, Path, str]] = []
         self.outputs: list[Output] = []
         self.output2extractor: dict[str, OutputExtractor] = {}
-        self.logger = logger or logging.getLogger(name=self.name)
         self.args = args
 
         for fn in args:
@@ -341,10 +343,27 @@ class Simulation(core.Runner):
         """
         Get a parameter from a YAML file.
 
+        The parameter is identified by the path to the YAML file
+        and the location of the variable in the file. This location is
+        a path-like string that uses slashes to separate
+        nested dictionaries, e.g. "a/b/c" for variable c in this file::
+            a:
+              b:
+                c: 42.0
+
+
         Args:
             file: path to the YAML file (relative to the setup directory)
-            variable_path: path to the variable in the YAML file
-            default: default value if the variable is not found
+            variable_path: location of the variable in the YAML file
+            default: default value if the variable is not found.
+                This must be specified for parameters that are not present
+                yet in the YAML file.
+
+        Returns:
+            A parameter object that can be used in optimization or sensitivity
+            analysis. The value that the parameter has in the YAML file (or
+            ``default``, if the parameter is not present) is  available as the
+            ``initial_value`` attribute of the parameter.
         """
         file = Path(file)
         original = self.setup_dir / file
@@ -493,18 +512,19 @@ class Simulation(core.Runner):
 
     def record_output(
         self, output_file: Union[os.PathLike[str], str], output_expression: str
-    ) -> core.Metric:
+    ):
         """
         Request an expression of output variables to be recorded.
 
+        In sensitivity analysis, this output will serve as one of the targets
+        to assess the sensitivity of. In optimization, it will serve
+        as additional metric recorded along with each model result.
+
         Args:
-            output_file: path to the output file (relative to the setup directory)
+            output_file: path to the NetCDF output file
+              (relative to the setup directory)
             output_expression: expression to evaluate in the output file.
                 It should return a scalar value.
-
-        Returns:
-            A metric object that can be used to refer the output when setting
-            up an optimization or sensitivity analysis.
         """
         output_file = Path(output_file)
         name = f"{self.name}:{output_file}:{output_expression}"
@@ -579,7 +599,8 @@ def read_profiles(
 
     Args:
         path: path to the GOTM profile file
-        column: column number to read (0-indexed)
+        column: column number to read.
+            This index is zero-based, so 0 means the first column.
     """
     dts = []
     values = []

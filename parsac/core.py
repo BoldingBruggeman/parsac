@@ -44,11 +44,13 @@ class Transform:
 
 
 class Runner:
-    def __init__(self, name: str):
+    def __init__(self, name: str, *, logger: Optional[logging.Logger] = None):
         self.name = name
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logger or logging.getLogger(name=self.name)
         self.transforms: list[Transform] = []
-        self.__last_work_dir: Optional[Path] = None
-        self.__final_work_dir: Optional[Path] = None
+        self._last_work_dir: Optional[Path] = None
+        self._final_work_dir: Optional[Path] = None
         self.temp_dir: Union[os.PathLike[Any], str, None] = None
 
     def __call__(self, name2value: Mapping[str, float]) -> Mapping[str, Any]:
@@ -158,7 +160,7 @@ class RunnerPool:
         root_work_dir = None if work_dir is None else Path(work_dir)
         runner_work_dir: Optional[Path] = None
         for r in self.runners:
-            if work_dir is not None:
+            if root_work_dir is not None:
                 runner_work_dir = root_work_dir / re.sub(r"[^\w()]", "_", r)
             future = self.executor.submit(
                 self._run, r, name2value, work_dir=runner_work_dir, **kwargs

@@ -15,21 +15,29 @@ from .. import core
 
 
 class SensitivityAnalysis(core.Experiment):
+    """A sensitivity analysis.
+
+    To configure the analysis, add parameters to include
+    by calling :meth:`~parsac.core.Experiment.add_parameter`,
+    and add jobs that calculate target metrics by calling
+    :meth:`add_job`. These target metrics should be
+    scalar outputs of the job. They are generally requested by
+    calling job-specific methods, such as
+    :meth:`parsac.job.gotm.Simulation.record_output`.
+    """
+
     def __init__(self, **kwargs) -> None:
-        """Set up a sensitivity analysis.
-
-        To configure the analysis, add parameters to include
-        by calling `add_parameter`, and add target metrics to
-        determine the sensitivity of by calling `add_target`.
-
+        """
         Args:
-            kwargs: Additional keyword arguments to passed to `core.Experiment`.
+            kwargs: Additional keyword arguments to passed to
+                :class:`~parsac.core.Experiment`.
         """
         super().__init__(**kwargs)
         self.targets: list[str] = []
 
     def add_job(self, runner: core.Runner) -> None:
-        """Add a metric to assess sensitivity of"""
+        """Add a job that takes parameter as input and produces scalar
+        outputs, suitable as target for sensitivity analysis."""
         if runner.name in self.runners:
             assert runner is self.runners[runner.name]
         self.runners[runner.name] = runner
@@ -38,7 +46,7 @@ class SensitivityAnalysis(core.Experiment):
         """Run the sensitivity analysis.
 
         Args:
-            **kwargs: Additional keyword arguments to pass to run_async.
+            **kwargs: Additional keyword arguments to pass to :func:`run_async`.
         """
         return asyncio.run(self.run_async(**kwargs))
 
@@ -51,7 +59,7 @@ class SensitivityAnalysis(core.Experiment):
 
         Args:
             work_dirs: A list of directories to use for each job, or a format string
-                that will be formatted with the index of the job. If None, temporary
+                that will be formatted with the index of the job. If ``None``, temporary
                 directories will be used for all jobs.
             **kwargs: Additional keyword arguments to pass to the analysis method.
         """
@@ -183,7 +191,7 @@ class MVR(SensitivityAnalysis):
 
 
 class CV(SensitivityAnalysis):
-    """Ratio of coefficient of variation, based on Monte Carlo sampling"""
+    """Ratio of coefficient of variation, based on Monte Carlo sampling."""
 
     def __init__(self, n: Optional[int] = None, **kwargs):
         super().__init__(**kwargs)

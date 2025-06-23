@@ -10,15 +10,18 @@ from . import desolver
 
 
 class Optimization(core.Experiment):
+    """An optimization experiment.
+
+    To configure the experiment, add parameters to calibrate
+    by calling :meth:`~parsac.core.Experiment.add_parameter`, and add
+    contributions to the objective function (log likelihood) by calling
+    :meth:`add_target`.
+    """
+
     def __init__(self, **kwargs) -> None:
-        """Set up an optimization experiment.
-
-        To configure the experiment, add parameters to calibrate
-        by calling `add_parameter`, and add contributions to the objective
-        function (likelihood) by calling `add_target`.
-
+        """
         Args:
-            kwargs: Additional keyword arguments to passed to `core.Experiment`.
+            kwargs: Additional keyword arguments to passed to :class:`~parsac.core.Experiment`.
         """
         super().__init__(**kwargs)
         self.total_lnl = TotalLikelihood(self.priors)
@@ -30,8 +33,9 @@ class Optimization(core.Experiment):
 
         Args:
             metric: The metric to add to the fitness function.
-                It is typically produced by a runner.
-            kwargs: Additional keyword arguments to pass to the likelihood function.
+                It is typically produced by a job from :mod:`parsac.job`.
+            kwargs: Additional keyword arguments to pass to the likelihood function
+                :class:`GaussianLikelihood`.
         """
         if metric.runner.name in self.runners:
             assert metric.runner is self.runners[metric.runner.name]
@@ -46,7 +50,7 @@ class Optimization(core.Experiment):
         """Run the optimization
 
         Args:
-            kwargs: Additional keyword arguments to pass to the solver.
+            kwargs: Additional keyword arguments to pass to :func:`desolver.solve`.
         """
         return asyncio.run(self.run_async(**kwargs))
 
@@ -118,25 +122,44 @@ class GaussianLikelihood(core.Transform):
         scale_factor: float = 1.0,
         estimate_sd: Optional[bool] = None,
     ):
-        """Set up a Gaussian likelihood function.
+        """Set up a Gaussian likelihood function
+        This typically contributes to the objective function in an optimization
+        experiment.
+
+        Observations are provided upon initialization, and the modelled values
+        are provided when the likelihood is called.
+
+        This function assumes that observations are normally distributed around
+        modelled values, with a standard deviation that can be either
+        provided or estimated from the model-observation differences.
+
+        It can also be used to represent observations that are _log_-normally
+        distributed around modelled values by setting argument `logscale` to
+        `True`. In that case both modelled and observed values are
+        log-transformed.
 
         Args:
-            source: The name of the output thta wil contain the model values.
+            source: The name of the output that will contain the model values.
             obs_vals: The observed values.
             sd: The standard deviation of the observed values.
+                If not provided, it will be estimated from the differences
+                betweeen modelled and observed values.
             logscale: Whether to log-transform modelled and observed values
                 before calculating the likelihood. This implies the distribution
                 of observations around the modelled values is log-normal.
             minimum: The minimum allowed value of the modelled and observed
                 values. Lower values will be clipped to this value. This argument
-                must be provided if logscale is True. It then must be greater than 0.0.
+                must be provided if logscale is True. It must then be greater than 0.0.
             estimate_scale_factor: Whether to estimate the scale factor with which
                 model values are multiplied before comparing to observations.
             min_scale_factor: Lower bound of the estimated scale factor.
             max_scale_factor: Upper bound of the estimated scale factor.
             scale_factor: Fixed scale factor, active only if estimate_scale_factor is False.
             estimate_sd: Whether to estimate the standard deviation of the observed values.
-                If None, the standard deviation is estimated if sd is not provided.
+                If ``None``, the standard deviation is estimated if sd is not provided.
+                If the observations do come with standard deviations, but you want to
+                ignore these and estimate the standard deviation from the
+                model-observation differences instead, set this argument to ``True``.
         """
         if logscale and (minimum is None or minimum <= 0.0):
             raise Exception(
