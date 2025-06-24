@@ -263,7 +263,8 @@ class _SALibAnalysis(SensitivityAnalysis):
         max_workers: Optional[int] = None,
         **sampler_kwargs,
     ):
-        """Args:
+        """
+        Args:
             sampler_args: Positional arguments to pass to the SALib sampler.
             db_file: The file to store the results in. If ``None``, a file with
                 the same name as the script will be created with the suffix
