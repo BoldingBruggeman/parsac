@@ -571,10 +571,11 @@ class Simulation(core.Runner):
 
         outputpath2nc: dict[Path, util.NcDict] = {}
         for output in self.outputs:
-            ncpath = work_dir / output.file
-            if not ncpath.is_file():
-                raise Exception(f"Output file {ncpath} was not created.")
-            outputpath2nc[output.file] = util.NcDict(ncpath)
+            if output.file not in outputpath2nc:
+                ncpath = work_dir / output.file
+                if not ncpath.is_file():
+                    raise Exception(f"Output file {ncpath} was not created.")
+                outputpath2nc[output.file] = util.NcDict(ncpath)
 
         results: dict[str, Optional[Union[float, np.ndarray]]] = {}
         previous_plotters: dict[str, OutputPlotter] = {}
