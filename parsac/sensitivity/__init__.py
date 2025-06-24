@@ -152,7 +152,7 @@ class MVR(SensitivityAnalysis):
         return self.sample_parameters(self.n or 10 * len(self.parameters))
 
     def _analyze(self, X: np.ndarray, y: np.ndarray) -> dict[str, Any]:
-        comp = Compressor(X)
+        comp = _Compressor(X)
         X = comp.X
 
         n, k = X.shape
@@ -212,7 +212,7 @@ class MVR(SensitivityAnalysis):
         return np.abs(analysis["beta"])
 
 
-class Compressor:
+class _Compressor:
     def __init__(self, X: np.ndarray):
         self.keep = X.min(axis=0) != X.max(axis=0)
         self.X = X[:, self.keep]
@@ -241,7 +241,7 @@ class CV(SensitivityAnalysis):
         return self.sample_parameters(self.n or 10 * len(self.parameters))
 
     def _analyze(self, X: np.ndarray, y: np.ndarray) -> dict[str, Any]:
-        comp = Compressor(X)
+        comp = _Compressor(X)
         X = comp.X
 
         X_cv = np.std(X, axis=0) / np.mean(X, axis=0)
@@ -252,7 +252,7 @@ class CV(SensitivityAnalysis):
         return np.abs(analysis["cv_ratio"])
 
 
-class SALibAnalysis(SensitivityAnalysis):
+class _SALibAnalysis(SensitivityAnalysis):
     """Sensitivity analysis based on SALib."""
 
     def __init__(
@@ -263,9 +263,7 @@ class SALibAnalysis(SensitivityAnalysis):
         max_workers: Optional[int] = None,
         **sampler_kwargs,
     ):
-        """Initialize a SALib-based sensitivity analysis.
-
-        Args:
+        """Args:
             sampler_args: Positional arguments to pass to the SALib sampler.
             db_file: The file to store the results in. If ``None``, a file with
                 the same name as the script will be created with the suffix
@@ -297,7 +295,7 @@ class SALibAnalysis(SensitivityAnalysis):
         return analysis[self._metric_name]
 
 
-class Sobol(SALibAnalysis):
+class Sobol(_SALibAnalysis):
     """Sobol’ Sensitivity Analysis, using :func:`SALib.sample.sobol.sample`
     and :func:`SALib.analyze.sobol.analyze`.
 
@@ -316,7 +314,7 @@ class Sobol(SALibAnalysis):
     _metric_name = "ST"
 
 
-class Morris(SALibAnalysis):
+class Morris(_SALibAnalysis):
     """Method of Morris, using :func:`SALib.sample.morris.sample`
     and :func:`SALib.analyze.morris.analyze`.
 
