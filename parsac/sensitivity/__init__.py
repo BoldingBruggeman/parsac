@@ -134,6 +134,14 @@ class MVR(SensitivityAnalysis):
     """Sensitivity analysis based on Monte Carlo sampling and linear
     regression, as described by `Saltelli et al.
     <https://doi.org/10.1002/9780470725184>`__ (section 1.2.5)
+
+    The sensitivity metric that is returned by default by
+    :meth:`~SensitivityAnalysis.run` and :meth:`~SensitivityAnalysis.run_async`
+    is the value of the standardized regression coefficients.
+    These can take negative values, indicating that the parameter
+    has an inverse relationship with the target metric.
+    When ranking parameters by their sensitivity, the absolute value
+    of the coefficients is used.
     """
 
     def __init__(self, n: Optional[int] = None, **kwargs):
@@ -293,9 +301,14 @@ class Sobol(SALibAnalysis):
     """Sobol’ Sensitivity Analysis, using :func:`SALib.sample.sobol.sample`
     and :func:`SALib.analyze.sobol.analyze`.
 
-    https://doi.org/10.1016/S0378-4754(00)00270-6
-    https://doi.org/10.1016/S0010-4655(02)00280-1
-    https://doi.org/10.1016/j.cpc.2009.09.018
+    The sensitivity metric that is returned by default by
+    :meth:`~SensitivityAnalysis.run` and :meth:`~SensitivityAnalysis.run_async`
+    is the total sensitivity (``ST``).
+
+    References:
+    `Sobol’ (2001) <https://doi.org/10.1016/S0378-4754(00)00270-6>`__;
+    `Saltelli (2002) <https://doi.org/10.1016/S0010-4655(02)00280-1>`__;
+    `Saltelli et al. (2010) <https://doi.org/10.1016/j.cpc.2009.09.018>`__
     """
 
     _sampler = staticmethod(SALib.sample.sobol.sample)
@@ -307,8 +320,14 @@ class Morris(SALibAnalysis):
     """Method of Morris, using :func:`SALib.sample.morris.sample`
     and :func:`SALib.analyze.morris.analyze`.
 
-    https://doi.org/10.1080/00401706.1991.10484804
-    https://doi.org/10.1016/j.envsoft.2006.10.004
+    The sensitivity metric that is returned by default by
+    :meth:`~SensitivityAnalysis.run` and :meth:`~SensitivityAnalysis.run_async`
+    is the mean of the distribution of the absolute values of the elementary
+    effects (``mu_star``).
+
+    References:
+    `Morris (1991) <https://doi.org/10.1080/00401706.1991.10484804>`__;
+    `Campolongo et al. (2007) <https://doi.org/10.1016/j.envsoft.2006.10.004>`__
     """
 
     _sampler = staticmethod(SALib.sample.morris.sample)

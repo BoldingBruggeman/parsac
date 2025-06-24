@@ -129,17 +129,17 @@ class GaussianLikelihood(core.Transform):
         This typically contributes to the objective function in an optimization
         experiment.
 
-        Observations are provided upon initialization, and the modelled values
-        are provided when the likelihood is called.
-
         This function assumes that observations are normally distributed around
         modelled values, with a standard deviation that can be either
         provided or estimated from the model-observation differences.
 
-        It can also be used to represent observations that are _log_-normally
-        distributed around modelled values by setting argument `logscale` to
-        `True`. In that case both modelled and observed values are
+        It can also be used to represent observations that are *log*-normally
+        distributed around modelled values by setting argument ``logscale`` to
+        ``True``. In that case both modelled and observed values are
         log-transformed.
+
+        Observations are provided upon initialization, and modelled values
+        are provided when the likelihood is called.
 
         Args:
             source: The name of the output that will contain the model values.
