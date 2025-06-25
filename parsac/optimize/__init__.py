@@ -88,7 +88,7 @@ class Optimization(core.Experiment):
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 self.logger.debug(f"Error evaluating parameters: {r}")
-            else:
+            elif not isinstance(r, BaseException):
                 lnls[i] = r["lnl"]
         return lnls
 
@@ -279,11 +279,11 @@ class GaussianLikelihood(core.Transform):
             cmp_plot.logscale = self.logscale
             cmp_plot.sd = np.broadcast_to(sd, obs_vals.shape)
 
-            name2output[self.source + ":mvo"] = ModelVsObservationPlotter(
+            name2output[self.source + ":Correlations"] = ModelVsObservationPlotter(
                 model_vals,
                 obs_vals,
             )
-            name2output[self.source + ":hist"] = HistogramPlotter(
+            name2output[self.source + ":Error histograms"] = HistogramPlotter(
                 self.source,
                 model_vals,
                 obs_vals,
@@ -291,7 +291,7 @@ class GaussianLikelihood(core.Transform):
 
 
 class ComparisonPlotter(core.Plotter):
-    POSTFIX = ":cmp"
+    POSTFIX = ":Comparisons"
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)

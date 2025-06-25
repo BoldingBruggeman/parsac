@@ -220,6 +220,7 @@ class Result:
                 curres = self.values[match, :]
                 lnl = self.lnls[match]
                 if plot_type != plot_type.MARGINAL:
+                    assert self.generations is not None
                     gen = self.generations[match]
                 logger.info(
                     f"  {run_id}: {match.sum()} points, best lnl = {lnl.max():.8g}."
@@ -234,7 +235,9 @@ class Result:
 
                     artists.append(points)
 
-            iref = (self.generations == -1).nonzero()[0][0]
+            iref: Optional[int] = None
+            if self.generations is not None:
+                iref = (self.generations == -1).nonzero()[0][0]
             for ipar, (name, lbound, rbound, ax) in enumerate(
                 zip(self.parnames, lci, uci, axes)
             ):
@@ -250,9 +253,10 @@ class Result:
                 plotci = ax.axhline if plot_type == PlotType.GENERATIONS else ax.axvline
                 line_cil = plotci(lbound, color="k", linestyle="--")
                 line_cir = plotci(rbound, color="k", linestyle="--")
+                artists.extend([line_cil, line_cir])
 
-                line_median = plotci(self.values[iref, ipar], color="r")
-                artists.extend([line_cil, line_cir, line_median])
+                if iref is not None:
+                    artists.append(plotci(self.values[iref, ipar], color="r"))
 
             if first_time:
                 if lnl_range is None:
@@ -339,7 +343,7 @@ class Result:
             nplots = len(name2plotter)
             nrows = int(np.ceil(np.sqrt(nplots)))
             ncols = int(np.ceil(float(nplots) / nrows))
-            fig = plt.figure()
+            fig = plt.figure(num=category)
             id2ax: dict[int, matplotlib.axes.Axes] = {}
             for i, (name, plotter) in enumerate(name2plotter.items()):
                 ax = fig.add_subplot(
@@ -360,7 +364,7 @@ def _collect_plotters(
     name2output: Mapping[str, Any],
 ) -> dict[str, dict[str, core.Plotter]]:
     """Collect plotters from the output."""
-    category2name2plotter = {}
+    category2name2plotter: dict[str, dict[str, core.Plotter]] = {}
     for name, output in name2output.items():
         if isinstance(output, core.Plotter):
             name, category = name.rsplit(":", 1)
@@ -380,12 +384,14 @@ if __name__ == "__main__":
         help=(
             "Target directory to create setups (worker configurations) of best parameter"
             " set in. If not provided a temporary directory will be used."
+            " This can only be used in combination with --best."
         ),
     )
     parser.add_argument(
         "--marg",
         action="store_true",
-        help="Plot marginal likelihood rather than generations",
+        help=("Plot marginal likelihood (x: parameter value, y: ln likelihood) "
+         " rather than generations (x: generation, y: parameter value)."),
     )
     parser.add_argument(
         "--range", type=float, default=None, help="Likelihood range for marginal plot"
@@ -407,9 +413,9 @@ if __name__ == "__main__":
     args.marg |= result.generations is None
     plot_type = PlotType.MARGINAL if args.marg else PlotType.GENERATIONS
     if args.best:
-        fig = result.plot_best(target_dir=args.target_dir, logger=logger)
+        result.plot_best(target_dir=args.target_dir, logger=logger)
     else:
-        fig = result.plot(
+        result.plot(
             keep_updating=True, plot_type=plot_type, lnl_range=args.range, logger=logger
         )
 

@@ -95,6 +95,7 @@ class SensitivityAnalysis(core.Experiment):
         results = await self.batch_eval(X, work_dirs)
         Y = np.empty((X.shape[0], len(self.targets)))
         for i, r in enumerate(results):
+            assert not isinstance(r, BaseException)
             Y[i, :] = [r[n] for n in self.targets]
         self.stop()
 
