@@ -152,16 +152,18 @@ class GaussianLikelihood(core.Transform):
                 of observations around the modelled values is log-normal.
             minimum: The minimum allowed value of the modelled and observed
                 values. Lower values will be clipped to this value. This argument
-                must be provided if logscale is True. It must then be greater than 0.0.
+                must be provided if ``logscale`` is ``True``. It must then be
+                greater than 0.0.
             estimate_scale_factor: Whether to estimate the scale factor with which
                 model values are multiplied before comparing to observations.
             min_scale_factor: Lower bound of the estimated scale factor.
             max_scale_factor: Upper bound of the estimated scale factor.
-            scale_factor: Fixed scale factor, active only if estimate_scale_factor is False.
+            scale_factor: Fixed scale factor, active only if ``estimate_scale_factor``
+                is ``False``.
             estimate_sd: Whether to estimate the standard deviation of the observed values.
-                If ``None``, the standard deviation is estimated if sd is not provided.
-                If the observations do come with standard deviations, but you want to
-                ignore these and estimate the standard deviation from the
+                If ``None`` (the default), the standard deviation is estimated if ``sd``
+                is not provided. If the observations do come with standard deviations,
+                but you want to ignore these and estimate the standard deviation from
                 model-observation differences instead, set this argument to ``True``.
         """
         if logscale and (minimum is None or minimum <= 0.0):
@@ -181,6 +183,10 @@ class GaussianLikelihood(core.Transform):
         if not estimate_sd:
             assert sd is not None
             self.sd = np.asarray(sd, dtype=float)
+            if not np.isfinite(self.sd).all():
+                raise Exception(
+                    f"{self.source}: standard deviations contain non-finite values."
+                )
             if (self.sd <= 0).any():
                 raise Exception(f"{self.source}: standard deviation must be positive.")
             np.broadcast_shapes(self.sd.shape, self.obs_vals.shape)
