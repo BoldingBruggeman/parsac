@@ -153,8 +153,8 @@ class RunnerPool:
 
         Args:
             name2value: The parameter values to use for the runners.
-            work_dir: The directory to use for the runners. If None, a temporary
-                directory will be created for each runner. If not None, it will
+            work_dir: The directory to use for the runners. If ``None``, a temporary
+                directory will be created for each runner. If not ``None``, it will
                 be created only if one or more runners require a work directory.
             **kwargs: Additional keyword arguments to pass to the runners."""
         futures = []
@@ -583,8 +583,9 @@ class Experiment:
         """Evaluate the runners with the given parameter values
 
         Args:
-            values: The parameter values to evaluate.
-            kwargs: extra arguments to pass to RunnerPool
+            values: The parameter values to evaluate. This can be a dictionary
+                mapping parameter names to values or a sequence of parameter values.
+            kwargs: extra arguments to pass to :meth:`RunnerPool.__call__`.
 
         Returns:
             A dictionary with the combined output of all runners.
@@ -605,8 +606,25 @@ class Experiment:
         self,
         values: Sequence[Union[Mapping[str, float], Sequence[float]]],
         work_dirs: Optional[Iterable[Union[os.PathLike[Any], str, None]]] = None,
-        return_exceptions: bool = False,
+        return_exceptions: bool = False, **kwargs
     ) -> list[Union[Mapping[str, Any], BaseException]]:
+        """Evaluate multiple parameter sets in parallel.
+
+        Args:
+            values: A sequence of parameter sets to evaluate. Each set can be a
+                dictionary mapping parameter names to values or a sequence of
+                parameter values.
+            work_dirs: Optional sequence of work directories for each evaluated
+                parameter set. If not provided, temporary directories will be used.
+            return_exceptions: If ``True``, exceptions will be returned as part of
+                the result list instead of raising them.
+            kwargs: Extra arguments to pass to :meth:`RunnerPool.__call__`.
+
+        Returns:
+            A list of results, where each result is either a dictionary with the
+            output of the runners for that parameter set, or an exception if
+            ``return_exceptions`` is ``True`` and an error occurred during evaluation.
+        """
         assert self.pool is not None
         progress = tqdm.tqdm(
             total=len(values),
@@ -619,7 +637,7 @@ class Experiment:
 
         tasks = []
         for v, wd in zip(values, work_dirs):
-            task = asyncio.create_task(self.async_eval(v, work_dir=wd))
+            task = asyncio.create_task(self.async_eval(v, work_dir=wd, **kwargs))
             task.add_done_callback(lambda f: progress.update())
             tasks.append(task)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
