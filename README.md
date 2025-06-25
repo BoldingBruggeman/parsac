@@ -64,7 +64,7 @@ Examples of advanced use are available from [the wiki](https://github.com/Boldin
 
 ### On HPC clusters
 
-Parsac uses MPI for communication, which it accesse via [mpi4py](https://mpi4py.readthedocs.io/en/stable/). Therefore, mpi4py needs to be installed in your conda environment. If your system has MPI libraries installed,
+Parsac uses MPI for communication, which it accesses via [mpi4py](https://mpi4py.readthedocs.io/en/stable/). Therefore, mpi4py needs to be installed in your conda environment. If your system has MPI libraries installed,
 then you'll want to install mpi4py with:
 
 ```

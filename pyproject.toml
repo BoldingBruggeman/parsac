@@ -20,7 +20,8 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/BoldingBruggeman/parsac"
+homepage = "https://github.com/BoldingBruggeman/parsac"
+documentation = "https://parsac.readthedocs.io/"
 
 [tool.hatch.build.targets.sdist]
 only-include = ["parsac"]
