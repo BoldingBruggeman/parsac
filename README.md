@@ -9,22 +9,36 @@ that use YAML-based configuration files and that write their output to NetCDF.
 
 ## Installation
 
-From the top-level directory of this repository:
+The latest release using [conda](https://docs.conda.io/):
+
+```
+conda install conda-forge::parsac
+```
+
+The latest release using [pip](https://docs.python.org/3/installing/index.html):
+
+```
+python -m pip install parsac
+```
+
+The current development version from this repository:
 
 ```
 conda env create -f environment.yml
 conda activate parsac
-pip install .
+python -m pip install .
 ```
 
-### Updating to the latest version
+If you install the development version, you can update later with:
 
 ```
 git pull
-pip install .
+python -m pip install .
 ```
 
 ## Usage
+
+Reference documentation is available at https://parsac.readthedocs.io/
 
 Examples are included in the `examples` subdirectory.
 Those using the General Ocean Turbulence Model (GOTM) are designed
@@ -38,12 +52,15 @@ python -m parsac.optimize.plot <DBFILE>
 
 Here, `<DBFILE>` is the result database created by the optimization.
 By default, it has the name of the run script, with `.results.db` appended instead of `.py`.
+Run with `-h` to see all supported command line options.
 
 To write the full set of results to a tab-separated text file, you can use the following:
 
 ```
 python -m parsac.record <DBFILE> --dump <OUTFILE>
 ```
+
+Examples of advanced use are available from [the wiki](https://github.com/BoldingBruggeman/parsac/wiki/Recipes-for-v2).
 
 ### On HPC clusters
 
