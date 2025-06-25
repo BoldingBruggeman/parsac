@@ -153,9 +153,9 @@ class RunnerPool:
 
         Args:
             name2value: The parameter values to use for the runners.
-            work_dir: The directory to use for the runners. If ``None``, a temporary
-                directory will be created for each runner. If not ``None``, it will
-                be created only if one or more runners require a work directory.
+            work_dir: The directory to use for the runners. If not provided,
+                a temporary directory will be used. Note that the directory will
+                be created only if one or more runners need a work directory.
             **kwargs: Additional keyword arguments to pass to the runners."""
         futures = []
         root_work_dir = None if work_dir is None else Path(work_dir)
@@ -464,7 +464,7 @@ class Experiment:
     def sample_parameters(
         self, n: int
     ) -> np.ndarray[tuple[int, int], np.dtype[np.float64]]:
-        """Sample n parameter sets from the parameter distributions."""
+        """Sample ``n`` parameter sets from the parameter distributions."""
         sample = np.empty((n, len(self.parameters)), dtype=float)
         for i, p in enumerate(self.parameters):
             sample[:, i] = p.fwt(p.dist.rvs(n, random_state=self.rng))
