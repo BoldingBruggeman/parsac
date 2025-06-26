@@ -416,7 +416,8 @@ class Simulation(core.Runner):
                 (relative to the setup directory)
             output_expression: expression to evaluate in the output file.
                 It should produce the model equivalent of the provided observations.
-                It can reference variables from the output file as well as numpy functions.
+                It can reference variables from the output file as well as
+                :mod:`numpy` functions.
             obs_file: path to the file with observations
                 (relative to the current working directory)
             obs_file_format: format of the observations file
