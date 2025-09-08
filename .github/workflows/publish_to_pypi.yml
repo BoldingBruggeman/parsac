@@ -12,7 +12,7 @@ jobs:
       with:
         fetch-depth: 0  # for version detection by hatch-vcs/setuptools_scm
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
     - name: Install build
       run: pip install build
     - name: Build a binary wheel and a source tarball
