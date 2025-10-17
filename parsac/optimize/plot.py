@@ -312,11 +312,13 @@ class Result:
         self,
         target_dir: Union[str, os.PathLike[Any], None] = None,
         logger: Optional[logging.Logger] = None,
+        rank: int = 1,
     ) -> list[matplotlib.figure.Figure]:
         logger = logger or logging.getLogger(__name__)
 
-        logger.info("Evaluating best parameter set...")
-        best = {n: float(v) for n, v in zip(self.parnames, self.best)}
+        best_values = self.values[-rank]
+        logger.info(f"Evaluating parameter set at position {rank} (1=best)...")
+        best = {n: float(v) for n, v in zip(self.parnames, best_values)}
         for n, v in best.items():
             logger.info(f"  {n}: {v:.6g}")
 
@@ -404,6 +406,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "db_file", help="SQLite database file with optimization results"
     )
+    parser.add_argument(
+        "-r", "--rank", type=int, default=1, help="Rank of the parameter set to evaluate (1=best)"
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -413,7 +418,7 @@ if __name__ == "__main__":
     args.marg |= result.generations is None
     plot_type = PlotType.MARGINAL if args.marg else PlotType.GENERATIONS
     if args.best:
-        result.plot_best(target_dir=args.target_dir, logger=logger)
+        result.plot_best(target_dir=args.target_dir, logger=logger, rank=args.rank)
     else:
         result.plot(
             keep_updating=True, plot_type=plot_type, lnl_range=args.range, logger=logger
