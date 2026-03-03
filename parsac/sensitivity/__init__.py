@@ -47,7 +47,7 @@ class SensitivityAnalysis(core.Experiment):
         """Run the sensitivity analysis.
 
         Args:
-            **kwargs: Additional keyword arguments to pass to :func:`run_async`.
+            **kwargs: Additional keyword arguments to pass to :meth:`run_async`.
         """
         return asyncio.run(self.run_async(**kwargs))
 
