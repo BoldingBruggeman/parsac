@@ -606,7 +606,8 @@ class Experiment:
         self,
         values: Sequence[Union[Mapping[str, float], Sequence[float]]],
         work_dirs: Optional[Iterable[Union[os.PathLike[Any], str, None]]] = None,
-        return_exceptions: bool = False, **kwargs
+        return_exceptions: bool = False,
+        **kwargs,
     ) -> list[Union[Mapping[str, Any], BaseException]]:
         """Evaluate multiple parameter sets in parallel.
 
@@ -634,6 +635,9 @@ class Experiment:
         )
         if work_dirs is None:
             work_dirs = [None] * len(values)
+        assert len(values) == len(
+            work_dirs
+        ), "Length of values and work_dirs must match."
 
         tasks = []
         for v, wd in zip(values, work_dirs):
@@ -657,3 +661,48 @@ class Plotter:
 
     def plot(self, ax: "matplotlib.axes.Axes", logger: logging.Logger) -> None:
         raise NotImplementedError
+
+
+class Ensemble(Experiment):
+    """Ensemble simulation"""
+
+    def __init__(self, **kwargs) -> None:
+        """
+        Args:
+            kwargs: Additional keyword arguments to passed to
+                :class:`~parsac.core.Experiment`.
+        """
+        super().__init__(**kwargs)
+
+    def add_job(self, runner: Runner) -> None:
+        """Add a job that takes parameters as input."""
+        if runner.name in self.runners:
+            assert runner is self.runners[runner.name]
+        self.runners[runner.name] = runner
+
+    async def run_async(
+        self,
+        values: Sequence[Union[Mapping[str, float], Sequence[float]]],
+        work_dirs: Iterable[Union[os.PathLike[Any], str]],
+    ):
+        """Run the ensemble asynchronously.
+
+        Args:
+            values: A sequence of parameter sets to evaluate. Each set can be a
+                dictionary mapping parameter names to values or a sequence of
+                parameter values.
+            work_dirs: A sequence of work directories for each evaluated
+                parameter set. The length of this sequence must match the length
+                of ``values``.
+        """
+        await self.start(record=False)
+        await self.batch_eval(values, work_dirs)
+        self.stop()
+
+    def run(self, *args, **kwargs):
+        """Run the ensemble.
+
+        Args:
+            *args: Positional arguments to pass to :meth:`run_async`.
+            **kwargs: Keyword arguments to pass to :meth:`run_async`."""
+        return asyncio.run(self.run_async(*args, **kwargs))
