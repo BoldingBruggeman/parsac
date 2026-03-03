@@ -48,3 +48,7 @@ jobs:
         run: |
           cd examples
           python sensitivity_gotm.py
+      - name: Test ensemble run
+        run: |
+          cd examples
+          python ensemble_gotm.py
