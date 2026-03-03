@@ -514,6 +514,7 @@ class Simulation(core.Runner):
                 logger=self.logger,
             )
 
+            self.parsed_yaml.clear()
             for _, file, _ in self.parameters:
                 if file not in self.parsed_yaml:
                     local_file = work_dir / file
