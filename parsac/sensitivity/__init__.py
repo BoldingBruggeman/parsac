@@ -62,7 +62,7 @@ class SensitivityAnalysis(core.Experiment):
         Args:
             work_dirs: A list of directories to use to store setups and results per
                 parameter set, or a format string with a single placeholder that incorporates
-                the parameter set index ``i``, for instance, ``workdirs="{i:03}"`` to place results
+                the parameter set index ``i``, for instance, ``work_dirs="{i:03}"`` to place results
                 in directories ``000``, ``001``, ... If this argument is not provided, temporary
                 directories will be used to store results while evaluating the parameter sets.
             return_details: If ``True``, return a dictionary with all results from the analysis.
@@ -76,7 +76,11 @@ class SensitivityAnalysis(core.Experiment):
         """
         if not self.parameters:
             raise Exception("No parameters have been added")
+
+        if work_dirs is not None:
+            self.row_metadata["work_dir"] = ""
         self.targets.extend(await self.start(record=False))
+        self.row_metadata.pop("work_dir", None)
         if not self.targets:
             raise Exception("No targets have been added to any job")
 
@@ -85,13 +89,6 @@ class SensitivityAnalysis(core.Experiment):
 
         # Run
         self.logger.info(f"Evaluating targets for {X.shape[0]} parameter sets")
-        if isinstance(work_dirs, str):
-            work_dirs = [work_dirs.format(i=i) for i in range(X.shape[0])]
-            if len(set(work_dirs)) != len(work_dirs):
-                raise Exception(
-                    "The work_dirs format string must produce unique directories"
-                    " for each member i, for instance with '{i:03}'."
-                )
         results = await self.batch_eval(X, work_dirs)
         Y = np.empty((X.shape[0], len(self.targets)))
         for i, r in enumerate(results):

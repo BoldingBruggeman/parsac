@@ -595,7 +595,7 @@ class Experiment:
         )
         assert self.pool is not None
         self.logger.debug(f"Running parameter set {name2value}.")
-        with self.recorder.record(**name2value, **self.row_metadata) as r:
+        with self.recorder.record(**name2value, **self.row_metadata, **kwargs) as r:
             name2output = await self.pool(name2value, **kwargs)
             for transform in self.global_transforms:
                 transform(name2value, name2output)
@@ -605,7 +605,7 @@ class Experiment:
     async def batch_eval(
         self,
         values: Sequence[Union[Mapping[str, float], Sequence[float]]],
-        work_dirs: Optional[Iterable[Union[os.PathLike[Any], str, None]]] = None,
+        work_dirs: Union[Iterable[Union[os.PathLike[Any], str]], str, None] = None,
         return_exceptions: bool = False,
         **kwargs,
     ) -> list[Union[Mapping[str, Any], BaseException]]:
@@ -616,7 +616,12 @@ class Experiment:
                 dictionary mapping parameter names to values or a sequence of
                 parameter values.
             work_dirs: Optional sequence of work directories for each evaluated
-                parameter set. If not provided, temporary directories will be used.
+                parameter set, or a format string with a single placeholder that
+                incorporates the parameter set index ``i``, for instance,
+                ``work_dirs="{i:03}"`` to place results in directories ``000``,
+                ``001``, ... If this argument is not provided, temporary
+                directories will be used to store results while evaluating
+                the parameter sets.
             return_exceptions: If ``True``, exceptions will be returned as part of
                 the result list instead of raising them.
             kwargs: Extra arguments to pass to :meth:`RunnerPool.__call__`.
@@ -635,13 +640,22 @@ class Experiment:
         )
         if work_dirs is None:
             work_dirs = [None] * len(values)
+        elif isinstance(work_dirs, str):
+            work_dirs = [work_dirs.format(i=i) for i in range(len(values))]
+            if len(set(work_dirs)) != len(work_dirs):
+                raise Exception(
+                    "The work_dirs format string must produce unique directories"
+                    " for each member i, for instance with '{i:03}'."
+                )
         assert len(values) == len(
             work_dirs
         ), "Length of values and work_dirs must match."
 
         tasks = []
         for v, wd in zip(values, work_dirs):
-            task = asyncio.create_task(self.async_eval(v, work_dir=wd, **kwargs))
+            if wd is not None:
+                kwargs["work_dir"] = wd
+            task = asyncio.create_task(self.async_eval(v, **kwargs))
             task.add_done_callback(lambda f: progress.update())
             tasks.append(task)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
@@ -695,7 +709,9 @@ class Ensemble(Experiment):
                 parameter set. The length of this sequence must match the length
                 of ``values``.
         """
+        self.row_metadata["work_dir"] = ""
         await self.start(record=False)
+        del self.row_metadata["work_dir"]
         await self.batch_eval(values, work_dirs)
         self.stop()
 
