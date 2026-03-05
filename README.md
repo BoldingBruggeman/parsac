@@ -113,7 +113,7 @@ Each line must contain:
 * the observed value
 * _optional:_ the standard deviation of the observation. This will be interpreted as the combination of measurement and model error.
 
-The format of the observations is specified when you call `parsac.job.gotm.Simulation.request_comparison`
+You specify the format of the observations with the `obs_file_format` argument when you call [`parsac.job.gotm.Simulation.request_comparison`](https://parsac.readthedocs.io/en/latest/api/parsac.job.gotm.html#parsac.job.gotm.Simulation.request_comparison)
 in your run script:
-`parsac.util.TextFormat.DEPTH_INDEPENDENT` specifies depth-independent observations,
-`parsac.util.TextFormat.DEPTH_DEPENDENT` specifies depth-independent observations.
+* [`parsac.util.TextFormat.DEPTH_INDEPENDENT`](https://parsac.readthedocs.io/en/latest/api/parsac.util.html#parsac.util.TextFormat.DEPTH_INDEPENDENT) specifies depth-independent observations
+* [`parsac.util.TextFormat.DEPTH_EXPLICIT`](https://parsac.readthedocs.io/en/latest/api/parsac.util.html#parsac.util.TextFormat.DEPTH_EXPLICIT) specifies depth-dependent observations
