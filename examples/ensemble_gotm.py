@@ -1,3 +1,14 @@
+# This example shows how to run an ensemble of GOTM simulations with
+# manually selected parameter values. It only uses parsac to set
+# parameter values and run simulations in parallel, but it does
+# not use parsac's functionality for sensitivity analysis or optimization.
+#
+# The parameter combinations tried, along with the directories where
+# the simulations were run, are logged in a SQLite database that can be
+# queried later for analysis. To do so, you can dump the database to a text
+# file with the following command:
+# python -m parsac.record ensemble_gotm.results.db --dump ensemble_gotm.txt
+
 import parsac.job.gotm
 
 if __name__ == "__main__":
@@ -25,7 +36,7 @@ if __name__ == "__main__":
 
     ensemble_members = []
     work_dirs = []
-    for k_min in [1e-7, 1e-6, 1e-5]:
+    for k_min in [1e-7, 1e-6 , 1e-5]:
         for u10_scale in [0.8, 1.0, 1.2]:
             for v10_scale in [0.8, 1.0, 1.2]:
                 work_dirs.append(f"member{len(ensemble_members):03}")
