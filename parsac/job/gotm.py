@@ -450,7 +450,7 @@ class Simulation(core.Runner):
         if obs_file.suffix == ".nc":
             if obs_variable is None:
                 raise Exception(
-                    "variable argument must be provided since {obs_file} is a NetCDF file."
+                    f"variable argument must be provided since {obs_file} is a NetCDF file."
                 )
             times, zs, values = util.readVariableFromNcFile(
                 obs_file,

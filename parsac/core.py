@@ -316,7 +316,7 @@ class Parameter:
                 if dep.name not in name2value:
                     dep.update(name2value)
             self.calculator.update(name2value)
-            assert self.name in name2value, "Calculator did not set {self.name}."
+            assert self.name in name2value, f"Calculator did not set {self.name}."
         self.status = 1
 
         for d in self.dependents:
