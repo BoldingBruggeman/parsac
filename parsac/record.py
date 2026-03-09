@@ -135,8 +135,8 @@ class Recorder:
         return [info[1] for info in cursor]
 
     def rows(self, where: str = "") -> Iterable[Sequence[Any]]:
-        assert self.conn is not None
         """Iterate over the rows of the results table."""
+        assert self.conn is not None
         cursor = self.conn.execute(f"SELECT * FROM results {where}")
         for row in cursor:
             yield row
