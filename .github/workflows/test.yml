@@ -17,7 +17,7 @@ jobs:
           shell: bash -el {0}
       steps:
       - name: Clone
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: conda-incubator/setup-miniconda@v3
@@ -28,7 +28,7 @@ jobs:
           activate-environment: parsac
       - run: pip install -v .
       - run: python -c "import parsac; print(parsac.__version__)"
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: 'gotm-model/code'
           ref: 'v6.0'
